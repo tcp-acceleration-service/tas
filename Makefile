@@ -14,7 +14,7 @@ LIBS_DPDK+= $(addprefix -lrte_pmd_,$(DPDK_PMDS))
 LIBS_DPDK+= -lrte_eal -lrte_mempool -lrte_mempool_ring \
 	    -lrte_hash -lrte_ring -lrte_kvargs -lrte_ethdev \
 	    -lrte_mbuf -lnuma -lrte_bus_pci -lrte_pci \
-	    -Wl,--no-whole-archive -ldl
+	    -Wl,--no-whole-archive -ldl $(EXTRA_LIBS_DPDK)
 
 LDLIBS += -lm -lpthread -lrt -ldl
 
