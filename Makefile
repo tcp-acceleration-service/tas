@@ -1,3 +1,5 @@
+-include Makefile.local
+
 HOSTNAME = $(shell hostname)
 CFLAGS = -std=gnu99 -O3 -g -Wall -Werror -I. -Iinclude/ -march=native -fno-omit-frame-pointer
 LDFLAGS = -pthread -g
