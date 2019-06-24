@@ -691,7 +691,7 @@ failed:
 
 static inline int parse_arg_append(char *s, struct configuration *c)
 {
-  void *new;
+  char **new;
 
   if ((new = realloc(c->dpdk_argv, sizeof(char *) * (c->dpdk_argc + 2)))
       == NULL)
@@ -700,7 +700,8 @@ static inline int parse_arg_append(char *s, struct configuration *c)
     return -1;
   }
 
-  c->dpdk_argv[c->dpdk_argc++] = strdup(s);
+  new[c->dpdk_argc++] = strdup(s);
+  c->dpdk_argv = new;
 
   return 0;
 }
