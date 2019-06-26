@@ -351,8 +351,8 @@ static int reta_setup()
 
   /* allocate RSS redirection table and core-bucket count table */
   rss_reta_size = eth_devinfo.reta_size;
-  rss_reta = rte_calloc("rss reta", (rss_reta_size / RTE_RETA_GROUP_SIZE),
-      sizeof(*rss_reta), 0);
+  rss_reta = rte_calloc("rss reta", ((rss_reta_size + RTE_RETA_GROUP_SIZE - 1) /
+        RTE_RETA_GROUP_SIZE), sizeof(*rss_reta), 0);
   rss_core_buckets = rte_calloc("rss core buckets", fp_cores_max,
       sizeof(*rss_core_buckets), 0);
 
