@@ -83,6 +83,7 @@ static uint16_t *rss_core_buckets = NULL;
 
 static struct rte_mempool *mempool_alloc(void);
 static int reta_setup(void);
+static int reta_mlx5_resize(void);
 
 int network_init(unsigned n_threads)
 {
@@ -119,6 +120,11 @@ int network_init(unsigned n_threads)
   rte_eth_macaddr_get(net_port_id, &eth_addr);
   rte_eth_dev_info_get(net_port_id, &eth_devinfo);
   eth_devinfo.default_txconf.txq_flags = ETH_TXQ_FLAGS_NOVLANOFFL;
+
+  /* workaround for mlx5. */
+  if (reta_mlx5_resize() != 0) {
+    goto error_exit;
+  }
 
 
   return 0;
@@ -381,4 +387,27 @@ error_exit:
   rte_free(rss_core_buckets);
   rte_free(rss_reta);
   return -1;
+}
+
+/* The mlx5 driver by default picks reta size = number of queues. Which is not
+ * enough for scaling up and down with balanced load. But when updating the reta
+ * with a larger size, the mlx5 driver resizes the reta.
+ */
+static int reta_mlx5_resize(void)
+{
+  if (!strcmp(eth_devinfo.driver_name, "net_mlx5")) {
+    /* for mlx5 we can increase the size with a call to
+     * rte_eth_dev_rss_reta_update with the target size, so just up the
+     * reta_sizeo in devinfo so that the reta_setup() call increases it.
+     */
+    eth_devinfo.reta_size = 512;
+  }
+
+  /* warn if reta is too small */
+  if (eth_devinfo.reta_size < 128) {
+    fprintf(stderr, "net: RSS redirection table is small (%u), this results in"
+        " bad load balancing when scaling down\n", eth_devinfo.reta_size);
+  }
+
+  return 0;
 }

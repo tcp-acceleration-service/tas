@@ -1187,6 +1187,13 @@ static inline void tcp_checksums(struct network_buf_handle *nbh,
 #endif
 }
 
+void fast_flows_kernelxsums(struct network_buf_handle *nbh,
+    struct pkt_tcp *p)
+{
+  tcp_checksums(nbh, p, p->ip.src, p->ip.dest,
+      f_beui16(p->ip.len) - sizeof(p->ip));
+}
+
 static inline uint32_t flow_hash(struct flow_key *k)
 {
   return crc32c_sse42_u32(k->local_port.x | (((uint32_t) k->remote_port.x) << 16),

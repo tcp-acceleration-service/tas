@@ -172,7 +172,5 @@ static inline void inject_tcp_ts(void *buf, uint16_t len, uint32_t ts,
 
   opts.ts->ts_val = t_beui32(ts);
 
-  p->ip.chksum = 0;
-  p->tcp.chksum = tx_xsum_enable(nbh, &p->ip, p->ip.src, p->ip.dest,
-      f_beui16(p->ip.len) - sizeof(p->ip));
+  fast_flows_kernelxsums(nbh, p);
 }

@@ -67,6 +67,8 @@ void fast_flows_packet_parse(struct dataplane_context *ctx,
     uint16_t n);
 void fast_flows_packet_pfbufs(struct dataplane_context *ctx,
     void **fss, uint16_t n);
+void fast_flows_kernelxsums(struct network_buf_handle *nbh,
+    struct pkt_tcp *p);
 
 int fast_flows_bump(struct dataplane_context *ctx, uint32_t flow_id,
     uint16_t bump_seq, uint32_t rx_tail, uint32_t tx_head, uint8_t flags,
