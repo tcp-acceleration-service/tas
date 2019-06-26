@@ -42,6 +42,7 @@
 
 #include <tas.h>
 #include <fastpath.h>
+#include "fast/internal.h"
 
 struct core_load {
   uint64_t cyc_busy;

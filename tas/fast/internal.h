@@ -35,7 +35,7 @@
 
 //#define FLEXNIC_TRACING
 #ifdef FLEXNIC_TRACING
-#   include <flexnic_trace.h>
+#   include <tas_trace.h>
 #   define FLEXNIC_TRACE_RX
 #   define FLEXNIC_TRACE_TX
 #   define FLEXNIC_TRACE_DMA
