@@ -34,6 +34,7 @@
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
 #include <rte_ip.h>
+#include <rte_version.h>
 
 #include <utils.h>
 #include <utils_rng.h>
@@ -49,13 +50,11 @@ static int device_running = 0;
 uint8_t net_port_id = 0;
 static const struct rte_eth_conf port_conf = {
     .rxmode = {
-      .split_hdr_size = 0,
-      .header_split   = 0, /* Header Split disabled */
-      .hw_ip_checksum = 0,
-      .hw_vlan_filter = 0, /* VLAN filtering disabled */
-      .jumbo_frame    = 0, /* Jumbo Frame Support disabled */
-      .hw_strip_crc   = 0, /* CRC stripped by hardware */
       .mq_mode = ETH_MQ_RX_RSS,
+      .offloads = 0,
+#if RTE_VER_YEAR < 18
+      .ignore_offload_bitfield = 1,
+#endif
     },
     .txmode = {
       .mq_mode = ETH_MQ_TX_NONE,
@@ -90,6 +89,7 @@ int network_init(unsigned n_threads)
 {
   uint8_t count;
   int ret;
+  uint16_t p;
 
   num_threads = n_threads;
   next_id = 0;
@@ -101,13 +101,21 @@ int network_init(unsigned n_threads)
   }
 
   /* make sure there is only one port */
+#if RTE_VER_YEAR < 18
   count = rte_eth_dev_count();
+#else
+  count = rte_eth_dev_count_avail();
+#endif
   if (count == 0) {
     fprintf(stderr, "No ethernet devices\n");
     goto error_exit;
   } else if (count > 1) {
     fprintf(stderr, "Multiple ethernet devices\n");
     goto error_exit;
+  }
+
+  RTE_ETH_FOREACH_DEV(p) {
+    net_port_id = p;
   }
 
   /* initialize port */
@@ -126,9 +134,11 @@ int network_init(unsigned n_threads)
     goto error_exit;
   }
 
+#if RTE_VER_YEAR < 18
   eth_devinfo.default_txconf.txq_flags = ETH_TXQ_FLAGS_IGNORE;
-  eth_devinfo.default_txconf.offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM;
-  eth_devinfo.default_txconf.offloads &= ~DEV_TX_OFFLOAD_VLAN_INSERT;
+#endif
+  eth_devinfo.default_rxconf.offloads = 0;
+  eth_devinfo.default_txconf.offloads = DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM;
 
   return 0;
 
