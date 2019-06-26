@@ -59,6 +59,7 @@ static const struct rte_eth_conf port_conf = {
     },
     .txmode = {
       .mq_mode = ETH_MQ_TX_NONE,
+      .offloads = DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM,
     },
     .rx_adv_conf = {
       .rss_conf = {
@@ -119,13 +120,15 @@ int network_init(unsigned n_threads)
   /* get mac address and device info */
   rte_eth_macaddr_get(net_port_id, &eth_addr);
   rte_eth_dev_info_get(net_port_id, &eth_devinfo);
-  eth_devinfo.default_txconf.txq_flags = ETH_TXQ_FLAGS_NOVLANOFFL;
 
   /* workaround for mlx5. */
   if (reta_mlx5_resize() != 0) {
     goto error_exit;
   }
 
+  eth_devinfo.default_txconf.txq_flags = ETH_TXQ_FLAGS_IGNORE;
+  eth_devinfo.default_txconf.offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM;
+  eth_devinfo.default_txconf.offloads &= ~DEV_TX_OFFLOAD_VLAN_INSERT;
 
   return 0;
 
