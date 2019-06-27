@@ -35,6 +35,7 @@
 #include <rte_mbuf.h>
 #include <rte_ip.h>
 #include <rte_version.h>
+#include <rte_spinlock.h>
 
 #include <utils.h>
 #include <utils_rng.h>
@@ -46,7 +47,6 @@
 #define RX_DESCRIPTORS 256
 #define TX_DESCRIPTORS 128
 
-static int device_running = 0;
 uint8_t net_port_id = 0;
 static const struct rte_eth_conf port_conf = {
     .rxmode = {
@@ -71,7 +71,6 @@ static const struct rte_eth_conf port_conf = {
   };
 
 static unsigned num_threads;
-static volatile unsigned next_id;
 static struct network_rx_thread **net_threads;
 
 static struct rte_eth_dev_info eth_devinfo;
@@ -84,6 +83,7 @@ static uint16_t *rss_core_buckets = NULL;
 static struct rte_mempool *mempool_alloc(void);
 static int reta_setup(void);
 static int reta_mlx5_resize(void);
+static rte_spinlock_t initlock = RTE_SPINLOCK_INITIALIZER;
 
 int network_init(unsigned n_threads)
 {
@@ -92,7 +92,6 @@ int network_init(unsigned n_threads)
   uint16_t p;
 
   num_threads = n_threads;
-  next_id = 0;
 
   /* allocate thread pointer arrays */
   net_threads = rte_calloc("net thread ptrs", n_threads, sizeof(*net_threads), 0);
@@ -169,6 +168,10 @@ void network_dump_stats(void)
 
 int network_thread_init(struct dataplane_context *ctx)
 {
+  static volatile uint32_t tx_init_done = 0;
+  static volatile uint32_t rx_init_done = 0;
+  static volatile uint32_t start_done = 0;
+
   struct network_thread *t = &ctx->net;
   int ret;
 
@@ -177,25 +180,38 @@ int network_thread_init(struct dataplane_context *ctx)
     goto error_mpool;
   }
 
-  /* initialize rx queue */
+  /* initialize tx queue */
   t->queue_id = ctx->id;
-  ret = rte_eth_rx_queue_setup(net_port_id, t->queue_id, RX_DESCRIPTORS,
-          rte_socket_id(), &eth_devinfo.default_rxconf, t->pool);
-  if (ret != 0) {
-    goto error_rx_queue;
-  }
-
-  /* initialize queue */
-  t->queue_id = ctx->id;
+  rte_spinlock_lock(&initlock);
   ret = rte_eth_tx_queue_setup(net_port_id, t->queue_id, TX_DESCRIPTORS,
           rte_socket_id(), &eth_devinfo.default_txconf);
+  rte_spinlock_unlock(&initlock);
   if (ret != 0) {
-    fprintf(stderr, "network_tx_thread_init: rte_eth_tx_queue_setup failed\n");
+    fprintf(stderr, "network_thread_init: rte_eth_tx_queue_setup failed\n");
     goto error_tx_queue;
   }
 
-  /* start device if this was the last queue */
-  if (num_threads == __sync_add_and_fetch(&next_id, 1)) {
+  /* barrier to make sure tx queues are initialized first */
+  __sync_add_and_fetch(&tx_init_done, 1);
+  while (tx_init_done < num_threads);
+
+  /* initialize rx queue */
+  t->queue_id = ctx->id;
+  rte_spinlock_lock(&initlock);
+  ret = rte_eth_rx_queue_setup(net_port_id, t->queue_id, RX_DESCRIPTORS,
+          rte_socket_id(), &eth_devinfo.default_rxconf, t->pool);
+  rte_spinlock_unlock(&initlock);
+  if (ret != 0) {
+    fprintf(stderr, "network_thread_init: rte_eth_rx_queue_setup failed\n");
+    goto error_rx_queue;
+  }
+
+  /* barrier to make sure rx queues are initialized first */
+  __sync_add_and_fetch(&rx_init_done, 1);
+  while (rx_init_done < num_threads);
+
+  /* start device if this ìs core 0 */
+  if (ctx->id == 0) {
     if (rte_eth_dev_start(net_port_id) != 0) {
       fprintf(stderr, "rte_eth_dev_start failed\n");
       goto error_tx_queue;
@@ -207,14 +223,29 @@ int network_thread_init(struct dataplane_context *ctx)
       goto error_tx_queue;
     }
 
-    device_running = 1;
+    start_done = 1;
+  }
+
+  /* barrier wait for main thread to start the device */
+  while (!start_done);
+
+  /* setup rx queue interrupt */
+  rte_spinlock_lock(&initlock);
+  ret = rte_eth_dev_rx_intr_ctl_q(net_port_id, t->queue_id,
+      RTE_EPOLL_PER_THREAD, RTE_INTR_EVENT_ADD, NULL);
+  rte_spinlock_unlock(&initlock);
+  if (ret != 0) {
+    fprintf(stderr, "network_thread_init: rte_eth_dev_rx_intr_ctl_q failed (%d)\n", rte_errno);
+    goto error_int_queue;
   }
 
   return 0;
 
-error_tx_queue:
+error_int_queue:
   /* TODO: destroy rx queue */
 error_rx_queue:
+  /* TODO: destroy tx queue */
+error_tx_queue:
   /* TODO: free mempool */
 error_mpool:
   rte_free(t);
@@ -223,20 +254,7 @@ error_mpool:
 
 int network_rx_interrupt_ctl(struct network_thread *t, int turnon)
 {
-  static int __thread initialized = 0;
-
-  if(!device_running) {
-    return 1;
-  }
-
   if(turnon) {
-    if(!initialized) {
-      int ret = rte_eth_dev_rx_intr_ctl_q(net_port_id, t->queue_id,
-          RTE_EPOLL_PER_THREAD, RTE_INTR_EVENT_ADD, NULL);
-      assert(ret == 0);
-      initialized = 1;
-    }
-
     return rte_eth_dev_rx_intr_enable(net_port_id, t->queue_id);
   } else {
     return rte_eth_dev_rx_intr_disable(net_port_id, t->queue_id);
