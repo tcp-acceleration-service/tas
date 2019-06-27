@@ -68,6 +68,7 @@ enum cfg_params {
   CP_IP_ROUTE,
   CP_IP_ADDR,
   CP_FP_CORES_MAX,
+  CP_FP_NO_INTS,
   CP_DPDK_EXTRA,
 };
 
@@ -174,6 +175,9 @@ static struct option opts[] = {
     { .name = "fp-cores-max",
       .has_arg = required_argument,
       .val = CP_FP_CORES_MAX },
+    { .name = "fp-no-ints",
+      .has_arg = no_argument,
+      .val = CP_FP_NO_INTS },
     { .name = "dpdk-extra",
       .has_arg = required_argument,
       .val = CP_DPDK_EXTRA },
@@ -419,6 +423,10 @@ int config_parse(struct configuration *c, int argc, char *argv[])
           goto failed;
         }
         break;
+      case CP_FP_NO_INTS:
+        c->fp_interrupts = 0;
+        break;
+
       case CP_DPDK_EXTRA:
         if (parse_arg_append(optarg, c) != 0) {
           goto failed;
@@ -486,6 +494,7 @@ static int config_defaults(struct configuration *c, char *progname)
   c->cc_timely_min_rtt = 11;
   c->cc_timely_min_rate = 10000;
   c->fp_cores_max = 1;
+  c->fp_interrupts = 1;
 
   c->dpdk_argc = 1;
   if ((c->dpdk_argv = calloc(2, sizeof(*c->dpdk_argv))) == NULL) {

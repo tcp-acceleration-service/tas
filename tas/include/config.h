@@ -111,6 +111,8 @@ struct configuration {
   uint32_t cc_timely_min_rate;
   /** FP: maximal number of cores used */
   uint32_t fp_cores_max;
+  /** FP: interrupts (blocking) enabled */
+  uint32_t fp_interrupts;
   /** DPDK extra argument vector */
   char **dpdk_argv;
   /** DPDK extra argument count */

@@ -182,7 +182,7 @@ void dataplane_loop(struct dataplane_context *ctx)
 
       if(startwait == 0) {
 	startwait = ts;
-      } else if(ts - startwait >= POLL_CYCLE) {
+      } else if (config.fp_interrupts && ts - startwait >= POLL_CYCLE) {
 	// Idle -- wait for interrupt or data from apps/kernel
 	int r = network_rx_interrupt_ctl(&ctx->net, 1);
 
