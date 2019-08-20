@@ -229,14 +229,17 @@ int network_thread_init(struct dataplane_context *ctx)
   /* barrier wait for main thread to start the device */
   while (!start_done);
 
-  /* setup rx queue interrupt */
-  rte_spinlock_lock(&initlock);
-  ret = rte_eth_dev_rx_intr_ctl_q(net_port_id, t->queue_id,
-      RTE_EPOLL_PER_THREAD, RTE_INTR_EVENT_ADD, NULL);
-  rte_spinlock_unlock(&initlock);
-  if (ret != 0) {
-    fprintf(stderr, "network_thread_init: rte_eth_dev_rx_intr_ctl_q failed (%d)\n", rte_errno);
-    goto error_int_queue;
+  if (config.fp_interrupts) {
+    /* setup rx queue interrupt */
+    rte_spinlock_lock(&initlock);
+    ret = rte_eth_dev_rx_intr_ctl_q(net_port_id, t->queue_id,
+        RTE_EPOLL_PER_THREAD, RTE_INTR_EVENT_ADD, NULL);
+    rte_spinlock_unlock(&initlock);
+    if (ret != 0) {
+      fprintf(stderr, "network_thread_init: rte_eth_dev_rx_intr_ctl_q failed "
+          "(%d)\n", rte_errno);
+      goto error_int_queue;
+    }
   }
 
   return 0;
