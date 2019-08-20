@@ -71,7 +71,7 @@ int arp_init(void)
 
   mac = 0;
   memcpy(&mac, &eth_addr, ETH_ADDR_LEN);
-  printf("host ip: %x MAC: %lu\n", config.ip, mac);
+  printf("host ip: %x MAC: %lx\n", config.ip, mac);
 
   return 0;
 }
