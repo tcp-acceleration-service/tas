@@ -1,7 +1,12 @@
 -include Makefile.local
 
-CFLAGS = -std=gnu99 -O3 -g -Wall -Werror -I. -Iinclude/ -march=native -fno-omit-frame-pointer
-LDFLAGS = -pthread -g
+PREFIX ?= /usr/local
+SBINDIR ?= $(PREFIX)/sbin
+LIBDIR ?= $(PREFIX)/lib
+INCDIR ?= $(PREFIX)/include
+
+CFLAGS += -std=gnu99 -O3 -g -Wall -Werror -I. -Iinclude/ -march=native -fno-omit-frame-pointer
+LDFLAGS += -pthread -g
 
 RTE_SDK ?= $(HOME)/dpdk/x86_64-native-linuxapp-gcc
 DPDK_PMDS ?= ixgbe i40e
@@ -110,4 +115,21 @@ clean:
 	  tools/tracetool tools/statetool tools/scaletool \
 	  tas/tas
 
-.PHONY: all tests clean docs
+install: tas/tas lib/libtas_sockets.so lib/libtas_interpose.so \
+  lib/libtas.so tools/statetool
+	mkdir -p $(DESTDIR)$(SBINDIR)
+	cp tas/tas $(DESTDIR)$(SBINDIR)/tas
+	cp tools/statetool $(DESTDIR)$(SBINDIR)/tas-statetool
+	mkdir -p $(DESTDIR)$(LIBDIR)
+	cp lib/libtas_interpose.so $(DESTDIR)$(LIBDIR)/libtas_interpose.so
+	cp lib/libtas_sockets.so $(DESTDIR)$(LIBDIR)/libtas_sockets.so
+	cp lib/libtas.so $(DESTDIR)$(LIBDIR)/libtas.so
+
+uninstall:
+	rm -f $(DESTDIR)$(SBINDIR)/tas
+	rm -f $(DESTDIR)$(SBINDIR)/tas-statetool
+	rm -f $(DESTDIR)$(LIBDIR)/libtas_interpose.so
+	rm -f $(DESTDIR)$(LIBDIR)/libtas_sockets.so
+	rm -f $(DESTDIR)$(LIBDIR)/libtas.so
+
+.PHONY: all tests clean docs install uninstall
