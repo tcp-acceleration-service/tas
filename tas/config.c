@@ -582,6 +582,8 @@ static void print_usage(struct configuration *c, char *progname)
       "Fast path:\n"
       "  --fp-cores-max=CORES        Max cores used for fast path "
           "[default: %"PRIu32"]\n"
+      "  --fp-no-ints                Disable Interrupts "
+          "[default: enabled]\n"
       "  --dpdk-extra=ARG            Add extra DPDK argument\n",
       progname,
       c->nic_rx_len, c->nic_tx_len, c->app_kin_len, c->app_kout_len,
