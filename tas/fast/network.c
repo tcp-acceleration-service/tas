@@ -74,7 +74,11 @@ static unsigned num_threads;
 static struct network_rx_thread **net_threads;
 
 static struct rte_eth_dev_info eth_devinfo;
-struct ether_addr eth_addr;
+#if RTE_VER_YEAR < 19
+  struct ether_addr eth_addr;
+#else
+  struct rte_ether_addr eth_addr;
+#endif
 
 uint16_t rss_reta_size;
 static struct rte_eth_rss_reta_entry64 *rss_reta = NULL;
