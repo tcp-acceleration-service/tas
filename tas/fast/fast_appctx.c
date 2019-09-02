@@ -88,8 +88,8 @@ int fast_appctx_poll_bump(struct dataplane_context *ctx, void *pqe,
   int ret;
 
   ret = fast_flows_bump(ctx, atx->msg.connupdate.flow_id,
-      atx->msg.connupdate.bump_seq, atx->msg.connupdate.rx_tail,
-      atx->msg.connupdate.tx_head, atx->msg.connupdate.flags, nbh, ts);
+      atx->msg.connupdate.bump_seq, atx->msg.connupdate.rx_bump,
+      atx->msg.connupdate.tx_bump, atx->msg.connupdate.flags, nbh, ts);
 
   if (ret != 0)
     ret = 1;

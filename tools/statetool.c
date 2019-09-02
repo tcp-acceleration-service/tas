@@ -149,8 +149,8 @@ static int dump_flow(uint32_t flow_id)
          "  tx {\n"
          "            base=%016"PRIx64"\n"
          "             len=%08x\n"
+         "           avail=%08x\n"
          "            sent=%08x\n"
-         "            head=%08x\n"
          "        next_pos=%08x\n"
          "        next_seq=%010u\n"
          "         next_ts=%08x\n"
@@ -176,7 +176,7 @@ static int dump_flow(uint32_t flow_id)
 #ifdef FLEXNIC_PL_OOO_RECV
       fs->rx_ooo_start, fs->rx_ooo_len,
 #endif
-      fs->tx_base, fs->tx_len, fs->tx_sent, fs->tx_head, fs->tx_next_pos,
+      fs->tx_base, fs->tx_len, fs->tx_avail, fs->tx_sent, fs->tx_next_pos,
       fs->tx_next_seq, fs->tx_next_ts,
       fs->tx_rate, fs->cnt_tx_drops, fs->cnt_rx_acks, fs->cnt_rx_ack_bytes,
       fs->cnt_rx_ecn_bytes, fs->rtt_est);

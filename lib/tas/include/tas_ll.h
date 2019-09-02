@@ -94,17 +94,24 @@ struct flextcp_connection {
   /* rx buffer */
   uint8_t *rxb_base;
   uint32_t rxb_len;
+  /** pointer to next new byte to be received */
   uint32_t rxb_head;
-  uint32_t rxb_tail;
-  uint32_t rxb_nictail;
+  /** number of received but not yet freed bytes (behind head). */
+  uint32_t rxb_used;
+  /** pending rx bump to fast path */
+  uint32_t rxb_bump;
 
   /* tx buffer */
   uint8_t *txb_base;
   uint32_t txb_len;
+  /** pointer to next byte to be sent */
   uint32_t txb_head;
-  uint32_t txb_head_alloc;
-  uint32_t txb_tail;
-  uint32_t txb_nichead;
+  /** number of sent but not yet acked bytes (behind head) */
+  uint32_t txb_sent;
+  /** number of allocated but not yet sent bytes (after head) */
+  uint32_t txb_allocated;
+  /** pending tx bump to fast path */
+  uint32_t txb_bump;
 
   uint32_t local_ip;
   uint32_t remote_ip;
@@ -120,6 +127,7 @@ struct flextcp_connection {
   struct flextcp_connection *bump_next;
   struct flextcp_connection *bump_prev;
   uint16_t fn_core;
+
   uint8_t bump_pending;
   uint8_t status;
   uint8_t flags;

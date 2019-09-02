@@ -184,10 +184,7 @@ static inline int tcp_valid_rxack(struct flextcp_pl_flowst *fs, uint32_t ack,
 
 #ifdef ALLOW_FUTURE_ACKS
   /* number of available unsent bytes in send buffer */
-  if (fs->tx_next_pos <= fs->tx_head)
-    fsack_b += fs->tx_head - fs->tx_next_pos;
-  else
-    fsack_b += fs->tx_head - fs->tx_next_pos + fs->tx_len;
+  fsack_b += fs->tx_avail;
 #endif
 
   if (fsack_a <= fsack_b) {
@@ -210,22 +207,16 @@ static inline int tcp_valid_rxack(struct flextcp_pl_flowst *fs, uint32_t ack,
  * flow control window
  *
  * @param fs Pointer to flow state.
- * @param [in] phead Pointer to head, used instead of fs->tx_head if not NULL.
+ * @param [in] phead Pointer to avail, used instead of fs->tx_avail if not NULL.
  *
  * @return Bytes that can be sent.
  */
 static inline uint32_t tcp_txavail(const struct flextcp_pl_flowst *fs,
-    const uint32_t *phead)
+    const uint32_t *pavail)
 {
-  uint32_t buf_avail, fc_avail, head;
+  uint32_t buf_avail, fc_avail;
 
-  head = (phead != NULL ? *phead : fs->tx_head);
-
-  /* number of available unsent bytes in send buffer */
-  if (fs->tx_next_pos <= head)
-    buf_avail = head - fs->tx_next_pos;
-  else
-    buf_avail = fs->tx_len - fs->tx_next_pos + head;
+  buf_avail = (pavail != NULL ? *pavail : fs->tx_avail);
 
   /* flow control window */
   fc_avail = fs->rx_remote_avail - fs->tx_sent;

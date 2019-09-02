@@ -562,10 +562,10 @@ static inline int event_kappin_conn_opened(
   if (inev->status != 0) {
     conn->status = CONN_CLOSED;
     return 1;
-  } else if (conn->rxb_head > 0 && conn->rx_closed && avail < 3) {
+  } else if (conn->rxb_used > 0 && conn->rx_closed && avail < 3) {
     /* if we've already received updates, we'll need to inject them */
     return -1;
-  } else if ((conn->rxb_head > 0 || conn->rx_closed) && avail < 2) {
+  } else if ((conn->rxb_used > 0 || conn->rx_closed) && avail < 2) {
     /* if we've already received updates, we'll need to inject them */
     return -1;
   }
@@ -585,14 +585,13 @@ static inline int event_kappin_conn_opened(
   conn->txb_len = inev->tx_len;
 
   /* inject bump if necessary */
-  if (conn->rxb_head > 0) {
-    assert(conn->rxb_head < conn->rxb_len);
-    conn->seq_rx += conn->rxb_head;
+  if (conn->rxb_used > 0) {
+    conn->seq_rx += conn->rxb_used;
 
     outev[j].event_type = FLEXTCP_EV_CONN_RECEIVED;
     outev[j].ev.conn_received.conn = conn;
     outev[j].ev.conn_received.buf = conn->rxb_base;
-    outev[j].ev.conn_received.len = conn->rxb_head;
+    outev[j].ev.conn_received.len = conn->rxb_used;
     j++;
   }
 
@@ -635,10 +634,10 @@ static inline int event_kappin_accept_conn(
   if (inev->status != 0) {
     conn->status = CONN_CLOSED;
     return 1;
-  } else if (conn->rxb_head > 0 && conn->rx_closed && avail < 3) {
+  } else if (conn->rxb_used > 0 && conn->rx_closed && avail < 3) {
     /* if we've already received updates, we'll need to inject them */
     return -1;
-  } else if ((conn->rxb_head > 0 || conn->rx_closed) && avail < 2) {
+  } else if ((conn->rxb_used > 0 || conn->rx_closed) && avail < 2) {
     /* if we've already received updates, we'll need to inject them */
     return -1;
   }
@@ -659,14 +658,13 @@ static inline int event_kappin_accept_conn(
   conn->txb_len = inev->tx_len;
 
   /* inject bump if necessary */
-  if (conn->rxb_head > 0) {
-    assert(conn->rxb_head < conn->rxb_len);
-    conn->seq_rx += conn->rxb_head;
+  if (conn->rxb_used > 0) {
+    conn->seq_rx += conn->rxb_used;
 
     outev[j].event_type = FLEXTCP_EV_CONN_RECEIVED;
     outev[j].ev.conn_received.conn = conn;
     outev[j].ev.conn_received.buf = conn->rxb_base;
-    outev[j].ev.conn_received.len = conn->rxb_head;
+    outev[j].ev.conn_received.len = conn->rxb_used;
     j++;
   }
 
@@ -723,7 +721,7 @@ static inline int event_arx_connupdate(struct flextcp_context *ctx,
     int outn, uint16_t fn_core)
 {
   struct flextcp_connection *conn;
-  uint32_t rx_bump, rx_len, tx_bump, tx_tail;
+  uint32_t rx_bump, rx_len, tx_bump, tx_sent;
   int i = 0, evs_needed, tx_avail_ev, eos;
 
   conn = OPAQUE_PTR(inev->opaque);
@@ -742,6 +740,7 @@ static inline int event_arx_connupdate(struct flextcp_context *ctx,
     assert(tx_bump == 0);
     conn->rx_closed = !!eos;
     conn->rxb_head += rx_bump;
+    conn->rxb_used += rx_bump;
     /* TODO: should probably handle eos here as well */
     return 0;
   } else if (conn->status == CONN_CLOSED ||
@@ -768,14 +767,11 @@ static inline int event_arx_connupdate(struct flextcp_context *ctx,
     evs_needed++;
   }
 
-  tx_tail = conn->txb_tail + tx_bump;
-  if (tx_tail >= conn->txb_len) {
-    tx_tail -= conn->txb_len;
-  }
+  tx_sent = conn->txb_sent - tx_bump;
 
   /* if tx close was acked, also add that event */
   if ((conn->flags & CONN_FLAG_TXEOS_ALLOC) == CONN_FLAG_TXEOS_ALLOC &&
-      tx_tail == conn->txb_head)
+      !tx_sent)
   {
     evs_needed++;
   }
@@ -817,11 +813,12 @@ static inline int event_arx_connupdate(struct flextcp_context *ctx,
     if (conn->rxb_head >= conn->rxb_len) {
       conn->rxb_head -= conn->rxb_len;
     }
+    conn->rxb_used += rx_bump;
   }
 
   /* bump tx */
   if (tx_bump > 0) {
-    conn->txb_tail = tx_tail;
+    conn->txb_sent -= tx_bump;
 
     if (tx_avail_ev) {
       outevs[i].event_type = FLEXTCP_EV_CONN_SENDBUF;
@@ -844,7 +841,7 @@ static inline int event_arx_connupdate(struct flextcp_context *ctx,
       assert(!(conn->flags & CONN_FLAG_TXEOS_ACK));
 
       /* if this was the last bump, mark TX EOS as acked */
-      if (conn->txb_tail == conn->txb_head) {
+      if (conn->txb_sent == 0) {
         conn->flags |= CONN_FLAG_TXEOS_ACK;
 
         outevs[i].event_type = FLEXTCP_EV_CONN_TXCLOSED;
@@ -924,8 +921,8 @@ static void conns_bump(struct flextcp_context *ctx)
       flags |= FLEXTCP_PL_ATX_FLTXDONE;
     }
 
-    atx->msg.connupdate.rx_tail = c->rxb_tail;
-    atx->msg.connupdate.tx_head = c->txb_head;
+    atx->msg.connupdate.rx_bump = c->rxb_bump;
+    atx->msg.connupdate.tx_bump = c->txb_bump;
     atx->msg.connupdate.flow_id = c->flow_id;
     atx->msg.connupdate.bump_seq = c->bump_seq++;
     atx->msg.connupdate.flags = flags;
@@ -934,7 +931,7 @@ static void conns_bump(struct flextcp_context *ctx)
 
     flextcp_context_tx_done(ctx, c->fn_core);
 
-    c->rxb_nictail = c->rxb_tail;
+    c->rxb_bump = c->txb_bump = 0;
     c->bump_pending = 0;
 
     if (c->bump_next == NULL) {

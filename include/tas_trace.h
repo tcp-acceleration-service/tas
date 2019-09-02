@@ -106,8 +106,8 @@ struct flextcp_pl_trev_adb {
 
 /** application tx queue entry */
 struct flextcp_pl_trev_atx {
-  uint32_t rx_tail;
-  uint32_t tx_head;
+  uint32_t rx_bump;
+  uint32_t tx_bump;
   uint32_t bump_seq_ent;
 
   uint32_t local_ip;
@@ -120,7 +120,7 @@ struct flextcp_pl_trev_atx {
 
   uint32_t tx_next_pos;
   uint32_t tx_next_seq;
-  uint32_t tx_head_prev;
+  uint32_t tx_avail_prev;
   uint32_t rx_next_pos;
   uint32_t rx_avail;
   uint32_t tx_len;
@@ -202,7 +202,7 @@ struct flextcp_pl_trev_actxqman {
 /* queue manager event fetching flow payload */
 struct flextcp_pl_trev_afloqman {
   uint64_t tx_base;
-  uint32_t tx_head;
+  uint32_t tx_avail;
   uint32_t tx_next_pos;
   uint32_t tx_len;
   uint32_t rx_remote_avail;

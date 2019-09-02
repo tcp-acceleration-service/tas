@@ -35,7 +35,6 @@ static void connection_init(struct flextcp_connection *conn);
 
 static inline void conn_mark_bump(struct flextcp_context *ctx,
     struct flextcp_connection *conn);
-static inline uint32_t conn_rx_recvdbytes(struct flextcp_connection *conn);
 static inline uint32_t conn_tx_allocbytes(struct flextcp_connection *conn);
 static inline uint32_t conn_tx_sendbytes(struct flextcp_connection *conn);
 
@@ -222,17 +221,16 @@ int flextcp_connection_close(struct flextcp_context *ctx,
 int flextcp_connection_rx_done(struct flextcp_context *ctx,
     struct flextcp_connection *conn, size_t len)
 {
-  if (conn_rx_recvdbytes(conn) < len) {
+  if (conn->rxb_used < len) {
     return -1;
   }
 
-  conn->rxb_tail += len;
-  if (conn->rxb_tail >= conn->rxb_len) {
-    conn->rxb_tail -= conn->rxb_len;
-  }
+  conn->rxb_used -= len;
 
-  /* Occasionally update the NIC on what we've already read */
-  if((conn->rxb_head - conn->rxb_nictail) % conn->rxb_len >= conn->rxb_len / 4) {
+  /* Occasionally update the NIC on what we've already read. Force if buffer was
+   * previously completely full*/
+  conn->rxb_bump += len;
+  if(conn->rxb_bump > conn->rxb_len / 4) {
     conn_mark_bump(ctx, conn);
   }
 
@@ -243,6 +241,7 @@ ssize_t flextcp_connection_tx_alloc(struct flextcp_connection *conn, size_t len,
     void **buf)
 {
   uint32_t avail;
+  uint32_t head;
 
   /* if outgoing connection has already been closed, abort */
   if ((conn->flags & CONN_FLAG_TXEOS) == CONN_FLAG_TXEOS)
@@ -254,18 +253,21 @@ ssize_t flextcp_connection_tx_alloc(struct flextcp_connection *conn, size_t len,
     len = avail;
   }
 
+  /* calculate alloc head */
+  head = conn->txb_head + conn->txb_allocated;
+  if (head >= conn->txb_len) {
+    head -= conn->txb_len;
+  }
+
   /* short alloc if we wrap around */
-  if (conn->txb_head_alloc + len > conn->txb_len) {
-    len = conn->txb_len - conn->txb_head_alloc;
+  if (head + len > conn->txb_len) {
+    len = conn->txb_len - head;
   }
 
-  *buf = conn->txb_base + conn->txb_head_alloc;
+  *buf = conn->txb_base + head;
 
-  /* bump head alloc pointer */
-  conn->txb_head_alloc += len;
-  if (conn->txb_head_alloc >= conn->txb_len) {
-    conn->txb_head_alloc -= conn->txb_len;
-  }
+  /* bump head alloc counter */
+  conn->txb_allocated += len;
 
   return len;
 }
@@ -273,7 +275,7 @@ ssize_t flextcp_connection_tx_alloc(struct flextcp_connection *conn, size_t len,
 ssize_t flextcp_connection_tx_alloc2(struct flextcp_connection *conn, size_t len,
     void **buf_1, size_t *len_1, void **buf_2)
 {
-  uint32_t avail;
+  uint32_t avail, head;
 
   /* if outgoing connection has already been closed, abort */
   if ((conn->flags & CONN_FLAG_TXEOS) == CONN_FLAG_TXEOS)
@@ -285,24 +287,25 @@ ssize_t flextcp_connection_tx_alloc2(struct flextcp_connection *conn, size_t len
     len = avail;
   }
 
-  *buf_1 = conn->txb_base + conn->txb_head_alloc;
+  /* calculate alloc head */
+  head = conn->txb_head + conn->txb_allocated;
+  if (head >= conn->txb_len) {
+    head -= conn->txb_len;
+  }
+
+  *buf_1 = conn->txb_base + head;
 
   /* short alloc if we wrap around */
-  if (conn->txb_head_alloc + len > conn->txb_len) {
-    *len_1 = conn->txb_len - conn->txb_head_alloc;
+  if (head + len > conn->txb_len) {
+    *len_1 = conn->txb_len - head;
     *buf_2 = conn->txb_base;
   } else {
     *len_1 = len;
     *buf_2 = NULL;
   }
 
-
-  /* bump head alloc pointer */
-  conn->txb_head_alloc += len;
-  if (conn->txb_head_alloc >= conn->txb_len) {
-    conn->txb_head_alloc -= conn->txb_len;
-  }
-
+  /* bump head alloc counter */
+  conn->txb_allocated += len;
   return len;
 }
 
@@ -315,12 +318,16 @@ int flextcp_connection_tx_send(struct flextcp_context *ctx,
     return -1;
   }
 
+  conn->txb_allocated -= len;
+  conn->txb_sent += len;
+
   next_head = conn->txb_head + len;
   if (next_head >= conn->txb_len) {
       next_head -= conn->txb_len;
   }
   conn->txb_head = next_head;
 
+  conn->txb_bump += len;
   conn_mark_bump(ctx, conn);
   return 0;
 }
@@ -351,6 +358,7 @@ int flextcp_connection_tx_close(struct flextcp_context *ctx,
 int flextcp_conn_pushtxeos(struct flextcp_context *ctx,
         struct flextcp_connection *conn)
 {
+  uint32_t head;
   assert(conn_tx_sendbytes(conn) == 0);
   assert((conn->flags & CONN_FLAG_TXEOS));
 
@@ -359,15 +367,16 @@ int flextcp_conn_pushtxeos(struct flextcp_context *ctx,
     return -1;
   }
 
-  conn->txb_head_alloc++;
-  if (conn->txb_head_alloc >= conn->txb_len) {
-    conn->txb_head_alloc -= conn->txb_len;
+  conn->txb_sent++;
+  head = conn->txb_head + 1;
+  if (head >= conn->txb_len) {
+    head -= conn->txb_len;
   }
-
-  conn->txb_head = conn->txb_head_alloc;
+  conn->txb_head = head;
 
   conn->flags |= CONN_FLAG_TXEOS_ALLOC;
 
+  conn->txb_bump++;
   conn_mark_bump(ctx, conn);
   return 0;
 }
@@ -418,12 +427,12 @@ int flextcp_connection_move(struct flextcp_context *ctx,
 static void connection_init(struct flextcp_connection *conn)
 {
   conn->rxb_head = 0;
-  conn->rxb_tail = 0;
-  conn->rxb_nictail = 0;
+  conn->rxb_used = 0;
+  conn->rxb_bump = 0;
   conn->txb_head = 0;
-  conn->txb_head_alloc = 0;
-  conn->txb_tail = 0;
-  conn->txb_nichead = 0;
+  conn->txb_sent = 0;
+  conn->txb_allocated = 0;
+  conn->txb_bump = 0;
   conn->bump_seq = 0;
   conn->status = CONN_CLOSED;
   conn->flags = 0;
@@ -452,32 +461,14 @@ static inline void conn_mark_bump(struct flextcp_context *ctx,
   conn->bump_pending = 1;
 }
 
-/** Number of bytes in receive buffer that have been received */
-static inline uint32_t conn_rx_recvdbytes(struct flextcp_connection *conn)
-{
-  if (conn->rxb_tail <= conn->rxb_head) {
-    return conn->rxb_head - conn->rxb_tail;
-  } else {
-    return conn->rxb_len - conn->rxb_tail + conn->rxb_head;
-  }
-}
-
 /** Number of bytes in send buffer that can be allocated */
 static inline uint32_t conn_tx_allocbytes(struct flextcp_connection *conn)
 {
-  if (conn->txb_tail <= conn->txb_head_alloc) {
-    return conn->txb_len - conn->txb_head_alloc + conn->txb_tail - 1;
-  } else {
-    return conn->txb_tail - conn->txb_head_alloc - 1;
-  }
+  return conn->txb_len - conn->txb_sent - conn->txb_allocated;
 }
 
 /** Number of bytes that have been allocated but not sent */
 static inline uint32_t conn_tx_sendbytes(struct flextcp_connection *conn)
 {
-  if (conn->txb_head <= conn->txb_head_alloc) {
-    return conn->txb_head_alloc - conn->txb_head;
-  } else {
-    return conn->txb_len - conn->txb_head + conn->txb_head_alloc;
-  }
+  return conn->txb_allocated;
 }

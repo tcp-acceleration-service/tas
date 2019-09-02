@@ -229,7 +229,7 @@ int nicif_connection_add(uint32_t db, uint64_t mac_remote, uint32_t ip_local,
   fs->tx_sent = 0;
   fs->tx_next_pos = 0;
   fs->tx_next_seq = local_seq;
-  fs->tx_head = 0;
+  fs->tx_avail = 0;
   fs->tx_next_ts = 0;
   fs->tx_rate = rate;
   fs->rtt_est = 0;

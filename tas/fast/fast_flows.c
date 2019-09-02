@@ -146,16 +146,16 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t queue,
 
 #if PL_DEBUG_ATX
   fprintf(stderr, "ATX try_sendseg local=%08x:%05u remote=%08x:%05u "
-      "tx_head=%x tx_next_pos=%x avail=%u\n",
+      "tx_avail=%x tx_next_pos=%x avail=%u\n",
       f_beui32(fs->local_ip), f_beui16(fs->local_port),
       f_beui32(fs->remote_ip), f_beui16(fs->remote_port),
-      fs->tx_head, fs->tx_next_pos, avail);
+      fs->tx_avail, fs->tx_next_pos, avail);
 #endif
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_afloqman te_afloqman = {
       .flow_id = flow_id,
       .tx_base = fs->tx_base,
-      .tx_head = fs->tx_head,
+      .tx_avail = fs->tx_avail,
       .tx_next_pos = fs->tx_next_pos,
       .tx_len = fs->tx_len,
       .rx_remote_avail = fs->rx_remote_avail,
@@ -184,9 +184,10 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t queue,
     fs->tx_next_pos -= fs->tx_len;
   }
   fs->tx_sent += len;
+  fs->tx_avail -= len;
 
   fin = (fs->rx_base_sp & FLEXNIC_PL_FLOWST_TXFIN) == FLEXNIC_PL_FLOWST_TXFIN &&
-    fs->tx_next_pos == fs->tx_head;
+    !fs->tx_avail;
 
   /* make sure we don't send out dummy byte for FIN */
   if (fin) {
@@ -641,18 +642,18 @@ slowpath:
 
 /* Update receive and transmit queue pointers from application */
 int fast_flows_bump(struct dataplane_context *ctx, uint32_t flow_id,
-    uint16_t bump_seq, uint32_t rx_tail, uint32_t tx_head, uint8_t flags,
+    uint16_t bump_seq, uint32_t rx_bump, uint32_t tx_bump, uint8_t flags,
     struct network_buf_handle *nbh, uint32_t ts)
 {
   struct flextcp_pl_flowst *fs = &fp_state->flowst[flow_id];
-  uint32_t tail, rx_avail_prev, old_avail, new_avail;
+  uint32_t rx_avail_prev, old_avail, new_avail, tx_avail;
   int ret = -1;
 
   fs_lock(fs);
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_atx te_atx = {
-      .rx_tail = rx_tail,
-      .tx_head = tx_head,
+      .rx_bump = rx_bump,
+      .tx_bump = tx_bump,
       .bump_seq_ent = bump_seq,
       .bump_seq_flow = fs->bump_seq,
 
@@ -666,7 +667,7 @@ int fast_flows_bump(struct dataplane_context *ctx, uint32_t flow_id,
 
       .tx_next_pos = fs->tx_next_pos,
       .tx_next_seq = fs->tx_next_seq,
-      .tx_head_prev = fs->tx_head,
+      .tx_avail_prev = fs->tx_avail,
       .rx_next_pos = fs->rx_next_pos,
       .rx_avail = fs->rx_avail,
       .tx_len = fs->tx_len,
@@ -690,23 +691,25 @@ int fast_flows_bump(struct dataplane_context *ctx, uint32_t flow_id,
   fs->bump_seq = bump_seq;
 
   if ((fs->rx_base_sp & FLEXNIC_PL_FLOWST_TXFIN) == FLEXNIC_PL_FLOWST_TXFIN &&
-      tx_head != fs->tx_head)
+      tx_bump != 0)
   {
     /* TX already closed, don't accept anything for transmission */
     fprintf(stderr, "fast_flows_bump: tx bump while TX is already closed\n");
-    tx_head = fs->tx_head;
+    tx_bump = 0;
   } else if ((flags & FLEXTCP_PL_ATX_FLTXDONE) == FLEXTCP_PL_ATX_FLTXDONE &&
       !(fs->rx_base_sp & FLEXNIC_PL_FLOWST_TXFIN) &&
-      tx_head == fs->tx_head)
+      !tx_bump)
   {
     /* Closing TX requires at least one byte (dummy) */
     fprintf(stderr, "fast_flows_bump: tx eos without dummy byte\n");
     goto unlock;
   }
 
+  tx_avail = fs->tx_avail + tx_bump;
+
   /* calculate how many bytes can be sent before and after this bump */
   old_avail = tcp_txavail(fs, NULL);
-  new_avail = tcp_txavail(fs, &tx_head);
+  new_avail = tcp_txavail(fs, &tx_avail);
 
   /* mark connection as closed if requested */
   if ((flags & FLEXTCP_PL_ATX_FLTXDONE) == FLEXTCP_PL_ATX_FLTXDONE &&
@@ -727,17 +730,9 @@ int fast_flows_bump(struct dataplane_context *ctx, uint32_t flow_id,
   }
 
   /* update flow state */
-  fs->tx_head = tx_head;
-  tail = fs->rx_next_pos + fs->rx_avail;
-  if (tail >= fs->rx_len) {
-    tail -= fs->rx_len;
-  }
+  fs->tx_avail = tx_avail;
   rx_avail_prev = fs->rx_avail;
-  if (rx_tail >= tail) {
-    fs->rx_avail += rx_tail - tail;
-  } else {
-    fs->rx_avail += fs->rx_len - tail + rx_tail;
-  }
+  fs->rx_avail += rx_bump;
 
   /* receive buffer freed up from empty, need to send out a window update, if
    * we're not sending anyways. */

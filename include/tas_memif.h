@@ -149,8 +149,8 @@ STATIC_ASSERT(sizeof(struct flextcp_pl_arx) == 32, arx_size);
 struct flextcp_pl_atx {
   union {
     struct {
-      uint32_t rx_tail;
-      uint32_t tx_head;
+      uint32_t rx_bump;
+      uint32_t tx_bump;
       uint32_t flow_id;
       uint16_t bump_seq;
       uint8_t  flags;
@@ -276,6 +276,8 @@ struct flextcp_pl_flowst {
   uint32_t rx_ooo_len;
 #endif
 
+  /** Number of bytes available to be sent */
+  uint32_t tx_avail;
   /** Number of bytes up to next pos in the buffer that were sent but not
    * acknowledged yet. */
   uint32_t tx_sent;
@@ -283,8 +285,6 @@ struct flextcp_pl_flowst {
   uint32_t tx_next_pos;
   /** Sequence number of next segment to be sent */
   uint32_t tx_next_seq;
-  /** End of data that is ready to be sent */
-  uint32_t tx_head;
   /** Timestamp to echo in next packet */
   uint32_t tx_next_ts;
 
