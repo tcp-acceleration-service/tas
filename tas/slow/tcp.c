@@ -144,8 +144,7 @@ void tcp_poll(void)
 }
 
 int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
-    uint16_t remote_port, uint32_t db_id, int objconn, int objnohash,
-    struct connection **pconn)
+    uint16_t remote_port, uint32_t db_id, struct connection **pconn)
 {
   int ret;
   struct connection *conn;
@@ -178,8 +177,7 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
   conn->remote_seq = 0;
   conn->cnt_tx_pending = 0;
   conn->db_id = db_id;
-  conn->flags = (objconn ? NICIF_CONN_OBJCONN : 0) |
-      (objnohash ? NICIF_CONN_OBJNOHASH : 0);
+  conn->flags = 0;
 
   conn->comp.q = &conn_async_q;
   conn->comp.notify_fd = -1;
@@ -210,8 +208,7 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
 }
 
 int tcp_listen(struct app_context *ctx, uint64_t opaque, uint16_t local_port,
-    uint32_t backlog, int reuseport, int objconn, int objnohash,
-    struct listener **listen)
+    uint32_t backlog, int reuseport, struct listener **listen)
 {
   struct listener *lst;
   uint32_t i;
@@ -302,8 +299,7 @@ int tcp_listen(struct app_context *ctx, uint64_t opaque, uint16_t local_port,
   lst->backlog_len = backlog;
   lst->backlog_pos = 0;
   lst->backlog_used = 0;
-  lst->flags = (objconn ? NICIF_CONN_OBJCONN : 0) |
-      (objnohash ? NICIF_CONN_OBJNOHASH : 0);
+  lst->flags = 0;
 
   /* add to port tables */
   if (reuseport == 0) {

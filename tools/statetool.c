@@ -122,8 +122,6 @@ static int dump_flow(uint32_t flow_id)
          "  opaque=%016"PRIx64"\n"
          "  db_id=%03u\n"
          "  flag_slowpath=%u\n"
-         "  flag_objconn=%u\n"
-         "  flag_objnohash=%u\n"
          "  flag_ecn=%u\n"
          "  flag_txfin=%u\n"
          "  flag_rxfin=%u\n"
@@ -142,7 +140,6 @@ static int dump_flow(uint32_t flow_id)
          "    remote_avail=%08x\n"
          "        next_pos=%08x\n"
          "        next_seq=%010u\n"
-         "          objrem=%08x\n"
          "      dupack_cnt=%08x\n"
 #ifdef FLEXNIC_PL_OOO_RECV
          "       ooo_start=%08x\n"
@@ -156,7 +153,6 @@ static int dump_flow(uint32_t flow_id)
          "            head=%08x\n"
          "        next_pos=%08x\n"
          "        next_seq=%010u\n"
-         "          objrem=%08x\n"
          "         next_ts=%08x\n"
          "  }\n"
          "  cc {\n"
@@ -169,8 +165,6 @@ static int dump_flow(uint32_t flow_id)
          "  }\n"
          "}\n", flow_id, fs->opaque, fs->db_id,
       !!(fs->rx_base_sp & FLEXNIC_PL_FLOWST_SLOWPATH),
-      !!(fs->rx_base_sp & FLEXNIC_PL_FLOWST_OBJCONN),
-      !!(fs->rx_base_sp & FLEXNIC_PL_FLOWST_OBJNOHASH),
       !!(fs->rx_base_sp & FLEXNIC_PL_FLOWST_ECN),
       !!(fs->rx_base_sp & FLEXNIC_PL_FLOWST_TXFIN),
       !!(fs->rx_base_sp & FLEXNIC_PL_FLOWST_RXFIN),
@@ -178,13 +172,12 @@ static int dump_flow(uint32_t flow_id)
       f_beui32(fs->local_ip), f_beui16(fs->local_port), f_beui32(fs->remote_ip),
       f_beui16(fs->remote_port), mac,
       (fs->rx_base_sp & FLEXNIC_PL_FLOWST_RX_MASK), fs->rx_len, fs->rx_avail,
-      fs->rx_remote_avail, fs->rx_next_pos, fs->rx_next_seq, fs->rx_objrem,
-      fs->rx_dupack_cnt,
+      fs->rx_remote_avail, fs->rx_next_pos, fs->rx_next_seq, fs->rx_dupack_cnt,
 #ifdef FLEXNIC_PL_OOO_RECV
       fs->rx_ooo_start, fs->rx_ooo_len,
 #endif
       fs->tx_base, fs->tx_len, fs->tx_sent, fs->tx_head, fs->tx_next_pos,
-      fs->tx_next_seq, fs->tx_objrem, fs->tx_next_ts,
+      fs->tx_next_seq, fs->tx_next_ts,
       fs->tx_rate, fs->cnt_tx_drops, fs->cnt_rx_acks, fs->cnt_rx_ack_bytes,
       fs->cnt_rx_ecn_bytes, fs->rtt_est);
 

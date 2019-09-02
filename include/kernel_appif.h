@@ -71,8 +71,6 @@ enum kernel_appout_type {
   KERNEL_APPOUT_REQ_SCALE,
 };
 
-#define KERNEL_APPOUT_OPEN_OBJSOCK 0x1
-#define KERNEL_APPOUT_OPEN_OBJNOHASH 0x2
 /** Open a new connection */
 struct kernel_appout_conn_open {
   uint64_t opaque;
@@ -103,8 +101,6 @@ struct kernel_appout_conn_move {
 } __attribute__((packed));
 
 #define KERNEL_APPOUT_LISTEN_REUSEPORT 0x1
-#define KERNEL_APPOUT_LISTEN_OBJSOCK 0x2
-#define KERNEL_APPOUT_LISTEN_OBJNOHASH 0x4
 /** Open listener */
 struct kernel_appout_listen_open {
   uint64_t opaque;

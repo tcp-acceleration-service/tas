@@ -109,10 +109,6 @@ int nicif_appctx_add(uint16_t appid, uint32_t db, uint64_t *rxq_base,
 
 /** Flags for connections (used in nicif_connection_add()) */
 enum nicif_connection_flags {
-  /** Enable object steering for connection. */
-  NICIF_CONN_OBJCONN    = (1 <<  0),
-  /** No hashing for object key for steering. */
-  NICIF_CONN_OBJNOHASH  = (1 <<  1),
   /** Enable ECN for connection. */
   NICIF_CONN_ECN        = (1 <<  2),
 };
@@ -608,16 +604,13 @@ void tcp_poll(void);
  * @param remote_ip   Remote IP address
  * @param remote_port Remote port number
  * @param db_id       Doorbell ID to use for connection
- * @param objconn     != 0 if opening an object connection
- * @param objnohash   != 0 to disable hashing on object connection
  * @param conn        Pointer to location for storing pointer of created conn
  *                    struct.
  *
  * @return 0 on success, <0 else
  */
 int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
-    uint16_t remote_port, uint32_t db_id, int objconn, int objnohash,
-    struct connection **conn);
+    uint16_t remote_port, uint32_t db_id, struct connection **conn);
 
 /**
  * Open a listener.
@@ -628,16 +621,13 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
  * @param backlog     Backlog queue length
  * @param reuseport   Enable reuseport, to have multiple listeners for the same
  *                    port.
- * @param objconn     != 0 to create a listener for object connections
- * @param objnohash   != 0 to disable hashing for object connections
  * @param listen      Pointer to location for storing pointer of created
  *                    listener struct.
  *
  * @return 0 on success, <0 else
  */
 int tcp_listen(struct app_context *ctx, uint64_t opaque, uint16_t local_port,
-    uint32_t backlog, int reuseport, int objconn, int objnohash,
-    struct listener **listen);
+    uint32_t backlog, int reuseport, struct listener **listen);
 
 /**
  * Prepare to receive a connection on a listener.

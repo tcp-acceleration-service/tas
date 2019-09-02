@@ -199,13 +199,6 @@ int nicif_connection_add(uint32_t db, uint64_t mac_remote, uint32_t ip_local,
   assert(i < FLEXNIC_PL_FLOWHT_ENTRIES);
   assert(d < FLEXNIC_PL_FLOWHT_NBSZ);
 
-  /* if this is an object connection, set flag accordingly */
-  if ((flags & NICIF_CONN_OBJCONN) == NICIF_CONN_OBJCONN) {
-    rx_base |= FLEXNIC_PL_FLOWST_OBJCONN;
-    if ((flags & NICIF_CONN_OBJNOHASH) == NICIF_CONN_OBJNOHASH) {
-      rx_base |= FLEXNIC_PL_FLOWST_OBJNOHASH;
-    }
-  }
   if ((flags & NICIF_CONN_ECN) == NICIF_CONN_ECN) {
     rx_base |= FLEXNIC_PL_FLOWST_ECN;
   }
@@ -237,7 +230,6 @@ int nicif_connection_add(uint32_t db, uint64_t mac_remote, uint32_t ip_local,
   fs->tx_next_pos = 0;
   fs->tx_next_seq = local_seq;
   fs->tx_head = 0;
-  fs->tx_objrem = 0;
   fs->tx_next_ts = 0;
   fs->tx_rate = rate;
   fs->rtt_est = 0;

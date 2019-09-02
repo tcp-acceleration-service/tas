@@ -317,13 +317,9 @@ static int kin_conn_open(struct application *app, struct app_context *ctx,
     volatile struct kernel_appout *kin, volatile struct kernel_appin *kout)
 {
   struct connection *conn;
-  int objconn, objnohash;
 
-  objconn = !!(kin->data.conn_open.flags & KERNEL_APPOUT_OPEN_OBJSOCK);
-  objnohash = !!(kin->data.conn_open.flags & KERNEL_APPOUT_OPEN_OBJNOHASH);
   if (tcp_open(ctx, kin->data.conn_open.opaque, kin->data.conn_open.remote_ip,
-      kin->data.conn_open.remote_port, ctx->doorbell->id, objconn, objnohash,
-      &conn) != 0)
+      kin->data.conn_open.remote_port, ctx->doorbell->id, &conn) != 0)
   {
     fprintf(stderr, "kin_conn_open: tcp_open failed\n");
     goto error;
@@ -444,8 +440,6 @@ static int kin_listen_open(struct application *app, struct app_context *ctx,
   if (tcp_listen(ctx, kin->data.listen_open.opaque,
         kin->data.listen_open.local_port, kin->data.listen_open.backlog,
         !!(kin->data.listen_open.flags & KERNEL_APPOUT_LISTEN_REUSEPORT),
-        !!(kin->data.listen_open.flags & KERNEL_APPOUT_LISTEN_OBJSOCK),
-        !!(kin->data.listen_open.flags & KERNEL_APPOUT_LISTEN_OBJNOHASH),
         &listen) != 0)
   {
     fprintf(stderr, "kin_listen_open: tcp_listen failed\n");

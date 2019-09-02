@@ -115,7 +115,6 @@ STATIC_ASSERT(sizeof(struct flextcp_pl_ktx) == 64, ktx_size);
 
 #define FLEXTCP_PL_ARX_INVALID    0x0
 #define FLEXTCP_PL_ARX_CONNUPDATE 0x1
-#define FLEXTCP_PL_ARX_OBJUPDATE  0x2
 
 #define FLEXTCP_PL_ARX_FLRXDONE  0x1
 
@@ -210,8 +209,6 @@ struct flextcp_pl_appctx {
 #define FLEXNIC_PL_OOO_RECV 1
 
 #define FLEXNIC_PL_FLOWST_SLOWPATH 1
-#define FLEXNIC_PL_FLOWST_OBJCONN 2
-#define FLEXNIC_PL_FLOWST_OBJNOHASH 4
 #define FLEXNIC_PL_FLOWST_ECN 8
 #define FLEXNIC_PL_FLOWST_TXFIN 16
 #define FLEXNIC_PL_FLOWST_RXFIN 32
@@ -304,13 +301,7 @@ struct flextcp_pl_flowst {
   /** RTT estimate */
   uint32_t rtt_est;
 
-
 // 128
-  /** Bytes left in current object */
-  uint32_t tx_objrem;
-  /** Bytes left in current object */
-  uint32_t rx_objrem;
-
 } __attribute__((packed, aligned(64)));
 
 #define FLEXNIC_PL_FLOWHTE_VALID  (1 << 31)
