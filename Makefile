@@ -50,9 +50,7 @@ TESTS= \
 	tests/usocket_move \
 	tests/usocket_epoll_eof \
 	tests/usocket_shutdown \
-	tests/bench_ll_echo \
-	tests/obj_ll_echo \
-	tests/obj_ll_bench
+	tests/bench_ll_echo
 
 
 all: lib/libtas_sockets.so lib/libtas_interpose.so \
@@ -73,8 +71,6 @@ flexnic/tests/tcp_common: flexnic/tests/tcp_common.o
 
 tests/lowlevel: tests/lowlevel.o lib/libtas.so
 tests/lowlevel_echo: tests/lowlevel_echo.o lib/libtas.so
-tests/obj_ll_echo: tests/obj_ll_echo.o lib/libtas.so
-tests/obj_ll_bench: tests/obj_ll_bench.o lib/libtas.so
 
 tests/usocket_accept: tests/usocket_accept.o lib/libtas_sockets.so
 tests/usocket_connect: tests/usocket_connect.o lib/libtas_sockets.so

@@ -13,8 +13,6 @@ tests/usocket_accrx
 tests/usocket_conntx
 tests/usocket_conntx_large
 tests/usocket_move
-tests/obj_ll_echo
-tests/obj_ll_bench
 tracetool
 statetool
 scaletool
