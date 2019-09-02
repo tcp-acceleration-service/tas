@@ -279,15 +279,15 @@ static void event_dump(void *buf, size_t len, uint16_t type)
     case FLEXNIC_PL_TREV_ATX:
       printf("FLEXTCP_EV_ATX ");
       if (sizeof(*atx) == len) {
-        printf("rx_tail=%u tx_head=%u bump_seq_ent=%u bump_seq_flow=%u "
+        printf("rx_bump=%u tx_bump=%u bump_seq_ent=%u bump_seq_flow=%u "
             "local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
-            "flow=%u db=%u tx_next_pos=%u tx_next_seq=%u tx_head_prev=%u "
+            "flow=%u db=%u tx_next_pos=%u tx_next_seq=%u tx_avail_prev=%u "
             "rx_next_pos=%u rx_avail=%u tx_len=%u rx_len=%u "
             "rx_remote_avail=%u tx_sent=%u",
-            atx->rx_tail, atx->tx_head, atx->bump_seq_ent, atx->bump_seq_flow,
+            atx->rx_bump, atx->tx_bump, atx->bump_seq_ent, atx->bump_seq_flow,
             atx->local_ip, atx->remote_ip, atx->local_port, atx->remote_port,
             atx->flow_id, atx->db_id, atx->tx_next_pos, atx->tx_next_seq,
-            atx->tx_head_prev, atx->rx_next_pos, atx->rx_avail, atx->tx_len,
+            atx->tx_avail_prev, atx->rx_next_pos, atx->rx_avail, atx->tx_len,
             atx->rx_len, atx->rx_remote_avail, atx->tx_sent);
       } else {
         printf("unexpected event length");
@@ -351,9 +351,9 @@ static void event_dump(void *buf, size_t len, uint16_t type)
     case FLEXNIC_PL_TREV_AFLOQMAN:
       printf("FLEXTCP_EV_AFLOQMAN ");
       if (sizeof(*floq) == len) {
-        printf("tx_base=%"PRIx64" tx_head=%u tx_next_pos=%u tx_len=%u "
+        printf("tx_base=%"PRIx64" tx_avail=%u tx_next_pos=%u tx_len=%u "
             "rx_remote_avail=%u tx_sent=%u tx_objrem=%u flow=%u",
-            floq->tx_base, floq->tx_head, floq->tx_next_pos, floq->tx_len,
+            floq->tx_base, floq->tx_avail, floq->tx_next_pos, floq->tx_len,
             floq->rx_remote_avail, floq->tx_sent, floq->tx_objrem,
             floq->flow_id);
      } else {
