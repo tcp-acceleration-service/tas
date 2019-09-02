@@ -127,29 +127,6 @@ struct flextcp_connection {
   uint8_t rx_closed;
 };
 
-/** Object TCP listening "socket". (opaque) */
-struct flextcp_obj_listener {
-  struct flextcp_listener l;
-};
-
-/** Context-local information for connection (not part of public interface) */
-struct flextcp_obj_conn_ctx {
-  uint32_t obj_pos;
-  uint32_t obj_len_rem;
-};
-
-/** Object TCP connection. (opaque) */
-struct flextcp_obj_connection {
-  struct flextcp_obj_conn_ctx ctx[FLEXTCP_MAX_CONTEXTS];
-  struct flextcp_connection c;
-  volatile uint8_t lock;
-};
-
-/** Object TCP handle for allocated object (opaque) */
-struct flextcp_obj_handle {
-  uint32_t pos;
-};
-
 /** Types of events that can occur in flextcp contexts */
 enum flextcp_event_type {
   /** flextcp_listen_open() result. */
@@ -173,23 +150,6 @@ enum flextcp_event_type {
   FLEXTCP_EV_CONN_TXCLOSED,
   /** Connection moved to new context */
   FLEXTCP_EV_CONN_MOVED,
-
-
-  /** flextcp_obj_listen_open() result */
-  FLEXTCP_EV_OBJ_LISTEN_OPEN,
-  /** New connection on listening socket arrived. */
-  FLEXTCP_EV_OBJ_LISTEN_NEWCONN,
-  /** Accept operation completed */
-  FLEXTCP_EV_OBJ_LISTEN_ACCEPT,
-
-  /** flextcp_obj_connection_open() result */
-  FLEXTCP_EV_OBJ_CONN_OPEN,
-  /** Connection was closed */
-  FLEXTCP_EV_OBJ_CONN_CLOSED,
-  /** Data arrived on connection */
-  FLEXTCP_EV_OBJ_CONN_RECEIVED,
-  /** More send buffer available */
-  FLEXTCP_EV_OBJ_CONN_SENDBUF,
 };
 
 /** Events that can occur on flextcp contexts. */
@@ -246,47 +206,10 @@ struct flextcp_event {
       int16_t status;
       struct flextcp_connection *conn;
     } conn_closed;
-
-
-    struct {
-      int16_t status;
-      struct flextcp_obj_listener *listener;
-    } obj_listen_open;
-    struct {
-      uint16_t remote_port;
-      uint32_t remote_ip;
-      struct flextcp_obj_listener *listener;
-    } obj_listen_newconn;
-    struct {
-      int16_t status;
-      struct flextcp_obj_connection *conn;
-    } obj_listen_accept;
-
-    struct {
-      int16_t status;
-      struct flextcp_obj_connection *conn;
-    } obj_conn_open;
-    struct {
-      uint8_t dstlen;
-      uint32_t len_1;
-      uint32_t len_2;
-      struct flextcp_obj_handle handle;
-
-      void *buf_1;
-      void *buf_2;
-
-      struct flextcp_obj_connection *conn;
-    } obj_conn_received;
-    struct {
-      struct flextcp_obj_connection *conn;
-    } obj_conn_sendbuf;
   } ev;
 };
 
 #define FLEXTCP_LISTEN_REUSEPORT 0x1
-#define FLEXTCP_LISTEN_OBJNOHASH 0x2
-
-#define FLEXTCP_CONNECT_OBJNOHASH 0x1
 
 /**
  * Initializes global flextcp state, must only be called once.
@@ -305,7 +228,7 @@ int flextcp_context_create(struct flextcp_context *ctx);
 int flextcp_context_poll(struct flextcp_context *ctx, int num,
     struct flextcp_event *events);
 
-
+void flextcp_block(struct flextcp_context *ctx, int timeout_ms);
 
 /*****************************************************************************/
 /* Regular TCP connection management */
@@ -363,46 +286,5 @@ int flextcp_connection_tx_possible(struct flextcp_context *ctx,
 /** Move connection to specfied context */
 int flextcp_connection_move(struct flextcp_context *ctx,
         struct flextcp_connection *conn);
-
-
-
-/*****************************************************************************/
-/* Object TCP connections */
-
-/** Open a object listening socket (asynchronous). */
-int flextcp_obj_listen_open(struct flextcp_context *ctx,
-    struct flextcp_obj_listener *lst, uint16_t port, uint32_t backlog,
-    uint32_t flags);
-
-/** Accept connections on a listening object socket (asynchronous). This can be
- * called more than once to register multiple connection handles. */
-int flextcp_obj_listen_accept(struct flextcp_context *ctx,
-    struct flextcp_obj_listener *lst, struct flextcp_obj_connection *conn);
-
-/** Open an object connection (asynchronous). */
-int flextcp_obj_connection_open(struct flextcp_context *ctx,
-    struct flextcp_obj_connection *conn, uint32_t dst_ip, uint16_t dst_port,
-    uint32_t flags);
-
-
-/** Received object fully processed. */
-void flextcp_obj_connection_rx_done(struct flextcp_context *ctx,
-    struct flextcp_obj_connection *conn, struct flextcp_obj_handle *oh);
-
-/** Allocate object for transmission (note that in contrast to
- * flextcp_connection_tx_alloc there won't be short allocs). */
-int flextcp_obj_connection_tx_alloc(struct flextcp_obj_connection *oconn,
-    uint8_t dstlen, size_t len, void **buf1, size_t *len1, void **buf2,
-    struct flextcp_obj_handle *oh);
-
-/** Send out allocated object */
-void flextcp_obj_connection_tx_send(struct flextcp_context *ctx,
-        struct flextcp_obj_connection *conn, struct flextcp_obj_handle *oh);
-
-/** Bump NIC pointers for rx and tx if necessary */
-int flextcp_obj_connection_bump(struct flextcp_context *ctx,
-        struct flextcp_obj_connection *conn);
-
-void flextcp_block(struct flextcp_context *ctx, int timeout_ms);
 
 #endif /* ndef TAS_LL_H_ */
