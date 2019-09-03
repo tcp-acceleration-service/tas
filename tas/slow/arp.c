@@ -174,7 +174,7 @@ void arp_packet(const void *pkt, uint16_t len)
 
     /* handle ARP response */
     if ((ae = ae_lookup(f_beui32(arp->spa))) == NULL) {
-      fprintf(stderr, "arp_packet: response has no entry\n");
+      ARP_DEBUG(stderr, "arp_packet: response has no entry\n");
       return;
     }
 
