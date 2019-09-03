@@ -281,8 +281,10 @@ void flexnic_loadmon(uint32_t ts)
 
   /* periodically print out staticstics */
   if (count++ % 100 == 0) {
-    fprintf(stderr, "flexnic_loadmon: status cores = %u   busy = %lu  "
-        "cycles =%lu  kdrops=%lu\n", num_cores, ewma_busy, ewma_cycles, kdrops);
+    if (!config.quiet)
+      fprintf(stderr, "flexnic_loadmon: status cores = %u   busy = %lu  "
+          "cycles =%lu  kdrops=%lu\n", num_cores, ewma_busy, ewma_cycles,
+          kdrops);
     kdrops = 0;
   }
 
@@ -299,8 +301,9 @@ void flexnic_loadmon(uint32_t ts)
 
   /* scale down if idle iterations more than 1.25 cores are idle */
   if (num_cores > 1 && id_cyc > ewma_cycles * 5 / 4) {
-    fprintf(stderr, "flexnic_loadmon: down cores = %u   idle_cyc = %lu  "
-        "1.2 cores = %lu\n", num_cores, id_cyc, ewma_cycles * 5 / 4);
+    if (!config.quiet)
+      fprintf(stderr, "flexnic_loadmon: down cores = %u   idle_cyc = %lu  "
+          "1.2 cores = %lu\n", num_cores, id_cyc, ewma_cycles * 5 / 4);
     flexnic_scale_to(num_cores - 1);
     waiting = 1;
     waiting_n = 0;
@@ -309,8 +312,9 @@ void flexnic_loadmon(uint32_t ts)
 
   /* scale up if idle iterations less than .2 of a core */
   if (num_cores < fp_cores_max && id_cyc < ewma_cycles / 5) {
-    fprintf(stderr, "flexnic_loadmon: up cores = %u   idle_cyc = %lu  "
-        "0.2 cores = %lu\n", num_cores, id_cyc,  ewma_cycles / 5);
+    if (!config.quiet)
+      fprintf(stderr, "flexnic_loadmon: up cores = %u   idle_cyc = %lu  "
+          "0.2 cores = %lu\n", num_cores, id_cyc,  ewma_cycles / 5);
     flexnic_scale_to(num_cores + 1);
     waiting = 1;
     waiting_n = 0;

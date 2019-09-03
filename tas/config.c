@@ -71,6 +71,7 @@ enum cfg_params {
   CP_FP_NO_INTS,
   CP_KNI_NAME,
   CP_DPDK_EXTRA,
+  CP_QUIET,
 };
 
 static struct option opts[] = {
@@ -185,6 +186,9 @@ static struct option opts[] = {
     { .name = "dpdk-extra",
       .has_arg = required_argument,
       .val = CP_DPDK_EXTRA },
+    { .name = "quiet",
+      .has_arg = no_argument,
+      .val = CP_QUIET },
     { .name = NULL },
   };
 
@@ -443,6 +447,9 @@ int config_parse(struct configuration *c, int argc, char *argv[])
           goto failed;
         }
         break;
+      case CP_QUIET:
+	c->quiet = 1;
+        break;
 
       case -1:
         done = 1;
@@ -507,6 +514,7 @@ static int config_defaults(struct configuration *c, char *progname)
   c->fp_cores_max = 1;
   c->fp_interrupts = 1;
   c->kni_name = NULL;
+  c->quiet = 0;
 
   c->dpdk_argc = 1;
   if ((c->dpdk_argv = calloc(2, sizeof(*c->dpdk_argv))) == NULL) {
@@ -600,6 +608,10 @@ static void print_usage(struct configuration *c, char *progname)
       "\n"
       "Host kernel interface:\n"
       "  --kni-name=NAME             Network interface name to expose "
+          "[default: disabled]\n"
+      "\n"
+      "Miscelaneous:\n"
+      "  --quiet                     Disable non-essential logging "
           "[default: disabled]\n"
       "\n",
       progname,

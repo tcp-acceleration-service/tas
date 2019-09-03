@@ -115,6 +115,8 @@ struct configuration {
   uint32_t fp_interrupts;
   /** SP: kni interface name */
   char *kni_name;
+  /** Minimize output */
+  int quiet;
   /** DPDK extra argument vector */
   char **dpdk_argv;
   /** DPDK extra argument count */
