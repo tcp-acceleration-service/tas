@@ -65,7 +65,7 @@ static void thread_error(void);
 static int common_thread(void *arg);
 
 
-static void *slowpath_thread(void *arg)
+static void *slowpath_thread(void)
 {
   slowpath_main();
   return NULL;
@@ -128,26 +128,8 @@ int main(int argc, char *argv[])
     goto error_dataplane_cleanup;
   }
 
-  // Start kernel thread
-  pthread_t kernel;
-  int r = pthread_create(&kernel, NULL, slowpath_thread, NULL);
-  assert(r == 0);
-
-  pthread_setname_np(kernel, "stcp-slow");
-
-#ifndef DATAPLANE_STATS
-  if (threads_launched < fp_cores_max) {
-    return common_thread((void *) (uintptr_t) threads_launched);
-  } else {
-    pause();
-  }
-#else
-  while (1) {
-    sleep(1);
-    dataplane_dump_stats();
-    shm_dump_stats();
-  }
-#endif
+  /* Start kernel thread */
+  slowpath_thread();
 
 error_dataplane_cleanup:
   /* TODO */
@@ -214,12 +196,9 @@ static int start_threads(void)
   unsigned cores_avail, cores_needed, core;
   void *arg;
 
-#ifdef DATAPLANE_STATS
-  cores_avail = rte_lcore_count() - 1;
-#else
   cores_avail = rte_lcore_count();
-#endif
-  cores_needed = fp_cores_max;
+  /* fast path cores + one slow path core */
+  cores_needed = fp_cores_max + 1;
 
   if ((ctxs = rte_calloc("context list", fp_cores_max, sizeof(*ctxs), 64)) == NULL) {
     perror("datplane_init: calloc failed");
