@@ -86,6 +86,9 @@ int nicif_init(void)
 {
   rte_hash_crc_init_alg();
 
+  /* wait for fastpath to be ready */
+  while (!(tas_info->flags & FLEXNIC_FLAG_READY));
+
   fn_cores = tas_info->cores_num;
 
   /* prepare packet memory manager */
