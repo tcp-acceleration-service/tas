@@ -649,8 +649,10 @@ int tcp_accept(struct app_context *ctx, uint64_t opaque,
  * @param len Length of packet
  * @param fn_core FlexNIC emulator core
  * @param flow_group Flow group (rss bucket for steering)
+ *
+ * @return 0 if packet has been consumed, <0 otherwise.
  */
-void tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
+int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
     uint16_t flow_group);
 
 /**

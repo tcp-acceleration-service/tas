@@ -346,29 +346,30 @@ int tcp_accept(struct app_context *ctx, uint64_t opaque,
   return 0;
 }
 
-void tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
+int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
     uint16_t flow_group)
 {
   struct connection *c;
   struct listener *l;
   const struct pkt_tcp *p = pkt;
   struct tcp_opts opts;
+  int ret = 0;
 
   if (len < sizeof(*p)) {
     fprintf(stderr, "tcp_packet: incomplete TCP receive (%u received, "
         "%u expected)\n", len, (unsigned) sizeof(*p));
-    return;
+    return -1;
   }
 
   if (f_beui32(p->ip.dest) != config.ip) {
     fprintf(stderr, "tcp_packet: unexpected destination IP (%x received, "
         "%x expected)\n", f_beui32(p->ip.dest), config.ip);
-    return;
+    return -1;
   }
 
   if (parse_options(p, len, &opts) != 0) {
     fprintf(stderr, "tcp_packet: parsing TCP options failed\n");
-    return;
+    return -1;
   }
 
   if ((c = conn_lookup(p)) != NULL) {
@@ -376,10 +377,14 @@ void tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
   } else if ((l = listener_lookup(p)) != NULL) {
     listener_packet(l, p, &opts, fn_core, flow_group);
   } else {
+    ret = -1;
+
     /* send reset if the packet received wasn't a reset */
     if (!(TCPH_FLAGS(&p->tcp) & TCP_RST))
       send_reset(p, &opts);
   }
+
+  return ret;
 }
 
 int tcp_close(struct connection *conn)
