@@ -120,9 +120,6 @@ int main(int argc, char *argv[])
 
   shm_set_ready();
 
-  printf("flexnic ready\n");
-  fflush(stdout);
-
   if (start_threads() != 0) {
     res = EXIT_FAILURE;
     goto error_dataplane_cleanup;

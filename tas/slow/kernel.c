@@ -110,7 +110,7 @@ int slowpath_main(void)
     return EXIT_FAILURE;
   }
 
-  printf("kernel ready\n");
+  printf("TAS ready\n");
   fflush(stdout);
 
   while (exited == 0) {

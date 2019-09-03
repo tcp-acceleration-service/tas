@@ -87,7 +87,6 @@ int nicif_init(void)
   rte_hash_crc_init_alg();
 
   fn_cores = tas_info->cores_num;
-  fprintf(stderr, "nicif: FlexNIC has %u cores\n", fn_cores);
 
   /* prepare packet memory manager */
   if (packetmem_init()) {
