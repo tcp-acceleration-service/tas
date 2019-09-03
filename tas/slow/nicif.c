@@ -531,6 +531,7 @@ static inline void process_packet(const void *buf, uint16_t len,
   const struct eth_hdr *eth = buf;
   const struct ip_hdr *ip = (struct ip_hdr *) (eth + 1);
   const struct tcp_hdr *tcp = (struct tcp_hdr *) (ip + 1);
+  int to_kni = 1;
 
   if (f_beui16(eth->type) == ETH_TYPE_ARP) {
     if (len < sizeof(struct pkt_arp)) {
@@ -551,9 +552,12 @@ static inline void process_packet(const void *buf, uint16_t len,
         return;
       }
 
-      tcp_packet(buf, len, fn_core, flow_group);
+      to_kni = !!tcp_packet(buf, len, fn_core, flow_group);
     }
   }
+
+  if (to_kni)
+    kni_packet(buf, len);
 }
 
 static inline volatile struct flextcp_pl_ktx *ktx_try_alloc(uint32_t core,

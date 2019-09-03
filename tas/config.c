@@ -69,6 +69,7 @@ enum cfg_params {
   CP_IP_ADDR,
   CP_FP_CORES_MAX,
   CP_FP_NO_INTS,
+  CP_KNI_NAME,
   CP_DPDK_EXTRA,
 };
 
@@ -178,6 +179,9 @@ static struct option opts[] = {
     { .name = "fp-no-ints",
       .has_arg = no_argument,
       .val = CP_FP_NO_INTS },
+    { .name = "kni-name",
+      .has_arg = required_argument,
+      .val = CP_KNI_NAME },
     { .name = "dpdk-extra",
       .has_arg = required_argument,
       .val = CP_DPDK_EXTRA },
@@ -427,6 +431,13 @@ int config_parse(struct configuration *c, int argc, char *argv[])
         c->fp_interrupts = 0;
         break;
 
+      case CP_KNI_NAME:
+        if (!(c->kni_name = strdup(optarg))) {
+          fprintf(stderr, "strdup kni name failed\n");
+          goto failed;
+        }
+        break;
+
       case CP_DPDK_EXTRA:
         if (parse_arg_append(optarg, c) != 0) {
           goto failed;
@@ -495,6 +506,7 @@ static int config_defaults(struct configuration *c, char *progname)
   c->cc_timely_min_rate = 10000;
   c->fp_cores_max = 1;
   c->fp_interrupts = 1;
+  c->kni_name = NULL;
 
   c->dpdk_argc = 1;
   if ((c->dpdk_argv = calloc(2, sizeof(*c->dpdk_argv))) == NULL) {
@@ -584,7 +596,12 @@ static void print_usage(struct configuration *c, char *progname)
           "[default: %"PRIu32"]\n"
       "  --fp-no-ints                Disable Interrupts "
           "[default: enabled]\n"
-      "  --dpdk-extra=ARG            Add extra DPDK argument\n",
+      "  --dpdk-extra=ARG            Add extra DPDK argument\n"
+      "\n"
+      "Host kernel interface:\n"
+      "  --kni-name=NAME             Network interface name to expose "
+          "[default: disabled]\n"
+      "\n",
       progname,
       c->nic_rx_len, c->nic_tx_len, c->app_kin_len, c->app_kout_len,
       c->tcp_rtt_init, c->tcp_link_bw, c->tcp_rxbuf_len, c->tcp_txbuf_len,

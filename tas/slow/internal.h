@@ -784,4 +784,23 @@ int routing_resolve(struct nicif_completion *comp, uint32_t ip, uint64_t *mac);
 
 /** @} */
 
+/*****************************************************************************/
+/**
+ * @addtogroup kernel-kni
+ * @brief Host Kernel Interface.
+ * @ingroup kernel
+ *
+ * This is implemented in kni.c
+ * @{ */
+
+
+/** Initialize kni if enabled */
+int kni_init(void);
+
+/** Pass packet to KNI if enabled (buffer is not consumed). */
+void kni_packet(const void *pkt, uint16_t len);
+
+/** Poll kni */
+unsigned kni_poll(void);
+
 #endif // ndef INTERNAL_H_

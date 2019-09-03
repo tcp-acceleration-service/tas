@@ -19,7 +19,7 @@ LIBS_DPDK+= $(addprefix -lrte_pmd_,$(DPDK_PMDS))
 LIBS_DPDK+= -lrte_eal -lrte_mempool -lrte_mempool_ring \
 	    -lrte_hash -lrte_ring -lrte_kvargs -lrte_ethdev \
 	    -lrte_mbuf -lnuma -lrte_bus_pci -lrte_pci \
-	    -lrte_cmdline -lrte_timer -lrte_net \
+	    -lrte_cmdline -lrte_timer -lrte_net -lrte_kni \
 	    -Wl,--no-whole-archive -ldl $(EXTRA_LIBS_DPDK)
 
 LDLIBS += -lm -lpthread -lrt -ldl
@@ -27,7 +27,7 @@ LDLIBS += -lm -lpthread -lrt -ldl
 UTILS_OBJS = $(addprefix lib/utils/,utils.o rng.o timeout.o)
 TASCOMMON_OBJS = $(addprefix tas/,tas.o config.o shm.o)
 SLOWPATH_OBJS = $(addprefix tas/slow/,kernel.o packetmem.o appif.o appif_ctx.o \
-	nicif.o cc.o tcp.o arp.o routing.o)
+	nicif.o cc.o tcp.o arp.o routing.o kni.o)
 FASTPATH_OBJS = $(addprefix tas/fast/,fastemu.o network.o \
 		    qman.o trace.o fast_kernel.o fast_appctx.o fast_flows.o)
 STACK_OBJS = $(addprefix lib/tas/,init.o kernel.o conn.o connect.o)
