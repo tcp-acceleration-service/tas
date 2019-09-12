@@ -46,6 +46,8 @@ int flextcp_listen_open(struct flextcp_context *ctx,
   struct kernel_appout *kin = ctx->kin_base;
   uint32_t f = 0;
 
+  memset(lst, 0, sizeof(*lst));
+
   if ((flags & ~(FLEXTCP_LISTEN_REUSEPORT)) != 0) {
     fprintf(stderr, "flextcp_listen_open: unknown flags (%x)\n", flags);
     return -1;
@@ -426,17 +428,8 @@ int flextcp_connection_move(struct flextcp_context *ctx,
 
 static void connection_init(struct flextcp_connection *conn)
 {
-  conn->rxb_head = 0;
-  conn->rxb_used = 0;
-  conn->rxb_bump = 0;
-  conn->txb_head = 0;
-  conn->txb_sent = 0;
-  conn->txb_allocated = 0;
-  conn->txb_bump = 0;
-  conn->bump_seq = 0;
+  memset(conn, 0, sizeof(*conn));
   conn->status = CONN_CLOSED;
-  conn->flags = 0;
-  conn->rx_closed = 0;
 }
 
 static inline void conn_mark_bump(struct flextcp_context *ctx,

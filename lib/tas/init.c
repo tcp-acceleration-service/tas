@@ -118,6 +118,8 @@ int flextcp_context_create(struct flextcp_context *ctx)
 {
   static uint16_t ctx_id = 0;
 
+  memset(ctx, 0, sizeof(*ctx));
+
   ctx->ctx_id = __sync_fetch_and_add(&ctx_id, 1);
   if (ctx->ctx_id >= FLEXTCP_MAX_CONTEXTS) {
     fprintf(stderr, "flextcp_context_create: maximum number of contexts "
