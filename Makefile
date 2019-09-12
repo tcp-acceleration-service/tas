@@ -50,7 +50,8 @@ TESTS= \
 	tests/usocket_move \
 	tests/usocket_epoll_eof \
 	tests/usocket_shutdown \
-	tests/bench_ll_echo
+	tests/bench_ll_echo \
+	tests/libtas/tas_ll
 
 
 all: lib/libtas_sockets.so lib/libtas_interpose.so \
@@ -59,6 +60,9 @@ all: lib/libtas_sockets.so lib/libtas_interpose.so \
 	tas/tas
 
 tests: $(TESTS)
+
+run-tests: tests/libtas/tas_ll
+	tests/libtas/tas_ll
 
 docs:
 	cd doc && doxygen
@@ -83,6 +87,9 @@ tests/usocket_epoll_eof: tests/usocket_epoll_eof.o
 tests/usocket_shutdown: tests/usocket_shutdown.o
 tests/bench_ll_echo: tests/bench_ll_echo.o lib/libtas.so
 
+tests/libtas/tas_ll: tests/libtas/tas_ll.o tests/libtas/harness.o \
+	tests/libtas/harness.o tests/libtas/testutils.o lib/libtas.so
+
 tools/tracetool: tools/tracetool.o
 tools/statetool: tools/statetool.o lib/libtas.so
 tools/scaletool: tools/scaletool.o lib/libtas.so
@@ -104,7 +111,7 @@ lib/libtas.so: $(call shared_objs, $(UTILS_OBJS) $(STACK_OBJS))
 
 clean:
 	rm -f *.o tas/*.o tas/fast/*.o tas/slow/*.o lib/utils/*.o \
-	  lib/tas/*.o lib/sockets/*.o tests/*.o tools/*.o \
+	  lib/tas/*.o lib/sockets/*.o tests/*.o tests/*.otools/*.o \
 	  lib/libtas_sockets.so lib/libtas_interpose.so \
 	  lib/libtas.so \
 	  $(TESTS) \
@@ -128,4 +135,4 @@ uninstall:
 	rm -f $(DESTDIR)$(LIBDIR)/libtas_sockets.so
 	rm -f $(DESTDIR)$(LIBDIR)/libtas.so
 
-.PHONY: all tests clean docs install uninstall
+.PHONY: all tests clean docs install uninstall run-tests
