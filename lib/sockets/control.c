@@ -597,6 +597,11 @@ int tas_getsockopt(int sockfd, int level, int optname, void *optval,
     if (s->type == SOCK_LISTENER) {
       res = (s->data.listener.status == SOL_OPEN ? 0 : EINPROGRESS);
     } else if (s->type == SOCK_CONNECTION) {
+      /* if connection is opening, make sure to poll context to make busy loops
+       * work */
+      if (s->data.connection.status == SOC_CONNECTING)
+        flextcp_sockctx_poll(flextcp_sockctx_get());
+
       if (s->data.connection.status == SOC_CONNECTED) {
         res = 0;
       } else if (s->data.connection.status == SOC_CONNECTING) {
