@@ -51,7 +51,8 @@ TESTS= \
 	tests/usocket_epoll_eof \
 	tests/usocket_shutdown \
 	tests/bench_ll_echo \
-	tests/libtas/tas_ll
+	tests/libtas/tas_ll \
+	tests/libtas/tas_sockets
 
 
 all: lib/libtas_sockets.so lib/libtas_interpose.so \
@@ -61,8 +62,9 @@ all: lib/libtas_sockets.so lib/libtas_interpose.so \
 
 tests: $(TESTS)
 
-run-tests: tests/libtas/tas_ll
+run-tests: tests/libtas/tas_ll tests/libtas/tas_sockets
 	tests/libtas/tas_ll
+	tests/libtas/tas_sockets
 
 docs:
 	cd doc && doxygen
@@ -89,6 +91,8 @@ tests/bench_ll_echo: tests/bench_ll_echo.o lib/libtas.so
 
 tests/libtas/tas_ll: tests/libtas/tas_ll.o tests/libtas/harness.o \
 	tests/libtas/harness.o tests/libtas/testutils.o lib/libtas.so
+tests/libtas/tas_sockets: tests/libtas/tas_sockets.o tests/libtas/harness.o \
+	tests/libtas/harness.o tests/libtas/testutils.o lib/libtas_sockets.so
 
 tools/tracetool: tools/tracetool.o
 tools/statetool: tools/statetool.o lib/libtas.so

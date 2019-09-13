@@ -14,6 +14,7 @@ tests/usocket_conntx
 tests/usocket_conntx_large
 tests/usocket_move
 tests/libtas/tas_ll
+tests/libtas/tas_sockets
 tracetool
 statetool
 scaletool

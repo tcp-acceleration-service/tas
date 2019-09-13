@@ -136,6 +136,35 @@ int harness_aout_pull_connopen(size_t ctxid, uint64_t opaque, uint32_t remote_ip
   }
 }
 
+int harness_aout_pull_connopen_op(size_t ctxid, uint64_t *opaque,
+    uint32_t remote_ip, uint16_t remote_port, uint8_t flags)
+{
+  struct harness_ctx *hc = &harness.ctxs[ctxid];
+  struct kernel_appout *pao;
+  struct kernel_appout_conn_open *aco;
+
+  if (harness_aout_peek(&pao, 0) != 0)
+    return -1;
+
+  aco = &pao->data.conn_open;
+  if (pao->type == KERNEL_APPOUT_CONN_OPEN &&
+      aco->remote_ip == remote_ip &&
+      aco->remote_port == remote_port &&
+      aco->flags == flags)
+  {
+    *opaque = aco->opaque;
+    pao->type = 0;
+
+    hc->aout_pos++;
+    if (hc->aout_pos >= hc->aout_len)
+      hc->aout_pos -= hc->aout_len;
+
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
 int harness_ain_push(size_t ctxid, struct kernel_appin *ai)
 {
   struct harness_ctx *hc = &harness.ctxs[ctxid];

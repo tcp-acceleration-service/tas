@@ -22,6 +22,8 @@ int harness_aout_peek(struct kernel_appout **ao, size_t ctxid);
 int harness_aout_pop(size_t ctxid);
 int harness_aout_pull_connopen(size_t ctxid, uint64_t opaque, uint32_t remote_ip,
     uint16_t remote_port, uint8_t flags);
+int harness_aout_pull_connopen_op(size_t ctxid, uint64_t *opaque,
+    uint32_t remote_ip, uint16_t remote_port, uint8_t flags);
 
 int harness_ain_push(size_t ctxid, struct kernel_appin *ai);
 int harness_ain_push_connopened(size_t ctxid, uint64_t opaque, uint32_t rx_len,
