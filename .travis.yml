@@ -1,6 +1,17 @@
+sudo: required
 dist: bionic
 language: generic
 compiler:
 - gcc
+env:
+- DPDK_VER=17.11.6
+- DPDK_VER=18.11.2
+- DPDK_VER=19.08
+cache:
+  directories:
+    - $HOME/dpdk/
+install:
+- /bin/bash .travis-install.sh
 script:
-- make run-tests
+- make all RTE_SDK=${HOME}/dpdk/${DPDK_VER}
+- make run-tests RTE_SDK=${HOME}/dpdk/${DPDK_VER}
