@@ -1,0 +1,6 @@
+dist: bionic
+language: generic
+compiler:
+- gcc
+script:
+- make run-tests
