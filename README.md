@@ -1,5 +1,7 @@
 # TCP Acceleration Service
 
+[![Build Status](https://travis-ci.org/tcp-acceleration-service/tas.svg?branch=master)](https://travis-ci.org/tcp-acceleration-service/tas)
+
 TAS is a drop-in highly CPU efficient and scalable TCP acceleration service.
 
 Our [EuroSys2019 Paper](https://dl.acm.org/authorize?N678517) describes the TAS
