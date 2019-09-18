@@ -4,7 +4,7 @@
 
 #include <tas_ll.h>
 
-#include "testutils.h"
+#include "../testutils.h"
 #include "harness.h"
 
 #define TEST_IP   0x0a010203

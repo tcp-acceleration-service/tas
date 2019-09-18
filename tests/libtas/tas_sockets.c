@@ -10,7 +10,7 @@
 
 #include <tas_sockets.h>
 
-#include "testutils.h"
+#include "../testutils.h"
 #include "harness.h"
 
 #define TEST_IP   0x0a010203

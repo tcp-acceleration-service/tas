@@ -94,13 +94,13 @@ tests/usocket_shutdown: tests/usocket_shutdown.o
 tests/bench_ll_echo: tests/bench_ll_echo.o lib/libtas.so
 
 tests/libtas/tas_ll: tests/libtas/tas_ll.o tests/libtas/harness.o \
-	tests/libtas/harness.o tests/libtas/testutils.o lib/libtas.so
+	tests/libtas/harness.o tests/testutils.o lib/libtas.so
 tests/libtas/tas_sockets: tests/libtas/tas_sockets.o tests/libtas/harness.o \
-	tests/libtas/harness.o tests/libtas/testutils.o lib/libtas_sockets.so
+	tests/libtas/harness.o tests/testutils.o lib/libtas_sockets.so
 
 tests/tas_unit/%.o: CFLAGS+=-Itas/include
 tests/tas_unit/fastpath: LDLIBS+=-lrte_eal
-tests/tas_unit/fastpath: tests/tas_unit/fastpath.o tests/tas_unit/testutils.o \
+tests/tas_unit/fastpath: tests/tas_unit/fastpath.o tests/testutils.o \
   tas/fast/fast_flows.o
 
 tools/tracetool: tools/tracetool.o

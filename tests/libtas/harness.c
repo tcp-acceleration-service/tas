@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "harness.h"
-#include "testutils.h"
+#include "../testutils.h"
 #include <tas_ll.h>
 #include <tas_memif.h>
 

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "testutils.h"
+#include "../testutils.h"
 
 #include <rte_config.h>
 #include <rte_ether.h>
