@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/mman.h>
 
 #include "../testutils.h"
 
@@ -41,7 +42,7 @@ struct qman_set_op {
   uint32_t avail;
   uint16_t max_chunk;
   uint8_t flags;
-} qm_set_op;
+} qm_set_op = { .got_op = 0 };
 
 int qman_set(struct qman_thread *t, uint32_t id, uint32_t rate, uint32_t avail,
     uint16_t max_chunk, uint8_t flags)
@@ -65,8 +66,10 @@ void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
 static void flow_init(uint32_t fid, uint32_t rxlen, uint32_t txlen, uint64_t opaque)
 {
   struct flextcp_pl_flowst *fs = &state_base.flowst[fid];
-  void *rxbuf = test_zalloc(rxlen);
-  void *txbuf = test_zalloc(txlen);
+  void *rxbuf = mmap(NULL, rxlen, PROT_READ | PROT_WRITE,
+      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+  void *txbuf = mmap(NULL, rxlen, PROT_READ | PROT_WRITE,
+      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
   fs->opaque = opaque;
   fs->rx_base_sp = (uintptr_t) rxbuf;
@@ -257,6 +260,8 @@ void test_rxbump_fc_reopen_deadlock(void *arg)
 int main(int argc, char *argv[])
 {
   int ret = 0;
+
+  memset(&state_base, 0, sizeof(state_base));
 
   if (test_subcase("tx bump small", test_txbump_small, NULL))
     ret = 1;
