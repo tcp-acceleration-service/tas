@@ -38,6 +38,10 @@ CFLAGS += -I. -Ilib/tas/include -Ilib/sockets/include
 
 shared_objs = $(patsubst %.o,%.shared.o,$(1))
 
+TESTS_AUTO= \
+	tests/libtas/tas_ll \
+	tests/libtas/tas_sockets \
+	tests/tas_unit/fastpath \
 
 TESTS= \
 	tests/lowlevel \
@@ -51,8 +55,7 @@ TESTS= \
 	tests/usocket_epoll_eof \
 	tests/usocket_shutdown \
 	tests/bench_ll_echo \
-	tests/libtas/tas_ll \
-	tests/libtas/tas_sockets
+	$(TESTS_AUTO)
 
 
 all: lib/libtas_sockets.so lib/libtas_interpose.so \
@@ -62,9 +65,10 @@ all: lib/libtas_sockets.so lib/libtas_interpose.so \
 
 tests: $(TESTS)
 
-run-tests: tests/libtas/tas_ll tests/libtas/tas_sockets
+run-tests: $(TESTS_AUTO)
 	tests/libtas/tas_ll
 	tests/libtas/tas_sockets
+	tests/tas_unit/fastpath
 
 docs:
 	cd doc && doxygen
@@ -94,6 +98,11 @@ tests/libtas/tas_ll: tests/libtas/tas_ll.o tests/libtas/harness.o \
 tests/libtas/tas_sockets: tests/libtas/tas_sockets.o tests/libtas/harness.o \
 	tests/libtas/harness.o tests/libtas/testutils.o lib/libtas_sockets.so
 
+tests/tas_unit/%.o: CFLAGS+=-Itas/include
+tests/tas_unit/fastpath: LDLIBS+=-lrte_eal
+tests/tas_unit/fastpath: tests/tas_unit/fastpath.o tests/tas_unit/testutils.o \
+  tas/fast/fast_flows.o
+
 tools/tracetool: tools/tracetool.o
 tools/statetool: tools/statetool.o lib/libtas.so
 tools/scaletool: tools/scaletool.o lib/libtas.so
@@ -115,7 +124,7 @@ lib/libtas.so: $(call shared_objs, $(UTILS_OBJS) $(STACK_OBJS))
 
 clean:
 	rm -f *.o tas/*.o tas/fast/*.o tas/slow/*.o lib/utils/*.o \
-	  lib/tas/*.o lib/sockets/*.o tests/*.o tests/*.otools/*.o \
+	  lib/tas/*.o lib/sockets/*.o tests/*.o tests/*/*.o tools/*.o \
 	  lib/libtas_sockets.so lib/libtas_interpose.so \
 	  lib/libtas.so \
 	  $(TESTS) \
