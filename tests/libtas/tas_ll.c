@@ -343,6 +343,8 @@ static void test_full_txbuf(void *p)
 
 int main(int argc, char *argv[])
 {
+  int ret = 0;
+
   struct harness_params params;
   params.num_ctxs = 1;
   params.fp_cores = 2;
@@ -354,10 +356,20 @@ int main(int argc, char *argv[])
   harness_prepare(&params);
 
 
-  test_subcase("poll empty ctx", test_poll_empty, NULL);
-  test_subcase("connect success", test_connect_success, NULL);
-  test_subcase("connect fail", test_connect_fail, NULL);
-  test_subcase("full rxbuf", test_full_rxbuf, NULL);
-  test_subcase("full txbuf", test_full_txbuf, NULL);
-  return 0;
+  if (test_subcase("poll empty ctx", test_poll_empty, NULL))
+    ret = 1;
+
+  if (test_subcase("connect success", test_connect_success, NULL))
+    ret = 1;
+
+  if (test_subcase("connect fail", test_connect_fail, NULL))
+    ret = 1;
+
+  if (test_subcase("full rxbuf", test_full_rxbuf, NULL))
+    ret = 1;
+
+  if (test_subcase("full txbuf", test_full_txbuf, NULL))
+    ret = 1;
+
+  return ret;
 }
