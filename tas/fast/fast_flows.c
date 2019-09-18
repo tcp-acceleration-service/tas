@@ -707,6 +707,18 @@ int fast_flows_bump(struct dataplane_context *ctx, uint32_t flow_id,
 
   tx_avail = fs->tx_avail + tx_bump;
 
+  /* validate tx bump */
+  if (tx_bump > fs->tx_len || tx_avail > fs->tx_len ||
+      tx_avail + fs->tx_sent > fs->tx_len)
+  {
+    fprintf(stderr, "fast_flows_bump: tx bump too large\n");
+    goto unlock;
+  }
+  /* validate rx bump */
+  if (rx_bump > fs->rx_len || rx_bump + fs->rx_avail > fs->tx_len) {
+    fprintf(stderr, "fast_flows_bump: rx bump too large\n");
+    goto unlock;
+  }
   /* calculate how many bytes can be sent before and after this bump */
   old_avail = tcp_txavail(fs, NULL);
   new_avail = tcp_txavail(fs, &tx_avail);
