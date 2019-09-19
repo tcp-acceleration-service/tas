@@ -12,6 +12,7 @@ RTE_SDK ?= $(HOME)/dpdk/x86_64-native-linuxapp-gcc
 DPDK_PMDS ?= ixgbe i40e
 
 CFLAGS+= -I$(RTE_SDK)/include -I$(RTE_SDK)/include/dpdk
+CFLAGS+= -I$(RTE_SDK)/include/x86_64-linux-gnu/dpdk/
 LDFLAGS+= -L$(RTE_SDK)/lib/
 
 LIBS_DPDK= -Wl,--whole-archive
