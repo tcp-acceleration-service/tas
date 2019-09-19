@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <rte_version.h>
 #include <rte_kni.h>
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
@@ -47,6 +48,9 @@ enum change_linkstate {
 
 static int interface_set_carrier(const char *name, int status);
 static int op_config_network_if(uint16_t port_id, uint8_t if_up);
+#if RTE_VER_YEAR >= 18
+static int op_config_mac_address(uint16_t port_id, uint8_t mac_addr[]);
+#endif
 
 static struct rte_mempool *kni_pool;
 static struct rte_kni *kni_if;
@@ -54,6 +58,9 @@ static struct rte_kni_conf conf;
 static struct rte_kni_ops ops = {
     .port_id = 0,
     .config_network_if = op_config_network_if,
+#if RTE_VER_YEAR >= 18
+    .config_mac_address = op_config_mac_address,
+#endif
   };
 static int change_linkstate = LST_NOOP;
 
@@ -186,3 +193,10 @@ static int op_config_network_if(uint16_t port_id, uint8_t if_up)
   change_linkstate = (if_up ? LST_UP : LST_DOWN);
   return 0;
 }
+
+#if RTE_VER_YEAR >= 18
+static int op_config_mac_address(uint16_t port_id, uint8_t mac_addr[])
+{
+  return 0;
+}
+#endif
