@@ -143,6 +143,8 @@ int network_init(unsigned n_threads)
   eth_devinfo.default_rxconf.offloads = 0;
   eth_devinfo.default_txconf.offloads = DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM;
 
+  memcpy(&tas_info->mac_address, &eth_addr, 6);
+
   return 0;
 
 error_exit:

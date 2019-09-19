@@ -103,6 +103,7 @@ int shm_init(unsigned num)
   tas_info->internal_mem_size = FLEXNIC_INTERNAL_MEM_SIZE;
   tas_info->qmq_num = FLEXNIC_NUM_QMQUEUES;
   tas_info->cores_num = num;
+  tas_info->mac_address = 0;
 
   return 0;
 }
