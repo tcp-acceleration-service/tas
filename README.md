@@ -23,14 +23,14 @@ This will build the TAS service (binary `tas/tas`), client libraries (in
 ## Running
 
 Before running TAS the following steps are necessary:
-   * Make sure `hugetlbfs` is mounted on `/mnt/huge` and enough huge pages are
+   * Make sure `hugetlbfs` is mounted on `/dev/hugepages` and enough huge pages are
      allocated for TAS and dpdk.
    * Binding the NIC to the dpdk driver, as with any other dpdk application (for
      Intel NICs use `vfio` because `uio` does not support multiple interrupts).
 
 ```
 sudo modprobe vfio-pci
-sudo mount -t hugetlbfs nodev /mnt/huge
+sudo mount -t hugetlbfs nodev /dev/hugepages
 echo 1024 | sudo tee /sys/devices/system/node/node*/hugepages/hugepages-2048kB/nr_hugepages
 sudo ~/dpdk-inst/sbin/dpdk-devbind  -b vfio-pci 0000:08:00.0
 ```

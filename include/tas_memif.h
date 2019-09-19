@@ -30,7 +30,7 @@
 #include <packet_defs.h>
 
 
-#define FLEXNIC_HUGE_PREFIX "/mnt/huge"
+#define FLEXNIC_HUGE_PREFIX "/dev/hugepages"
 
 /** Name for the info shared memory region. */
 #define FLEXNIC_NAME_INFO "tas_info"
