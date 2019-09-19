@@ -22,3 +22,4 @@ scaletool
 doc/latex
 doc/html
 .dockerwrap
+Makefile.local
