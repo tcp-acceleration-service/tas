@@ -1040,7 +1040,7 @@ static inline int send_control_raw(uint64_t remote_mac, uint32_t remote_ip,
   p->tcp.chksum = rte_ipv4_udptcp_cksum((void *) &p->ip, (void *) &p->tcp);
   
   /* send packet */
-  nicif_tx_send(new_tail);
+  nicif_tx_send(new_tail, 0);
   return 0;
 }
 

@@ -155,7 +155,7 @@ unsigned kni_poll(void)
   if (n == 1) {
     if (nicif_tx_alloc(rte_pktmbuf_pkt_len(mb), &buf, &op) == 0) {
       memcpy(buf, rte_pktmbuf_mtod(mb, void *), rte_pktmbuf_pkt_len(mb));
-      nicif_tx_send(op);
+      nicif_tx_send(op, 1);
     } else {
       fprintf(stderr, "kni_poll: send failed\n");
     }

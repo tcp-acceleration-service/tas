@@ -93,6 +93,7 @@ STATIC_ASSERT(sizeof(struct flextcp_pl_krx) == 64, krx_size);
 #define FLEXTCP_PL_KTX_INVALID 0x0
 #define FLEXTCP_PL_KTX_PACKET 0x1
 #define FLEXTCP_PL_KTX_CONNRETRAN 0x2
+#define FLEXTCP_PL_KTX_PACKET_NOTS 0x3
 
 /** Kernel TX queue entry */
 struct flextcp_pl_ktx {

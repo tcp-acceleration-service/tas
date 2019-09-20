@@ -365,13 +365,13 @@ int nicif_tx_alloc(uint16_t len, void **pbuf, uint32_t *opaque)
 }
 
 /** Actually send out transmit buffer (lens need to match) */
-void nicif_tx_send(uint32_t opaque)
+void nicif_tx_send(uint32_t opaque, int no_ts)
 {
   uint32_t tail = (opaque == 0 ? txq_len - 1 : opaque - 1);
   volatile struct flextcp_pl_ktx *ktx = &txq_base[0][tail];
 
   MEM_BARRIER();
-  ktx->type = FLEXTCP_PL_KTX_PACKET;
+  ktx->type = (!no_ts ? FLEXTCP_PL_KTX_PACKET : FLEXTCP_PL_KTX_PACKET_NOTS);
   txq_tail[0] = opaque;
   
   util_flexnic_kick(&fp_state->kctx[0], util_timeout_time_us());

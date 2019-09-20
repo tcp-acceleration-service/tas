@@ -294,7 +294,7 @@ static inline int response_tx(const void *dst_mac, uint32_t dst_ip)
   parp_out->arp.plen = 4;
   parp_out->arp.oper = t_beui16(ARP_OPER_REPLY);
 
-  nicif_tx_send(new_tail);
+  nicif_tx_send(new_tail, 0);
 
   return 0;
 }
@@ -326,7 +326,7 @@ static inline int request_tx(uint32_t dst_ip)
   parp_out->arp.plen = 4;
   parp_out->arp.oper = t_beui16(ARP_OPER_REQUEST);
 
-  nicif_tx_send(new_tail);
+  nicif_tx_send(new_tail, 0);
 
   return 0;
 }

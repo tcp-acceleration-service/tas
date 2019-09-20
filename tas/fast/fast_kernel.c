@@ -64,6 +64,15 @@ int fast_kernel_poll(struct dataplane_context *ctx,
     ret = 0;
     inject_tcp_ts(buf, len, ts, nbh);
     tx_send(ctx, nbh, 0, len);
+  } else if (ktx->type == FLEXTCP_PL_KTX_PACKET_NOTS) {
+    /* send packet without filling in timestamp */
+    len = ktx->msg.packet.len;
+
+    /* Read transmit queue entry */
+    dma_read(ktx->msg.packet.addr, len, buf);
+
+    ret = 0;
+    tx_send(ctx, nbh, 0, len);
   } else if (ktx->type == FLEXTCP_PL_KTX_CONNRETRAN) {
     flow_id = ktx->msg.connretran.flow_id;
     if (flow_id >= FLEXNIC_PL_FLOWST_NUM) {

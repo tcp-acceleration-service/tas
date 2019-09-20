@@ -243,10 +243,11 @@ int nicif_tx_alloc(uint16_t len, void **buf, uint32_t *opaque);
  * Actually send out transmit buffer (lens need to match).
  *
  * @param opaque Opaque value returned from nicif_tx_alloc().
+ * @param no_ts  If != 0, skip inserting tcp timestamp
  *
  * @return 0 on success, <0 else
  */
-void nicif_tx_send(uint32_t opaque);
+void nicif_tx_send(uint32_t opaque, int no_ts);
 
 /** @} */
 
