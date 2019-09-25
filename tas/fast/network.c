@@ -121,6 +121,20 @@ int network_init(unsigned n_threads)
     net_port_id = p;
   }
 
+  /* get mac address and device info */
+  rte_eth_macaddr_get(net_port_id, &eth_addr);
+  rte_eth_dev_info_get(net_port_id, &eth_devinfo);
+
+  /* mask unsupported RSS hash functions */
+  if ((port_conf.rx_adv_conf.rss_conf.rss_hf &
+       eth_devinfo.flow_type_rss_offloads) !=
+      port_conf.rx_adv_conf.rss_conf.rss_hf)
+  {
+    fprintf(stderr, "Warning: NIC does not support all requested RSS "
+        "hash functions.\n");
+    port_conf.rx_adv_conf.rss_conf.rss_hf &= eth_devinfo.flow_type_rss_offloads;
+  }
+
   /* enable per port checksum offload if requested */
   if (config.fp_xsumoffload)
     port_conf.txmode.offloads =
@@ -134,9 +148,6 @@ int network_init(unsigned n_threads)
     goto error_exit;
   }
 
-  /* get mac address and device info */
-  rte_eth_macaddr_get(net_port_id, &eth_addr);
-  rte_eth_dev_info_get(net_port_id, &eth_devinfo);
 
   /* workaround for mlx5. */
   if (config.fp_autoscale) {
