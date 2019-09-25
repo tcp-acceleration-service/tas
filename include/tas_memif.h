@@ -30,7 +30,6 @@
 #include <packet_defs.h>
 
 
-#define FLEXNIC_USE_HUGEPAGES 1
 #define FLEXNIC_HUGE_PREFIX "/mnt/huge"
 
 /** Name for the info shared memory region. */
@@ -45,6 +44,8 @@
 
 /** Indicates that flexnic is done initializing. */
 #define FLEXNIC_FLAG_READY 1
+/** Indicates that huge pages should be used for the internal and dma memory */
+#define FLEXNIC_FLAG_HUGEPAGES 2
 
 /** Info struct: layout of info shared memory region */
 struct flexnic_info {

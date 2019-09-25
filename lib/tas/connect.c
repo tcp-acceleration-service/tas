@@ -67,13 +67,13 @@ int flexnic_driver_connect(struct flexnic_info **p_info, void **p_mem_start)
     goto error_unmap_info;
   }
 
-  /* open and map flexnic info shm region */
-#ifdef FLEXNIC_USE_HUGEPAGES
-  if ((m = map_region_huge(FLEXNIC_NAME_DMA_MEM, fi->dma_mem_size)) == NULL)
-#else
-  if ((m = map_region(FLEXNIC_NAME_DMA_MEM, fi->dma_mem_size)) == NULL)
-#endif
-  {
+  /* open and map dma shm region */
+  if ((fi->flags & FLEXNIC_FLAG_HUGEPAGES) == FLEXNIC_FLAG_HUGEPAGES) {
+    m = map_region_huge(FLEXNIC_NAME_DMA_MEM, fi->dma_mem_size);
+  } else {
+    m = map_region(FLEXNIC_NAME_DMA_MEM, fi->dma_mem_size);
+  }
+  if (m == NULL) {
     perror("flexnic_driver_connect: mapping dma memory failed");
     goto error_unmap_info;
   }
@@ -98,14 +98,12 @@ int flexnic_driver_internal(void **int_mem_start)
   }
 
   /* open and map flexnic internal memory shm region */
-#ifdef FLEXNIC_USE_HUGEPAGES
-  if ((m = map_region_huge(FLEXNIC_NAME_INTERNAL_MEM, info->internal_mem_size))
-      == NULL)
-#else
-  if ((m = map_region(FLEXNIC_NAME_INTERNAL_MEM, info->internal_mem_size))
-      == NULL)
-#endif
-  {
+  if ((info->flags & FLEXNIC_FLAG_HUGEPAGES) == FLEXNIC_FLAG_HUGEPAGES) {
+    m = map_region_huge(FLEXNIC_NAME_INTERNAL_MEM, info->internal_mem_size);
+  } else {
+    m = map_region(FLEXNIC_NAME_INTERNAL_MEM, info->internal_mem_size);
+  }
+  if (m == NULL) {
     perror("flexnic_driver_internal: map_region failed");
     return -1;
   }

@@ -117,6 +117,8 @@ struct configuration {
   uint32_t fp_xsumoffload;
   /** FP: auto scaling enabled */
   uint32_t fp_autoscale;
+  /** FP: use huge pages for internal and buffer memory */
+  uint32_t fp_hugepages;
   /** SP: kni interface name */
   char *kni_name;
   /** Minimize output */

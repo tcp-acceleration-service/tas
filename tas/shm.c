@@ -58,26 +58,26 @@ static void destroy_shm_huge(const char *name, size_t size, void *addr)
 int shm_preinit(void)
 {
   /* create shm for dma memory */
-#ifdef FLEXNIC_USE_HUGEPAGES
-  tas_shm = util_create_shmsiszed_huge(FLEXNIC_NAME_DMA_MEM,
-      FLEXNIC_DMA_MEM_SIZE, NULL);
-#else
-  tas_shm = util_create_shmsiszed(FLEXNIC_NAME_DMA_MEM, FLEXNIC_DMA_MEM_SIZE,
-      NULL);
-#endif
+  if (config.fp_hugepages) {
+    tas_shm = util_create_shmsiszed_huge(FLEXNIC_NAME_DMA_MEM,
+        FLEXNIC_DMA_MEM_SIZE, NULL);
+  } else {
+    tas_shm = util_create_shmsiszed(FLEXNIC_NAME_DMA_MEM, FLEXNIC_DMA_MEM_SIZE,
+        NULL);
+  }
   if (tas_shm == NULL) {
     fprintf(stderr, "mapping flexnic dma memory failed\n");
     return -1;
   }
 
   /* create shm for internal memory */
-#ifdef FLEXNIC_USE_HUGEPAGES
-  fp_state = util_create_shmsiszed_huge(FLEXNIC_NAME_INTERNAL_MEM,
-      FLEXNIC_INTERNAL_MEM_SIZE, NULL);
-#else
-  fp_state = util_create_shmsiszed(FLEXNIC_NAME_INTERNAL_MEM,
-      FLEXNIC_INTERNAL_MEM_SIZE, NULL);
-#endif
+  if (config.fp_hugepages) {
+    fp_state = util_create_shmsiszed_huge(FLEXNIC_NAME_INTERNAL_MEM,
+        FLEXNIC_INTERNAL_MEM_SIZE, NULL);
+  } else {
+    fp_state = util_create_shmsiszed(FLEXNIC_NAME_INTERNAL_MEM,
+        FLEXNIC_INTERNAL_MEM_SIZE, NULL);
+  }
   if (fp_state == NULL) {
     fprintf(stderr, "mapping flexnic internal memory failed\n");
     shm_cleanup();
@@ -105,6 +105,9 @@ int shm_init(unsigned num)
   tas_info->cores_num = num;
   tas_info->mac_address = 0;
 
+  if (config.fp_hugepages)
+    tas_info->flags |= FLEXNIC_FLAG_HUGEPAGES;
+
   return 0;
 }
 
@@ -112,22 +115,22 @@ void shm_cleanup(void)
 {
   /* cleanup internal memory region */
   if (fp_state != NULL) {
-#ifdef FLEXNIC_USE_HUGEPAGES
-    destroy_shm_huge(FLEXNIC_NAME_INTERNAL_MEM, FLEXNIC_INTERNAL_MEM_SIZE,
-        fp_state);
-#else
-    destroy_shm(FLEXNIC_NAME_INTERNAL_MEM, FLEXNIC_INTERNAL_MEM_SIZE,
-        fp_state);
-#endif
+    if (config.fp_hugepages) {
+      destroy_shm_huge(FLEXNIC_NAME_INTERNAL_MEM, FLEXNIC_INTERNAL_MEM_SIZE,
+          fp_state);
+    } else {
+      destroy_shm(FLEXNIC_NAME_INTERNAL_MEM, FLEXNIC_INTERNAL_MEM_SIZE,
+          fp_state);
+    }
   }
 
   /* cleanup dma memory region */
   if (tas_shm != NULL) {
-#ifdef FLEXNIC_USE_HUGEPAGES
-    destroy_shm_huge(FLEXNIC_NAME_DMA_MEM, FLEXNIC_DMA_MEM_SIZE, tas_shm);
-#else
-    destroy_shm(FLEXNIC_NAME_DMA_MEM, FLEXNIC_DMA_MEM_SIZE, tas_shm);
-#endif
+    if (config.fp_hugepages) {
+      destroy_shm_huge(FLEXNIC_NAME_DMA_MEM, FLEXNIC_DMA_MEM_SIZE, tas_shm);
+    } else {
+      destroy_shm(FLEXNIC_NAME_DMA_MEM, FLEXNIC_DMA_MEM_SIZE, tas_shm);
+    }
   }
 
   /* cleanup tas_info memory region */
