@@ -113,6 +113,8 @@ struct configuration {
   uint32_t fp_cores_max;
   /** FP: interrupts (blocking) enabled */
   uint32_t fp_interrupts;
+  /** FP: tcp checksum offload enabled */
+  uint32_t fp_xsumoffload;
   /** SP: kni interface name */
   char *kni_name;
   /** Minimize output */

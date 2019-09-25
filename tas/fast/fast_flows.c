@@ -37,8 +37,6 @@
 #define TCP_MSS 1448
 #define TCP_MAX_RTT 100000
 
-#define HWXSUM_EN 1
-
 //#define SKIP_ACK 1
 
 struct flow_key {
@@ -1036,13 +1034,13 @@ static inline void tcp_checksums(struct network_buf_handle *nbh,
     struct pkt_tcp *p, beui32_t ip_s, beui32_t ip_d, uint16_t l3_paylen)
 {
   p->ip.chksum = 0;
-#ifdef HWXSUM_EN
-  p->tcp.chksum = tx_xsum_enable(nbh, &p->ip, ip_s, ip_d, l3_paylen);
-#else
-  p->tcp.chksum = 0;
-  p->ip.chksum = rte_ipv4_cksum((void *) &p->ip);
-  p->tcp.chksum = rte_ipv4_udptcp_cksum((void *) &p->ip, (void *) &p->tcp);
-#endif
+  if (config.fp_xsumoffload) {
+    p->tcp.chksum = tx_xsum_enable(nbh, &p->ip, ip_s, ip_d, l3_paylen);
+  } else {
+    p->tcp.chksum = 0;
+    p->ip.chksum = rte_ipv4_cksum((void *) &p->ip);
+    p->tcp.chksum = rte_ipv4_udptcp_cksum((void *) &p->ip, (void *) &p->tcp);
+  }
 }
 
 void fast_flows_kernelxsums(struct network_buf_handle *nbh,

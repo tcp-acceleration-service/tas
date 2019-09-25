@@ -48,7 +48,7 @@
 #define TX_DESCRIPTORS 128
 
 uint8_t net_port_id = 0;
-static const struct rte_eth_conf port_conf = {
+static struct rte_eth_conf port_conf = {
     .rxmode = {
       .mq_mode = ETH_MQ_RX_RSS,
       .offloads = 0,
@@ -58,7 +58,7 @@ static const struct rte_eth_conf port_conf = {
     },
     .txmode = {
       .mq_mode = ETH_MQ_TX_NONE,
-      .offloads = DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM,
+      .offloads = 0,
     },
     .rx_adv_conf = {
       .rss_conf = {
@@ -121,6 +121,12 @@ int network_init(unsigned n_threads)
     net_port_id = p;
   }
 
+  /* enable per port checksum offload if requested */
+  if (config.fp_xsumoffload)
+    port_conf.txmode.offloads =
+      DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM;
+
+
   /* initialize port */
   ret = rte_eth_dev_configure(net_port_id, n_threads, n_threads, &port_conf);
   if (ret < 0) {
@@ -141,7 +147,12 @@ int network_init(unsigned n_threads)
   eth_devinfo.default_txconf.txq_flags = ETH_TXQ_FLAGS_IGNORE;
 #endif
   eth_devinfo.default_rxconf.offloads = 0;
-  eth_devinfo.default_txconf.offloads = DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM;
+
+  /* enable per-queue checksum offload if requested */
+  eth_devinfo.default_txconf.offloads = 0;
+  if (config.fp_xsumoffload)
+    eth_devinfo.default_txconf.offloads =
+      DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM;
 
   memcpy(&tas_info->mac_address, &eth_addr, 6);
 

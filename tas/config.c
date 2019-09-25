@@ -69,6 +69,7 @@ enum cfg_params {
   CP_IP_ADDR,
   CP_FP_CORES_MAX,
   CP_FP_NO_INTS,
+  CP_FP_NO_XSUMOFFLOAD,
   CP_KNI_NAME,
   CP_DPDK_EXTRA,
   CP_QUIET,
@@ -180,6 +181,9 @@ static struct option opts[] = {
     { .name = "fp-no-ints",
       .has_arg = no_argument,
       .val = CP_FP_NO_INTS },
+    { .name = "fp-no-xsumoffload",
+      .has_arg = no_argument,
+      .val = CP_FP_NO_XSUMOFFLOAD },
     { .name = "kni-name",
       .has_arg = required_argument,
       .val = CP_KNI_NAME },
@@ -434,6 +438,9 @@ int config_parse(struct configuration *c, int argc, char *argv[])
       case CP_FP_NO_INTS:
         c->fp_interrupts = 0;
         break;
+      case CP_FP_NO_XSUMOFFLOAD:
+        c->fp_xsumoffload = 0;
+        break;
 
       case CP_KNI_NAME:
         if (!(c->kni_name = strdup(optarg))) {
@@ -513,6 +520,7 @@ static int config_defaults(struct configuration *c, char *progname)
   c->cc_timely_min_rate = 10000;
   c->fp_cores_max = 1;
   c->fp_interrupts = 1;
+  c->fp_xsumoffload = 1;
   c->kni_name = NULL;
   c->quiet = 0;
 
@@ -603,6 +611,8 @@ static void print_usage(struct configuration *c, char *progname)
       "  --fp-cores-max=CORES        Max cores used for fast path "
           "[default: %"PRIu32"]\n"
       "  --fp-no-ints                Disable Interrupts "
+          "[default: enabled]\n"
+      "  --fp-no-xsumoffload         Disable TX Checksum offload "
           "[default: enabled]\n"
       "  --dpdk-extra=ARG            Add extra DPDK argument\n"
       "\n"

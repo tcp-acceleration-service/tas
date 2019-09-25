@@ -11,6 +11,7 @@
 
 #include <tas.h>
 #include <tas_memif.h>
+#include "../../tas/include/config.h"
 #include "../../tas/fast/internal.h"
 #include "../../tas/fast/fastemu.h"
 
@@ -34,6 +35,7 @@ struct flextcp_pl_mem state_base;
 struct flextcp_pl_mem *fp_state = &state_base;
 
 struct dataplane_context **ctxs = NULL;
+struct configuration config;
 
 struct qman_set_op {
   int got_op;
