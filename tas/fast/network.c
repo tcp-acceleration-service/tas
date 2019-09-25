@@ -139,8 +139,10 @@ int network_init(unsigned n_threads)
   rte_eth_dev_info_get(net_port_id, &eth_devinfo);
 
   /* workaround for mlx5. */
-  if (reta_mlx5_resize() != 0) {
-    goto error_exit;
+  if (config.fp_autoscale) {
+    if (reta_mlx5_resize() != 0) {
+      goto error_exit;
+    }
   }
 
 #if RTE_VER_YEAR < 18
@@ -235,11 +237,12 @@ int network_thread_init(struct dataplane_context *ctx)
     }
 
     /* setting up RETA failed */
-    if (reta_setup() != 0) {
-      fprintf(stderr, "RETA setup failed\n");
-      goto error_tx_queue;
+    if (config.fp_autoscale) {
+      if (reta_setup() != 0) {
+        fprintf(stderr, "RETA setup failed\n");
+        goto error_tx_queue;
+      }
     }
-
     start_done = 1;
   }
 

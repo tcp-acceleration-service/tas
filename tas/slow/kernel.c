@@ -124,7 +124,7 @@ int slowpath_main(void)
     tcp_poll();
     util_timeout_poll_ts(&timeout_mgr, cur_ts);
 
-    if (cur_ts - loadmon_ts >= 10000) {
+    if (config.fp_autoscale && cur_ts - loadmon_ts >= 10000) {
       flexnic_loadmon(cur_ts);
       loadmon_ts = cur_ts;
     }

@@ -115,6 +115,8 @@ struct configuration {
   uint32_t fp_interrupts;
   /** FP: tcp checksum offload enabled */
   uint32_t fp_xsumoffload;
+  /** FP: auto scaling enabled */
+  uint32_t fp_autoscale;
   /** SP: kni interface name */
   char *kni_name;
   /** Minimize output */
