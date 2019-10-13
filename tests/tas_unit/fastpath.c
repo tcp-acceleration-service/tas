@@ -258,6 +258,34 @@ void test_rxbump_fc_reopen_deadlock(void *arg)
   /* TODO: check ack packet */
 }
 
+void test_retransmit(void *arg)
+{
+  struct flextcp_pl_flowst *fs = &state_base.flowst[0];
+  struct dataplane_context ctx;
+  memset(&ctx, 0, sizeof(ctx));
+
+  flow_init(0, 1024, 1024, 123456);
+  fs->tx_avail = 256;
+  fs->tx_sent = 128;
+  fs->tx_next_pos = 128;
+  fs->tx_next_seq = 129;
+  fs->rx_remote_avail -= 128;
+
+  fast_flows_retransmit(&ctx, 0);
+  test_assert("tx sent is zero", fs->tx_sent == 0);
+  test_assert("tx avail increased", fs->tx_avail == 128 + 256);
+  test_assert("tx next pos reset", fs->tx_next_pos == 0);
+  test_assert("tx next seq reset", fs->tx_next_seq == 1);
+  test_assert("tx remote avail reset", fs->rx_remote_avail == 1024);
+
+  test_assert("qman set sent", qm_set_op.got_op);
+  test_assert("qman set id correct", qm_set_op.id == 0);
+  test_assert("qman set rate correct", qm_set_op.rate == fs->tx_rate);
+  test_assert("qman set avail correct", qm_set_op.avail == 128);
+  test_assert("qman set max chunk correct", qm_set_op.max_chunk == 1448);
+  test_assert("qman set flags", qm_set_op.flags ==
+      (QMAN_SET_RATE | QMAN_SET_MAXCHUNK | QMAN_ADD_AVAIL));
+}
 
 int main(int argc, char *argv[])
 {
@@ -285,6 +313,9 @@ int main(int argc, char *argv[])
 
   if (test_subcase("rx bump fc reopen deadlock",
         test_rxbump_fc_reopen_deadlock, NULL))
+    ret = 1;
+
+  if (test_subcase("retransmit", test_retransmit, NULL))
     ret = 1;
 
   return ret;
