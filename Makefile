@@ -9,7 +9,7 @@ CFLAGS += -std=gnu99 -O3 -g -Wall -Werror -I. -Iinclude/ -march=native -fno-omit
 LDFLAGS += -pthread -g
 
 RTE_SDK ?= $(HOME)/dpdk/x86_64-native-linuxapp-gcc
-DPDK_PMDS ?= ixgbe i40e
+DPDK_PMDS ?= ixgbe i40e tap
 
 CFLAGS+= -I$(RTE_SDK)/include -I$(RTE_SDK)/include/dpdk
 CFLAGS+= -I$(RTE_SDK)/include/x86_64-linux-gnu/dpdk/
@@ -21,6 +21,7 @@ LIBS_DPDK+= -lrte_eal -lrte_mempool -lrte_mempool_ring \
 	    -lrte_hash -lrte_ring -lrte_kvargs -lrte_ethdev \
 	    -lrte_mbuf -lnuma -lrte_bus_pci -lrte_pci \
 	    -lrte_cmdline -lrte_timer -lrte_net -lrte_kni \
+	    -lrte_bus_vdev -lrte_gso \
 	    -Wl,--no-whole-archive -ldl $(EXTRA_LIBS_DPDK)
 
 LDLIBS += -lm -lpthread -lrt -ldl
