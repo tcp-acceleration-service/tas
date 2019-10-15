@@ -14,4 +14,4 @@ install:
 - /bin/bash .travis-install.sh
 script:
 - make all RTE_SDK=${HOME}/dpdk/${DPDK_VER}
-- make run-tests RTE_SDK=${HOME}/dpdk/${DPDK_VER}
+- make run-tests run-tests-full RTE_SDK=${HOME}/dpdk/${DPDK_VER}

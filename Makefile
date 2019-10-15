@@ -47,6 +47,9 @@ TESTS_AUTO= \
 	tests/libtas/tas_sockets \
 	tests/tas_unit/fastpath \
 
+TESTS_AUTO_FULL= \
+	tests/full/tas_linux \
+
 TESTS= \
 	tests/lowlevel \
 	tests/lowlevel_echo \
@@ -59,7 +62,8 @@ TESTS= \
 	tests/usocket_epoll_eof \
 	tests/usocket_shutdown \
 	tests/bench_ll_echo \
-	$(TESTS_AUTO)
+	$(TESTS_AUTO) \
+	$(TESTS_AUTO_FULL)
 
 
 all: lib/libtas_sockets.so lib/libtas_interpose.so \
@@ -69,10 +73,15 @@ all: lib/libtas_sockets.so lib/libtas_interpose.so \
 
 tests: $(TESTS)
 
+# run all simple testcases
 run-tests: $(TESTS_AUTO)
 	tests/libtas/tas_ll
 	tests/libtas/tas_sockets
 	tests/tas_unit/fastpath
+
+# run full tests that run full TAS
+run-tests-full: $(TESTS_AUTO_FULL) tas/tas
+	tests/full/tas_linux
 
 docs:
 	cd doc && doxygen
@@ -106,6 +115,9 @@ tests/tas_unit/%.o: CFLAGS+=-Itas/include
 tests/tas_unit/fastpath: LDLIBS+=-lrte_eal
 tests/tas_unit/fastpath: tests/tas_unit/fastpath.o tests/testutils.o \
   tas/fast/fast_flows.o
+
+tests/full/%.o: CFLAGS+=-Itas/include
+tests/full/tas_linux: tests/full/tas_linux.o tests/full/fulltest.o lib/libtas.so
 
 tools/tracetool: tools/tracetool.o
 tools/statetool: tools/statetool.o lib/libtas.so
