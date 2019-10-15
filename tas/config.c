@@ -73,6 +73,7 @@ enum cfg_params {
   CP_FP_NO_AUTOSCALE,
   CP_FP_NO_HUGEPAGES,
   CP_KNI_NAME,
+  CP_READY_FD,
   CP_DPDK_EXTRA,
   CP_QUIET,
 };
@@ -195,6 +196,9 @@ static struct option opts[] = {
     { .name = "kni-name",
       .has_arg = required_argument,
       .val = CP_KNI_NAME },
+    { .name = "ready-fd",
+      .has_arg = required_argument,
+      .val = CP_READY_FD },
     { .name = "dpdk-extra",
       .has_arg = required_argument,
       .val = CP_DPDK_EXTRA },
@@ -218,6 +222,7 @@ int config_parse(struct configuration *c, int argc, char *argv[])
 {
   int ret, done = 0;
   double d;
+  uint32_t i;
 
   if (config_defaults(c, argv[0]) != 0) {
     fprintf(stderr, "config_parse: config defaults failed\n");
@@ -463,6 +468,13 @@ int config_parse(struct configuration *c, int argc, char *argv[])
         }
         break;
 
+      case CP_READY_FD:
+        if (parse_int32(optarg, &i) != 0) {
+          fprintf(stderr, "read fd parsing failed\n");
+          goto failed;
+        }
+        c->ready_fd = i;
+        break;
       case CP_DPDK_EXTRA:
         if (parse_arg_append(optarg, c) != 0) {
           goto failed;
@@ -538,6 +550,7 @@ static int config_defaults(struct configuration *c, char *progname)
   c->fp_autoscale = 1;
   c->fp_hugepages = 1;
   c->kni_name = NULL;
+  c->ready_fd = -1;
   c->quiet = 0;
 
   c->dpdk_argc = 1;
@@ -640,6 +653,8 @@ static void print_usage(struct configuration *c, char *progname)
       "\n"
       "Miscelaneous:\n"
       "  --quiet                     Disable non-essential logging "
+          "[default: disabled]\n"
+      "  --ready-fd=FD               File descriptor to signal readiness "
           "[default: disabled]\n"
       "\n",
       progname,

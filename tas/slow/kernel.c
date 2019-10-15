@@ -35,6 +35,7 @@
 #include "internal.h"
 
 static void timeout_trigger(struct timeout *to, uint8_t type, void *opaque);
+static void signal_tas_ready(void);
 void flexnic_loadmon(uint32_t cur_ts);
 
 struct timeout_manager timeout_mgr;
@@ -110,8 +111,7 @@ int slowpath_main(void)
     return EXIT_FAILURE;
   }
 
-  printf("TAS ready\n");
-  fflush(stdout);
+  signal_tas_ready();
 
   while (exited == 0) {
     unsigned n = 0;
@@ -212,5 +212,21 @@ static void timeout_trigger(struct timeout *to, uint8_t type, void *opaque)
     default:
       fprintf(stderr, "Unknown timeout type: %u\n", type);
       abort();
+  }
+}
+
+static void signal_tas_ready(void)
+{
+  uint64_t x;
+
+  printf("TAS ready\n");
+  fflush(stdout);
+
+  x = 1;
+  if (config.ready_fd >= 0 &&
+      write(config.ready_fd, &x, sizeof(x)) < 0)
+  {
+    perror("TAS signal: ready fd write failed");
+    /* proceeed */
   }
 }

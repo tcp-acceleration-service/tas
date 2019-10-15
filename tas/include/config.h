@@ -121,6 +121,8 @@ struct configuration {
   uint32_t fp_hugepages;
   /** SP: kni interface name */
   char *kni_name;
+  /** Ready signal fd */
+  int ready_fd;
   /** Minimize output */
   int quiet;
   /** DPDK extra argument vector */
