@@ -645,6 +645,8 @@ static void print_usage(struct configuration *c, char *progname)
           "[default: enabled]\n"
       "  --fp-no-autoscale           Disable autoscaling "
           "[default: enabled]\n"
+      "  --fp-no-hugepages           Disable hugepages for SHM "
+          "[default: enabled]\n"
       "  --dpdk-extra=ARG            Add extra DPDK argument\n"
       "\n"
       "Host kernel interface:\n"
