@@ -313,6 +313,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
       .local_port = f_beui16(p->tcp.dest),
       .remote_port = f_beui16(p->tcp.src),
 
+      .flow_id = flow_id,
       .flow_seq = f_beui32(p->tcp.seqno),
       .flow_ack = f_beui32(p->tcp.ackno),
       .flow_flags = TCPH_FLAGS(&p->tcp),
@@ -324,6 +325,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
       .fs_tx_nextpos = fs->tx_next_pos,
       .fs_tx_nextseq = fs->tx_next_seq,
       .fs_tx_sent = fs->tx_sent,
+      .fs_tx_avail = fs->tx_avail,
     };
   trace_event(FLEXNIC_PL_TREV_RXFS, sizeof(te_rxfs), &te_rxfs);
 #endif
@@ -581,11 +583,22 @@ unlock:
     fprintf(stderr, "dma_krx_pkt_fastpath: updating application state\n");
 #endif
 
+    uint16_t type;
+    type = FLEXTCP_PL_ARX_CONNUPDATE;
+
+    if (fin_bump) {
+      type |= FLEXTCP_PL_ARX_FLRXDONE << 8;
+    }
+
 #ifdef FLEXNIC_TRACING
     struct flextcp_pl_trev_arx te_arx = {
+        .opaque = fs->opaque,
         .rx_bump = rx_bump,
         .tx_bump = tx_bump,
+        .rx_pos = rx_pos,
+        .flags = type,
 
+        .flow_id = flow_id,
         .db_id = fs->db_id,
 
         .local_ip = f_beui32(p->ip.dest),
@@ -595,13 +608,6 @@ unlock:
       };
     trace_event(FLEXNIC_PL_TREV_ARX, sizeof(te_arx), &te_arx);
 #endif
-
-    uint16_t type;
-    type = FLEXTCP_PL_ARX_CONNUPDATE;
-
-    if (fin_bump) {
-      type |= FLEXTCP_PL_ARX_FLRXDONE << 8;
-    }
 
     arx_cache_add(ctx, fs->db_id, fs->opaque, rx_bump, rx_pos, tx_bump, type);
   }
@@ -654,6 +660,7 @@ int fast_flows_bump(struct dataplane_context *ctx, uint32_t flow_id,
       .tx_bump = tx_bump,
       .bump_seq_ent = bump_seq,
       .bump_seq_flow = fs->bump_seq,
+      .flags = flags,
 
       .local_ip = f_beui32(fs->local_ip),
       .remote_ip = f_beui32(fs->remote_ip),
@@ -764,6 +771,19 @@ void fast_flows_retransmit(struct dataplane_context *ctx, uint32_t flow_id)
   uint32_t old_avail, new_avail = -1;
 
   fs_lock(fs);
+
+#ifdef FLEXNIC_TRACING
+    struct flextcp_pl_trev_rexmit te_rexmit = {
+        .flow_id = flow_id,
+        .tx_avail = fs->tx_avail,
+        .tx_sent = fs->tx_sent,
+        .tx_next_pos = fs->tx_next_pos,
+        .tx_next_seq = fs->tx_next_seq,
+        .rx_remote_avail = fs->rx_remote_avail,
+      };
+    trace_event(FLEXNIC_PL_TREV_REXMIT, sizeof(te_rexmit), &te_rexmit);
+#endif
+
 
   /*    uint32_t old_head = fs->tx_head;
       uint32_t old_sent = fs->tx_sent;

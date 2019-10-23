@@ -33,7 +33,6 @@
 #define FLEXNIC_TRACE_EV_TXPKT 2
 #define FLEXNIC_TRACE_EV_DMARD 3
 #define FLEXNIC_TRACE_EV_DMAWR 4
-#define FLEXNIC_TRACE_EV_PCIDB 5
 #define FLEXNIC_TRACE_EV_QMSET 6
 #define FLEXNIC_TRACE_EV_QMEVT 7
 
@@ -56,11 +55,6 @@ struct flexnic_trace_entry_tail {
 struct flexnic_trace_entry_dma {
   uint64_t addr;
   uint64_t len;
-  uint8_t data[];
-} __attribute__((packed));
-
-struct flexnic_trace_entry_pcidb {
-  uint64_t id;
   uint8_t data[];
 } __attribute__((packed));
 
@@ -89,26 +83,14 @@ struct flexnic_trace_entry_qman_event {
 #define FLEXNIC_PL_TREV_TXSEG     0x105
 #define FLEXNIC_PL_TREV_ACTXQMAN  0x106
 #define FLEXNIC_PL_TREV_AFLOQMAN  0x107
-#define FLEXNIC_PL_TREV_APARSEO   0x108
-
-/** application queue bump */
-struct flextcp_pl_trev_adb {
-  uint32_t rx_tail;
-  uint32_t tx_tail;
-  uint32_t rx_tail_prev;
-  uint32_t tx_tail_prev;
-  uint32_t rx_head;
-  uint32_t tx_head;
-
-  uint32_t db_id;
-  uint32_t qman_qid;
-} __attribute__((packed));
+#define FLEXNIC_PL_TREV_REXMIT    0x108
 
 /** application tx queue entry */
 struct flextcp_pl_trev_atx {
   uint32_t rx_bump;
   uint32_t tx_bump;
   uint32_t bump_seq_ent;
+  uint32_t flags;
 
   uint32_t local_ip;
   uint32_t remote_ip;
@@ -132,9 +114,13 @@ struct flextcp_pl_trev_atx {
 
 /** application rx queue entry */
 struct flextcp_pl_trev_arx {
+  uint64_t opaque;
   uint32_t rx_bump;
   uint32_t tx_bump;
+  uint32_t rx_pos;
+  uint32_t flags;
 
+  uint32_t flow_id;
   uint32_t db_id;
 
   uint32_t local_ip;
@@ -150,6 +136,7 @@ struct flextcp_pl_trev_rxfs {
   uint16_t local_port;
   uint16_t remote_port;
 
+  uint32_t flow_id;
   uint32_t flow_seq;
   uint32_t flow_ack;
   uint16_t flow_flags;
@@ -161,6 +148,7 @@ struct flextcp_pl_trev_rxfs {
   uint32_t fs_tx_nextpos;
   uint32_t fs_tx_nextseq;
   uint32_t fs_tx_sent;
+  uint32_t fs_tx_avail;
 } __attribute__((packed));
 
 /** tcp ack sent out */
@@ -188,17 +176,6 @@ struct flextcp_pl_trev_txseg {
   uint16_t flow_len;
 } __attribute__((packed));
 
-/* queue manager event fetching tx queue entry */
-struct flextcp_pl_trev_actxqman {
-  uint64_t tx_base;
-  uint32_t tx_len;
-  uint32_t tx_head;
-  uint32_t tx_head_last;
-  uint32_t tx_tail;
-
-  uint32_t db_id;
-} __attribute__((packed));
-
 /* queue manager event fetching flow payload */
 struct flextcp_pl_trev_afloqman {
   uint64_t tx_base;
@@ -207,27 +184,18 @@ struct flextcp_pl_trev_afloqman {
   uint32_t tx_len;
   uint32_t rx_remote_avail;
   uint32_t tx_sent;
-  uint32_t tx_objrem;
 
   uint32_t flow_id;
 } __attribute__((packed));
 
-/* parse object headers */
-struct flextcp_pl_trev_aparseobj {
-  uint64_t tx_base;
-  uint32_t tx_head;
+/* reset flow re-transmission */
+struct flextcp_pl_trev_rexmit {
+  uint32_t flow_id;
+  uint32_t tx_avail;
+  uint32_t tx_sent;
   uint32_t tx_next_pos;
   uint32_t tx_next_seq;
-  uint32_t tx_len;
   uint32_t rx_remote_avail;
-  uint32_t rx_avail;
-  uint32_t tx_sent;
-  uint32_t tx_objrem;
-
-  uint32_t rem_len;
-  uint32_t objlen;
-
-  uint32_t flow_id;
 } __attribute__((packed));
 
 
