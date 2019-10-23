@@ -140,6 +140,9 @@ int network_init(unsigned n_threads)
     port_conf.txmode.offloads =
       DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM;
 
+  /* disable rx interrupts if requested */
+  if (!config.fp_interrupts)
+    port_conf.intr_conf.rxq = 0;
 
   /* initialize port */
   ret = rte_eth_dev_configure(net_port_id, n_threads, n_threads, &port_conf);
