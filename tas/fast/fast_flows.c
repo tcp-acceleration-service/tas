@@ -396,6 +396,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
       fs->tx_next_pos += tx_bump - fs->tx_sent;
       if (fs->tx_next_pos >= fs->tx_len)
         fs->tx_next_pos -= fs->tx_len;
+      fs->tx_avail -= tx_bump - fs->tx_sent;
       fs->tx_sent = 0;
 #else
       /* this should not happen */
