@@ -11,7 +11,7 @@ CFLAGS += -std=gnu99 -O3 -g -Wall -Werror -I. -Iinclude/ -march=native -fno-omit
 LDFLAGS += -pthread -g
 
 RTE_SDK ?= $(HOME)/dpdk/x86_64-native-linuxapp-gcc
-DPDK_PMDS ?= ixgbe i40e tap
+DPDK_PMDS ?= ixgbe i40e tap virtio
 
 CFLAGS+= -I$(RTE_SDK)/include -I$(RTE_SDK)/include/dpdk
 CFLAGS+= -I$(RTE_SDK)/include/x86_64-linux-gnu/dpdk/
