@@ -622,6 +622,9 @@ int tas_getsockopt(int sockfd, int level, int optname, void *optval,
   } else if (level == SOL_SOCKET && optname == SO_KEEPALIVE) {
     /* keepalive is always disabled */
     res = 0;
+  } else if (level == IPPROTO_TCP && (optname == TCP_KEEPIDLE ||
+        optname == TCP_KEEPINTVL || optname == TCP_KEEPCNT)) {
+    res = 0;
   } else if (level == SOL_SOCKET && optname == SO_LINGER) {
     fprintf(stderr, "flextcp getsockopt: SO_LINGER not implemented\n");
     errno = ENOPROTOOPT;
@@ -698,7 +701,10 @@ int tas_setsockopt(int sockfd, int level, int optname, const void *optval,
     fprintf(stderr, "flextcp setsockopt: Ignoring REUSEADDR\n");
     // Ignore...
   } else if (level == SOL_SOCKET && optname == SO_KEEPALIVE) {
-    fprintf(stderr, "flextcp setsockopt: Ignoring KEEPALIVE\n");
+    fprintf(stderr, "flextcp setsockopt: Ignoring SO_KEEPALIVE\n");
+  } else if (level == IPPROTO_TCP && (optname == TCP_KEEPIDLE ||
+       optname == TCP_KEEPINTVL || optname == TCP_KEEPCNT)) {
+    fprintf(stderr, "flextcp setsockopt: Ignoring TCP_KEEP*\n");
   } else if (level == SOL_SOCKET && optname == SO_LINGER) {
     fprintf(stderr, "flextcp setsockopt: SO_LINGER not implemented\n");
     errno = ENOPROTOOPT;
