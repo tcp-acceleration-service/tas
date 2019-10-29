@@ -71,28 +71,28 @@ ssize_t tas_recvmsg(int sockfd, struct msghdr *msg, int flags)
 
   ctx = flextcp_sockctx_get();
 
-  /* wait for data if necessary, or abort if non-blocking */
-  if (s->data.connection.rx_len_1 == 0 &&
+  /* wait for data if necessary, or abort after polling once if non-blocking */
+  while (s->data.connection.rx_len_1 == 0 &&
       !(s->data.connection.st_flags & CSTF_RXCLOSED))
   {
     flextcp_epoll_clear(s, EPOLLIN);
 
-    if ((s->flags & SOF_NONBLOCK) == SOF_NONBLOCK) {
+    /* even if non-blocking we have to poll the context at least once to handle
+     * busy polling loops of recvmsg */
+    flextcp_sockctx_poll(ctx);
+
+    /* if non-blocking and nothing then we abort now */
+    if ((s->flags & SOF_NONBLOCK) == SOF_NONBLOCK &&
+        s->data.connection.rx_len_1 == 0 &&
+        !(s->data.connection.st_flags & CSTF_RXCLOSED))
+    {
       errno = EAGAIN;
       ret = -1;
       goto out;
-    } else {
-      while (s->data.connection.rx_len_1 == 0 &&
-        !(s->data.connection.st_flags & CSTF_RXCLOSED))
-      {
-        flextcp_sockctx_poll(ctx);
-      }
     }
   }
 
-  /* static size_t all_received = 0; */
-
-  /*  */
+  /* copy data into buffer vector */
   for (i = 0; i < msg->msg_iovlen && s->data.connection.rx_len_1 > 0; i++) {
     off = 0;
     if (s->data.connection.rx_len_1 <= iov[i].iov_len) {
@@ -155,21 +155,24 @@ static inline ssize_t recv_simple(int sockfd, void *buf, size_t len, int flags)
 
   ctx = flextcp_sockctx_get();
 
-  /* wait for data if necessary, or abort if non-blocking */
-  if (s->data.connection.rx_len_1 == 0 &&
+  /* wait for data if necessary, or abort after polling once if non-blocking */
+  while (s->data.connection.rx_len_1 == 0 &&
       !(s->data.connection.st_flags & CSTF_RXCLOSED))
   {
     flextcp_epoll_clear(s, EPOLLIN);
-    if ((s->flags & SOF_NONBLOCK) == SOF_NONBLOCK) {
+
+    /* even if non-blocking we have to poll the context at least once to handle
+     * busy polling loops of recvmsg */
+    flextcp_sockctx_poll(ctx);
+
+    /* if non-blocking and nothing then we abort now */
+    if ((s->flags & SOF_NONBLOCK) == SOF_NONBLOCK &&
+        s->data.connection.rx_len_1 == 0 &&
+        !(s->data.connection.st_flags & CSTF_RXCLOSED))
+    {
       errno = EAGAIN;
       ret = -1;
       goto out;
-    } else {
-      while (s->data.connection.rx_len_1 == 0 &&
-        !(s->data.connection.st_flags & CSTF_RXCLOSED))
-      {
-        flextcp_sockctx_poll(ctx);
-      }
     }
   }
 
@@ -260,22 +263,21 @@ ssize_t tas_sendmsg(int sockfd, const struct msghdr *msg, int flags)
     abort();
   }
 
-  if (ret == 0) {
-    if ((s->flags & SOF_NONBLOCK) == SOF_NONBLOCK) {
+  /* if tx buffer allocation failed, either block or poll context at least once
+   * to handle busy loops of send on non-blocking sockets. */
+  while (ret == 0) {
+    flextcp_sockctx_poll(ctx);
+
+    ret = flextcp_connection_tx_alloc2(&s->data.connection.c, len, &dst_1,
+        &len_1, &dst_2);
+    if (ret < 0) {
+      fprintf(stderr, "sendmsg: flextcp_connection_tx_alloc failed\n");
+      abort();
+    } else if (ret == 0 && (s->flags & SOF_NONBLOCK) == SOF_NONBLOCK) {
+      fprintf(stderr, "EAGAIN because alloc failed\n");
       errno = EAGAIN;
       ret = -1;
       goto out;
-    } else {
-      do {
-        flextcp_sockctx_poll(ctx);
-
-        ret = flextcp_connection_tx_alloc2(&s->data.connection.c, len, &dst_1,
-            &len_1, &dst_2);
-        if (ret < 0) {
-          fprintf(stderr, "sendmsg: flextcp_connection_tx_alloc failed\n");
-          abort();
-        }
-      } while (ret == 0);
     }
   }
   len_2 = ret - len_1;
@@ -352,22 +354,21 @@ static inline ssize_t send_simple(int sockfd, const void *buf, size_t len,
     abort();
   }
 
-  if (ret == 0) {
-    if ((s->flags & SOF_NONBLOCK) == SOF_NONBLOCK) {
+  /* if tx buffer allocation failed, either block or poll context at least once
+   * to handle busy loops of send on non-blocking sockets. */
+  while (ret == 0) {
+    flextcp_sockctx_poll(ctx);
+
+    ret = flextcp_connection_tx_alloc2(&s->data.connection.c, len, &dst_1,
+        &len_1, &dst_2);
+    if (ret < 0) {
+      fprintf(stderr, "sendmsg: flextcp_connection_tx_alloc failed\n");
+      abort();
+    } else if (ret == 0 && (s->flags & SOF_NONBLOCK) == SOF_NONBLOCK) {
+      fprintf(stderr, "EAGAIN because alloc failed\n");
       errno = EAGAIN;
       ret = -1;
       goto out;
-    } else {
-      do {
-        flextcp_sockctx_poll(ctx);
-
-        ret = flextcp_connection_tx_alloc2(&s->data.connection.c, len, &dst_1,
-            &len_1, &dst_2);
-        if (ret < 0) {
-          fprintf(stderr, "sendmsg: flextcp_connection_tx_alloc failed\n");
-          abort();
-        }
-      } while (ret == 0);
     }
   }
   len_2 = ret - len_1;
