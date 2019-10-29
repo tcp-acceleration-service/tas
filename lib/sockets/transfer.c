@@ -416,6 +416,20 @@ ssize_t tas_recvfrom(int sockfd, void *buf, size_t len, int flags,
   return ret;
 }
 
+ssize_t tas_readv(int sockfd, const struct iovec *iov, int iovlen)
+{
+  struct msghdr msg;
+  msg.msg_name = NULL;
+  msg.msg_namelen = 0;
+  msg.msg_iov = (struct iovec *) iov;
+  msg.msg_iovlen = iovlen;
+  msg.msg_control = NULL;
+  msg.msg_controllen = 0;
+  msg.msg_flags = 0;
+
+  return tas_recvmsg(sockfd, &msg, 0);
+}
+
 ssize_t tas_write(int sockfd, const void *buf, size_t len)
 {
   return send_simple(sockfd, buf, len, 0);
@@ -430,4 +444,18 @@ ssize_t tas_sendto(int sockfd, const void *buf, size_t len, int flags,
                    const struct sockaddr *dest_addr, socklen_t addrlen)
 {
   return send_simple(sockfd, buf, len, flags);
+}
+
+ssize_t tas_writev(int sockfd, const struct iovec *iov, int iovlen)
+{
+  struct msghdr msg;
+  msg.msg_name = NULL;
+  msg.msg_namelen = 0;
+  msg.msg_iov = (struct iovec *) iov;
+  msg.msg_iovlen = iovlen;
+  msg.msg_control = NULL;
+  msg.msg_controllen = 0;
+  msg.msg_flags = 0;
+
+  return tas_sendmsg(sockfd, &msg, 0);
 }
