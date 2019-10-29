@@ -713,13 +713,12 @@ int tas_setsockopt(int sockfd, int level, int optname, const void *optval,
       s->flags &= ~SOF_REUSEPORT;
     }
   } else if (level == SOL_SOCKET && optname == SO_REUSEADDR) {
-    fprintf(stderr, "flextcp setsockopt: Ignoring REUSEADDR\n");
-    // Ignore...
+    /* ignore silently */
   } else if (level == SOL_SOCKET && optname == SO_KEEPALIVE) {
-    fprintf(stderr, "flextcp setsockopt: Ignoring SO_KEEPALIVE\n");
+    /* ignore silently */
   } else if (level == IPPROTO_TCP && (optname == TCP_KEEPIDLE ||
        optname == TCP_KEEPINTVL || optname == TCP_KEEPCNT)) {
-    fprintf(stderr, "flextcp setsockopt: Ignoring TCP_KEEP*\n");
+    /* ignore silently */
   } else if (level == SOL_SOCKET && optname == SO_LINGER) {
     fprintf(stderr, "flextcp setsockopt: SO_LINGER not implemented\n");
     errno = ENOPROTOOPT;
