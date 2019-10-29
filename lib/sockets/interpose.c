@@ -77,7 +77,10 @@ static ssize_t (*libc_sendmsg)(int sockfd, const struct msghdr *msg, int flags)
 static ssize_t (*libc_writev)(int sockfd, const struct iovec *iov, int iovcnt)
     = NULL;
 static int (*libc_select)(int nfds, fd_set *readfds, fd_set *writefds,
-			  fd_set *exceptfds, struct timeval *timeout) = NULL;
+    fd_set *exceptfds, struct timeval *timeout) = NULL;
+static int (*libc_pselect)(int nfds, fd_set *readfds, fd_set *writefds,
+    fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask)
+    = NULL;
 
 int socket(int domain, int type, int protocol)
 {
@@ -338,6 +341,12 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
   return tas_select(nfds, readfds, writefds, exceptfds, timeout);
 }
 
+int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
+    const struct timespec *timeout, const sigset_t *sigmask)
+{
+  return tas_pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask);
+}
+
 int epoll_create(int size)
 {
   return tas_epoll_create(size);
@@ -404,6 +413,7 @@ static void init(void)
   libc_sendmsg = bind_symbol("sendmsg");
   libc_writev = bind_symbol("writev");
   libc_select = bind_symbol("select");
+  libc_pselect = bind_symbol("pselect");
 
   if (tas_init() != 0) {
     abort();

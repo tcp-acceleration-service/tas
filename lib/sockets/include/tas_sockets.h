@@ -100,7 +100,11 @@ int tas_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
 int tas_epoll_pwait(int epfd, struct epoll_event *events, int maxevents,
     int timeout, const sigset_t *sigmask);
 
+
 int tas_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     struct timeval *timeout);
+
+int tas_pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
+    const struct timespec *timeout, const sigset_t *sigmask);
 
 #endif /* ndef FLEXTCP_SOCKETS_H_ */
