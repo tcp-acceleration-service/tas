@@ -102,7 +102,8 @@ int tas_epoll_create1(int flags)
   ep->active_first = NULL;
   ep->active_last = NULL;
   ep->num_linux = 0;
-  ep->linux_cnt = 0;
+  ep->num_tas = 0;
+  ep->linux_next = 0;
 
   flextcp_fd_release(fd);
   return fd;
@@ -160,6 +161,8 @@ int tas_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 
   /* execute operation */
   if (op == EPOLL_CTL_ADD) {
+    ep->num_tas++;
+
     /* add fd to epoll */
     if (es != NULL) {
       /* socket not on this epoll */
@@ -215,6 +218,7 @@ int tas_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
     }
   } else if (op == EPOLL_CTL_DEL) {
     /* remove fd from epoll */
+    ep->num_tas--;
 
     if (es == NULL) {
       /* socket not on this epoll */
@@ -237,55 +241,17 @@ out:
   return ret;
 }
 
-/* #include <pthread.h> */
-
-int tas_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
-    int timeout)
+static unsigned ep_poll_tas(struct flextcp_context *ctx, int epfd,
+    struct epoll *ep, struct epoll_event *events, int maxevents, int timeout,
+    uint64_t mtimeout)
 {
-  struct flextcp_context *ctx;
-  struct epoll *ep;
   struct epoll_socket *es;
   struct socket *s;
-  int ret = 0, n = 0, nevents = 0;
   uint32_t i, num_active;
-  uint64_t mtimeout = 0;
-
-  libc_ptrs_init();
-  EPOLL_DEBUG("flextcp_epoll_wait(%d, %d, %d)\n", epfd, maxevents, timeout);
-
-  /* fprintf(stderr, "flextcp_epoll_wait(%d, %d, %d) on %p\n", epfd, maxevents, timeout, (void *)pthread_self()); */
-
-  if (maxevents <= 0) {
-    errno = EINVAL;
-    return -1;
-  }
-
-  if (flextcp_fd_elookup(epfd, &ep) != 0) {
-    errno = EBADF;
-    return -1;
-  }
-
-  if(ep->num_linux > 0) {
-    // XXX: Has Linux FDs - go straight to Linux
-    return libc_epoll_wait(epfd, events, maxevents, timeout);
-  }
-
-  util_prefetch0(ep->active_first);
-
-  /* calculate timeout */
-  if (timeout > 0) {
-    mtimeout = get_msecs() + timeout;
-  }
-
-  ctx = flextcp_sockctx_get();
+  unsigned n = 0;
+  int nevents;
 
   do {
-    /* check whether we have to give priority to linux fds */
-    /* TODO */
-    /*if (ep->num_linux > 0) {
-      if (
-    }*/
-
     /* make sure to poll for some events even if there is already enough on the
      * epoll */
 again:
@@ -336,8 +302,70 @@ again:
     }
   } while (n == 0 && timeout != 0 && (timeout == -1 || mtimeout < get_msecs()));
 
+  return n;
+}
+
+int tas_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
+    int timeout)
+{
+  struct flextcp_context *ctx;
+  struct epoll *ep;
+  int ret = 0, n = 0;
+  uint64_t mtimeout = 0;
+
+  libc_ptrs_init();
+  EPOLL_DEBUG("flextcp_epoll_wait(%d, %d, %d)\n", epfd, maxevents, timeout);
+
+  if (maxevents <= 0) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  if (flextcp_fd_elookup(epfd, &ep) != 0) {
+    errno = EBADF;
+    return -1;
+  }
+
+  if(ep->num_tas == 0) {
+    /* no TAS fds on the epoll, go straight to linux */
+    ret = libc_epoll_wait(epfd, events, maxevents, timeout);
+    goto out;
+  }
+
+  util_prefetch0(ep->active_first);
+
+  /* calculate timeout */
+  if (timeout > 0) {
+    mtimeout = get_msecs() + timeout;
+  }
+
+  ctx = flextcp_sockctx_get();
+
+  do {
+    if (ep->num_linux == 0) {
+      /* only tas FDs, we can block as we want */
+      n = ep_poll_tas(ctx, epfd, ep, events, maxevents, timeout, mtimeout);
+    } else if (ep->linux_next) {
+      /* start by polling linux and then TAS if there is space */
+      n = libc_epoll_wait(epfd, events, maxevents, 0);
+      if (n >= 0 && n < maxevents) {
+        n += ep_poll_tas(ctx, epfd, ep, events + n, maxevents - n, 0, 0);
+      }
+      ep->linux_next = 0;
+    } else {
+      /* poll tas first */
+      n = ep_poll_tas(ctx, epfd, ep, events, maxevents, 0, 0);
+      if (n < maxevents) {
+        ret = libc_epoll_wait(epfd, events + n, maxevents - n, 0);
+        if (ret >= 0)
+          n += ret;
+      }
+      ep->linux_next = 1;
+    }
+  } while (n == 0 && timeout != 0 && (timeout == -1 || mtimeout < get_msecs()));
+
   ret = n;
-/*out:*/
+out:
   flextcp_fd_release(epfd);
   EPOLL_DEBUG("        = %d\n", ret);
   return ret;

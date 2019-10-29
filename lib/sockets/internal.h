@@ -121,8 +121,9 @@ struct epoll {
   struct epoll_socket *active_last;
 
   uint32_t num_linux;
+  uint32_t num_tas;
   uint32_t num_active;
-  uint8_t linux_cnt;
+  uint8_t linux_next;
 };
 
 struct epoll_socket {
