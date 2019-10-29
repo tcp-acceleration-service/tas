@@ -616,6 +616,9 @@ int tas_getsockopt(int sockfd, int level, int optname, void *optval,
     }
   } else if (level == SOL_SOCKET && optname == SO_REUSEPORT) {
     res = !!(s->flags & SOF_REUSEPORT);
+  } else if (level == SOL_SOCKET && optname == SO_REUSEADDR) {
+    /* reuseaddr is always on */
+    res = 1;
   } else {
     /* unknown option */
     fprintf(stderr, "flextcp getsockopt: unknown level optname combination "
