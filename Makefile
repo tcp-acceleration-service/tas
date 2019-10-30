@@ -36,7 +36,7 @@ FASTPATH_OBJS = $(addprefix tas/fast/,fastemu.o network.o \
 		    qman.o trace.o fast_kernel.o fast_appctx.o fast_flows.o)
 STACK_OBJS = $(addprefix lib/tas/,init.o kernel.o conn.o connect.o)
 SOCKETS_OBJS = $(addprefix lib/sockets/,control.o transfer.o context.o manage_fd.o \
-	epoll.o)
+	epoll.o libc.o)
 INTERPOSE_OBJS = $(addprefix lib/sockets/,interpose.o)
 CFLAGS += -I. -Ilib/tas/include -Ilib/sockets/include
 

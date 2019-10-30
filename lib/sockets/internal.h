@@ -160,4 +160,11 @@ void flextcp_epoll_sockclose(struct socket *s);
 void flextcp_epoll_set(struct socket *s, uint32_t evts);
 void flextcp_epoll_clear(struct socket *s, uint32_t evts);
 
+int tas_libc_epoll_create1(int flags);
+int tas_libc_epoll_ctl(int epfd, int op, int fd,
+    struct epoll_event *event);
+int tas_libc_epoll_wait(int epfd, struct epoll_event *events,
+    int maxevents, int timeout);
+int tas_libc_close(int fd);
+
 #endif /* ndef INTERNAL_H_ */

@@ -41,7 +41,6 @@
 #define EPOLL_DEBUG(x...) do {} while (0)
 //#define EPOLL_DEBUG(x...) fprintf(stderr, x)
 
-static void libc_ptrs_init(void);
 static inline void es_add_inactive(struct epoll_socket *es);
 static inline void es_activate(struct epoll_socket *es);
 static inline void es_deactivate(struct epoll_socket *es);
@@ -50,12 +49,6 @@ static inline void es_remove_ep(struct epoll_socket *es);
 static inline void es_remove_sock(struct epoll_socket *es);
 static inline uint64_t get_msecs(void);
 
-static int (*libc_epoll_create1)(int flags) = NULL;
-static int (*libc_epoll_ctl)(int epfd, int op, int fd,
-    struct epoll_event *event) = NULL;
-static int (*libc_epoll_wait)(int epfd, struct epoll_event *events,
-    int maxevents, int timeout) = NULL;
-static int (*libc_close)(int fd);
 
 int tas_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     struct timeval *timeout)
@@ -87,14 +80,12 @@ int tas_epoll_create1(int flags)
   int fd;
   struct epoll *ep;
 
-  libc_ptrs_init();
-
-  if ((fd = libc_epoll_create1(flags)) == -1) {
+  if ((fd = tas_libc_epoll_create1(flags)) == -1) {
     return -1;
   }
 
   if (flextcp_fd_ealloc(&ep, fd) < 0) {
-    libc_close(fd);
+    tas_libc_close(fd);
     return -1;
   }
 
@@ -117,7 +108,6 @@ int tas_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
   int ret = 0;
   uint32_t em;
 
-  libc_ptrs_init();
   EPOLL_DEBUG("flextcp_epoll_ctl(%d, %d, %d, {events=%x})\n", epfd, op,
       fd, (event != NULL ? event->events : -1));
 
@@ -129,7 +119,7 @@ int tas_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
   /* handle linux fds */
   if (flextcp_fd_slookup(fd, &s) != 0) {
     /* this is a linux fd */
-    if ((ret = libc_epoll_ctl(epfd, op, fd, event)) != 0) {
+    if ((ret = tas_libc_epoll_ctl(epfd, op, fd, event)) != 0) {
       goto out;
     }
 
@@ -313,7 +303,6 @@ int tas_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
   int ret = 0, n = 0;
   uint64_t mtimeout = 0;
 
-  libc_ptrs_init();
   EPOLL_DEBUG("flextcp_epoll_wait(%d, %d, %d)\n", epfd, maxevents, timeout);
 
   if (maxevents <= 0) {
@@ -328,7 +317,7 @@ int tas_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
 
   if(ep->num_tas == 0) {
     /* no TAS fds on the epoll, go straight to linux */
-    ret = libc_epoll_wait(epfd, events, maxevents, timeout);
+    ret = tas_libc_epoll_wait(epfd, events, maxevents, timeout);
     goto out;
   }
 
@@ -347,7 +336,7 @@ int tas_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
       n = ep_poll_tas(ctx, epfd, ep, events, maxevents, timeout, mtimeout);
     } else if (ep->linux_next) {
       /* start by polling linux and then TAS if there is space */
-      n = libc_epoll_wait(epfd, events, maxevents, 0);
+      n = tas_libc_epoll_wait(epfd, events, maxevents, 0);
       if (n >= 0 && n < maxevents) {
         n += ep_poll_tas(ctx, epfd, ep, events + n, maxevents - n, 0, 0);
       }
@@ -356,7 +345,7 @@ int tas_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
       /* poll tas first */
       n = ep_poll_tas(ctx, epfd, ep, events, maxevents, 0, 0);
       if (n < maxevents) {
-        ret = libc_epoll_wait(epfd, events + n, maxevents - n, 0);
+        ret = tas_libc_epoll_wait(epfd, events + n, maxevents - n, 0);
         if (ret >= 0)
           n += ret;
       }
@@ -584,34 +573,4 @@ static inline uint64_t get_msecs(void)
   }
 
   return ts.tv_sec * 1000ULL + (ts.tv_nsec / 1000000ULL);
-}
-
-static void libc_ptrs_init(void)
-{
-  void *handle;
-
-  if (libc_epoll_create1 != NULL) {
-    return;
-  }
-
-  if ((handle = dlopen("libc.so.6", RTLD_LAZY)) == NULL) {
-    perror("flextcp epoll init dlopen on libc failed");
-    abort();
-  }
-  if ((libc_epoll_create1 = dlsym(handle, "epoll_create1")) == NULL) {
-    perror("flextcp init: dlsym epoll_create1 failed");
-    abort();
-  }
-  if ((libc_epoll_ctl = dlsym(handle, "epoll_ctl")) == NULL) {
-    perror("flextcp init: dlsym epoll_ctl failed");
-    abort();
-  }
-  if ((libc_epoll_wait = dlsym(handle, "epoll_wait")) == NULL) {
-    perror("flextcp init: dlsym epoll_wait failed");
-    abort();
-  }
-  if ((libc_close = dlsym(handle, "close")) == NULL) {
-    perror("flextcp init: dlsym close failed");
-    abort();
-  }
 }
