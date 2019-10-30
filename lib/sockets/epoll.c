@@ -433,6 +433,29 @@ void flextcp_epoll_sockclose(struct socket *s)
   }
 }
 
+/* destroy epoll after the underlying file descriptor is already closed */
+void flextcp_epoll_destroy(struct epoll *ep)
+{
+  struct epoll_socket *es;
+
+  /* remove inactive epoll socket bindings */
+  while((es = ep->active_first) != NULL){
+    es = ep->active_first;
+    es_remove_sock(es);
+    es_remove_ep(es);
+    free(es);
+  }
+
+  /* remove active epoll socket bindings */
+  while((es = ep->inactive) != NULL){
+    es_remove_sock(es);
+    es_remove_ep(es);
+    free(es);
+  }
+
+  free(ep);
+}
+
 /* remove es from epoll's inactive list */
 static inline void es_remove_inactive(struct epoll_socket *es)
 {

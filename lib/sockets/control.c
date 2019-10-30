@@ -92,24 +92,31 @@ int tas_socket(int domain, int type, int protocol)
 int tas_close(int sockfd)
 {
   struct socket *s;
+  struct epoll *ep;
   struct flextcp_context *ctx;
 
-  if (flextcp_fd_slookup(sockfd, &s) != 0) {
+  if (flextcp_fd_slookup(sockfd, &s) == 0) {
+    flextcp_fd_close(sockfd);
+
+    /* remove from epoll */
+    flextcp_epoll_sockclose(s);
+
+    ctx = flextcp_sockctx_get();
+    if (s->type == SOCK_CONNECTION) {
+      conn_close(ctx, s);
+    } else {
+      fprintf(stderr, "TODO: close for non-connections. (leak)\n");
+    }
+  } else if (flextcp_fd_elookup(sockfd, &ep) == 0) {
+    flextcp_fd_close(sockfd);
+
+    /* destroy epoll */
+    flextcp_epoll_destroy(ep);
+  } else {
     errno = EBADF;
     return -1;
   }
 
-  flextcp_fd_close(sockfd);
-
-  /* remove from epoll */
-  flextcp_epoll_sockclose(s);
-
-  ctx = flextcp_sockctx_get();
-  if (s->type == SOCK_CONNECTION) {
-    conn_close(ctx, s);
-  } else {
-    fprintf(stderr, "TODO: close for non-connections. (leak)\n");
-  }
   return 0;
 }
 

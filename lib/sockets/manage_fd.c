@@ -143,6 +143,8 @@ void flextcp_fd_release(int fd)
 
 void flextcp_fd_close(int fd)
 {
+  assert(fhs[fd].type == FH_SOCKET || fhs[fd].type == FH_EPOLL);
+
   fhs[fd].data.s = NULL;
   fhs[fd].type = FH_UNUSED;
   MEM_BARRIER();
