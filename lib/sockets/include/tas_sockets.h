@@ -92,6 +92,8 @@ ssize_t tas_writev(int sockfd, const struct iovec *iov, int iovcnt);
 
 ssize_t tas_pwrite(int sockfd, const void *buf, size_t count, off_t offset);
 
+ssize_t tas_sendfile(int sockfd, int in_fd, off_t *offset, size_t len);
+
 
 int tas_epoll_create(int size);
 

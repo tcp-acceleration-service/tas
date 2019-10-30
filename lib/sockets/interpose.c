@@ -81,6 +81,8 @@ static ssize_t (*libc_writev)(int sockfd, const struct iovec *iov, int iovcnt)
     = NULL;
 static ssize_t (*libc_pwrite)(int sockfd, const void *buf, size_t count,
     off_t offset) = NULL;
+static ssize_t (*libc_sendfile)(int sockfd, int in_fd, off_t *offset,
+    size_t len) = NULL;
 static int (*libc_select)(int nfds, fd_set *readfds, fd_set *writefds,
     fd_set *exceptfds, struct timeval *timeout) = NULL;
 static int (*libc_pselect)(int nfds, fd_set *readfds, fd_set *writefds,
@@ -356,6 +358,16 @@ ssize_t pwrite(int sockfd, const void *buf, size_t count, off_t offset)
   ensure_init();
   if ((ret = tas_pwrite(sockfd, buf, count, offset)) == -1 && errno == EBADF) {
     return libc_pwrite(sockfd, buf, count, offset);
+  }
+  return ret;
+}
+
+ssize_t sendfile(int sockfd, int in_fd, off_t *offset, size_t len)
+{
+  ssize_t ret;
+  ensure_init();
+  if ((ret = tas_sendfile(sockfd, in_fd, offset, len)) == -1 && errno == EBADF) {
+    return libc_sendfile(sockfd, in_fd, offset, len);
   }
   return ret;
 }

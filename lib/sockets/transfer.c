@@ -473,3 +473,10 @@ ssize_t tas_pwrite(int sockfd, const void *buf, size_t len, off_t offset)
   /* skipping zero chet for offset here */
   return send_simple(sockfd, buf, len, 0);
 }
+
+ssize_t tas_sendfile(int sockfd, int in_fd, off_t *offset, size_t len)
+{
+  assert(!"NYI");
+  errno = ENOTSUP;
+  return -1;
+}
