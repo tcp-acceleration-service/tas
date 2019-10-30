@@ -98,6 +98,10 @@ int tas_close(int sockfd)
   if (flextcp_fd_slookup(sockfd, &s) == 0) {
     flextcp_fd_close(sockfd);
 
+    /* there is another fd associated with this socket */
+    if (s->refcnt != 0)
+      return 0;
+
     /* remove from epoll */
     flextcp_epoll_sockclose(s);
 
@@ -109,6 +113,10 @@ int tas_close(int sockfd)
     }
   } else if (flextcp_fd_elookup(sockfd, &ep) == 0) {
     flextcp_fd_close(sockfd);
+
+    /* there is another fd associated with this epoll */
+    if (ep->refcnt != 0)
+      return 0;
 
     /* destroy epoll */
     flextcp_epoll_destroy(ep);

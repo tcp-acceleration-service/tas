@@ -100,6 +100,7 @@ struct socket {
   struct sockaddr_in addr;
   uint8_t flags;
   uint8_t type;
+  int refcnt;
 
   /** epoll events currently active on this socket */
   uint32_t ep_events;
@@ -119,6 +120,8 @@ struct epoll {
   /** list of sockets with unmasked events pending */
   struct epoll_socket *active_first;
   struct epoll_socket *active_last;
+
+  int refcnt;
 
   uint32_t num_linux;
   uint32_t num_tas;
@@ -167,5 +170,7 @@ int tas_libc_epoll_ctl(int epfd, int op, int fd,
 int tas_libc_epoll_wait(int epfd, struct epoll_event *events,
     int maxevents, int timeout);
 int tas_libc_close(int fd);
+int tas_libc_dup(int oldfd);
+int tas_libc_dup3(int oldfd, int newfd, int flags);
 
 #endif /* ndef INTERNAL_H_ */

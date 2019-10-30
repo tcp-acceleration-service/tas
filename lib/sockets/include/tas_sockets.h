@@ -120,4 +120,11 @@ int tas_poll(struct pollfd *fds, nfds_t nfds, int timeout);
 int tas_ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
     const sigset_t *sigmask);
 
+
+int tas_dup(int oldfd);
+
+int tas_dup2(int oldfd, int newfd);
+
+int tas_dup3(int oldfd, int newfd, int flags);
+
 #endif /* ndef FLEXTCP_SOCKETS_H_ */

@@ -426,6 +426,22 @@ int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
   return tas_ppoll(fds, nfds, tmo_p, sigmask);
 }
 
+int dup(int oldfd)
+{
+  return tas_dup(oldfd);
+}
+
+int dup2(int oldfd, int newfd)
+{
+  return tas_dup2(oldfd, newfd);
+}
+
+int dup3(int oldfd, int newfd, int flags)
+{
+  return tas_dup3(oldfd, newfd, flags);
+}
+
+
 /******************************************************************************/
 /* Helper functions */
 

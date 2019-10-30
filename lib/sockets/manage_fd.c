@@ -31,6 +31,7 @@
 #include <sys/eventfd.h>
 
 #include "internal.h"
+#include <tas_sockets.h>
 
 #define MAXSOCK 1024 * 1024
 
@@ -82,6 +83,7 @@ int flextcp_fd_salloc(struct socket **ps)
   }
 
   s->type = SOCK_SOCKET;
+  s->refcnt = 1;
   fhs[fd].data.s = s;
   fhs[fd].type = FH_SOCKET;
 
@@ -118,6 +120,8 @@ int flextcp_fd_ealloc(struct epoll **pe, int fd)
     return -1;
   }
 
+  e->refcnt = 1;
+
   fhs[fd].data.e = e;
   fhs[fd].type = FH_EPOLL;
 
@@ -144,10 +148,85 @@ void flextcp_fd_release(int fd)
 void flextcp_fd_close(int fd)
 {
   assert(fhs[fd].type == FH_SOCKET || fhs[fd].type == FH_EPOLL);
+  if (fhs[fd].type == FH_SOCKET) {
+    fhs[fd].data.s->refcnt--;
+    fhs[fd].data.s = NULL;
+  } else if (fhs[fd].type == FH_EPOLL) {
+    fhs[fd].data.e->refcnt--;
+    fhs[fd].data.e = NULL;
+  } else {
+    fprintf(stderr, "flextcp_fd_close: trying to close non-opened tas fd\n");
+    abort();
+  }
 
-  fhs[fd].data.s = NULL;
   fhs[fd].type = FH_UNUSED;
   MEM_BARRIER();
   /* TODO: enusure this is the libc close */
   close(fd);
+}
+
+/* do the tas-internal part of duping oldfd to newfd, after the linux fds have
+ * already been dup'd */
+static inline int internal_dup3(int oldfd, int newfd, int flags)
+{
+  struct socket *s;
+  struct epoll *ep;
+
+  /* TODO: check flags */
+
+  if (newfd >= MAXSOCK) {
+    fprintf(stderr, "tas_dup: failed because new fd is larger than MAXSOCK\n");
+    abort();
+  }
+
+  assert(fhs[newfd].type == FH_UNUSED);
+
+  /* next dup the underlying TAS socket and epoll if necessary */
+  if (flextcp_fd_slookup(oldfd, &s) == 0) {
+    /* oldfd is a tas socket */
+    fhs[newfd].type = FH_SOCKET;
+    fhs[newfd].data.s = s;
+
+    s->refcnt++;
+
+    flextcp_fd_release(oldfd);
+  } else if (flextcp_fd_elookup(oldfd, &ep) == 0) {
+    /* oldfd is a tas epoll */
+    fhs[newfd].type = FH_EPOLL;
+    fhs[newfd].data.e = ep;
+
+    ep->refcnt++;
+
+    flextcp_fd_release(oldfd);
+  }
+
+  return newfd;
+
+}
+
+int tas_dup(int oldfd)
+{
+  int newfd;
+
+  /* either way we want to dup the linux fd */
+  newfd = tas_libc_dup(oldfd);
+  if (newfd < 0)
+    return newfd;
+
+  return internal_dup3(oldfd, newfd, 0);
+}
+
+int tas_dup2(int oldfd, int newfd)
+{
+  return tas_dup3(oldfd, newfd, 0);
+}
+
+int tas_dup3(int oldfd, int newfd, int flags)
+{
+  /* either way we want to dup the linux fd */
+  newfd = tas_libc_dup3(oldfd, newfd, flags);
+  if (newfd < 0)
+    return newfd;
+
+  return internal_dup3(oldfd, newfd, flags);
 }
