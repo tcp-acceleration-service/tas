@@ -83,11 +83,6 @@ static ssize_t (*libc_pwrite)(int sockfd, const void *buf, size_t count,
     off_t offset) = NULL;
 static ssize_t (*libc_sendfile)(int sockfd, int in_fd, off_t *offset,
     size_t len) = NULL;
-static int (*libc_select)(int nfds, fd_set *readfds, fd_set *writefds,
-    fd_set *exceptfds, struct timeval *timeout) = NULL;
-static int (*libc_pselect)(int nfds, fd_set *readfds, fd_set *writefds,
-    fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask)
-    = NULL;
 
 int socket(int domain, int type, int protocol)
 {
@@ -471,8 +466,6 @@ static void init(void)
   libc_sendmsg = bind_symbol("sendmsg");
   libc_writev = bind_symbol("writev");
   libc_pwrite = bind_symbol("pwrite");
-  libc_select = bind_symbol("select");
-  libc_pselect = bind_symbol("pselect");
 
   if (tas_init() != 0) {
     abort();
