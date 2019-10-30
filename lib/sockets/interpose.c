@@ -30,6 +30,7 @@
 #include <dlfcn.h>
 #include <pthread.h>
 #include <sys/select.h>
+#include <unistd.h>
 
 #include <utils.h>
 #include <tas_sockets.h>
@@ -67,6 +68,8 @@ static ssize_t (*libc_recvmsg)(int sockfd, struct msghdr *msg, int flags)
     = NULL;
 static ssize_t (*libc_readv)(int sockfd, const struct iovec *iov, int iovcnt)
     = NULL;
+static ssize_t (*libc_pread)(int sockfd, void *buf, size_t count, off_t offset)
+    = NULL;
 static ssize_t (*libc_write)(int fd, const void *buf, size_t count) = NULL;
 static ssize_t (*libc_send)(int sockfd, const void *buf, size_t len, int flags)
     = NULL;
@@ -76,6 +79,8 @@ static ssize_t (*libc_sendmsg)(int sockfd, const struct msghdr *msg, int flags)
     = NULL;
 static ssize_t (*libc_writev)(int sockfd, const struct iovec *iov, int iovcnt)
     = NULL;
+static ssize_t (*libc_pwrite)(int sockfd, const void *buf, size_t count,
+    off_t offset) = NULL;
 static int (*libc_select)(int nfds, fd_set *readfds, fd_set *writefds,
     fd_set *exceptfds, struct timeval *timeout) = NULL;
 static int (*libc_pselect)(int nfds, fd_set *readfds, fd_set *writefds,
@@ -282,6 +287,16 @@ ssize_t readv(int sockfd, const struct iovec *iov, int iovcnt)
   return ret;
 }
 
+ssize_t pread(int sockfd, void *buf, size_t count, off_t offset)
+{
+  ssize_t ret;
+  ensure_init();
+  if ((ret = tas_pread(sockfd, buf, count, offset)) == -1 && errno == EBADF) {
+    return libc_pread(sockfd, buf, count, offset);
+  }
+  return ret;
+}
+
 ssize_t write(int sockfd, const void *buf, size_t count)
 {
   ssize_t ret;
@@ -331,6 +346,16 @@ ssize_t writev(int sockfd, const struct iovec *iov, int iovcnt)
   ensure_init();
   if ((ret = tas_writev(sockfd, iov, iovcnt)) == -1 && errno == EBADF) {
     return libc_writev(sockfd, iov, iovcnt);
+  }
+  return ret;
+}
+
+ssize_t pwrite(int sockfd, const void *buf, size_t count, off_t offset)
+{
+  ssize_t ret;
+  ensure_init();
+  if ((ret = tas_pwrite(sockfd, buf, count, offset)) == -1 && errno == EBADF) {
+    return libc_pwrite(sockfd, buf, count, offset);
   }
   return ret;
 }
@@ -427,11 +452,13 @@ static void init(void)
   libc_recvfrom = bind_symbol("recvfrom");
   libc_recvmsg = bind_symbol("recvmsg");
   libc_readv = bind_symbol("readv");
+  libc_pread = bind_symbol("pread");
   libc_write = bind_symbol("write");
   libc_send = bind_symbol("send");
   libc_sendto = bind_symbol("sendto");
   libc_sendmsg = bind_symbol("sendmsg");
   libc_writev = bind_symbol("writev");
+  libc_pwrite = bind_symbol("pwrite");
   libc_select = bind_symbol("select");
   libc_pselect = bind_symbol("pselect");
 

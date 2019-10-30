@@ -77,6 +77,8 @@ ssize_t tas_recvmsg(int sockfd, struct msghdr *msg, int flags);
 
 ssize_t tas_readv(int sockfd, const struct iovec *iov, int iovcnt);
 
+ssize_t tas_pread(int sockfd, void *buf, size_t count, off_t offset);
+
 ssize_t tas_write(int fd, const void *buf, size_t count);
 
 ssize_t tas_send(int sockfd, const void *buf, size_t len, int flags);
@@ -87,6 +89,8 @@ ssize_t tas_sendto(int sockfd, const void *buf, size_t len, int flags,
 ssize_t tas_sendmsg(int sockfd, const struct msghdr *msg, int flags);
 
 ssize_t tas_writev(int sockfd, const struct iovec *iov, int iovcnt);
+
+ssize_t tas_pwrite(int sockfd, const void *buf, size_t count, off_t offset);
 
 
 int tas_epoll_create(int size);

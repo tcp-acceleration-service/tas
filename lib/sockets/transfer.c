@@ -431,6 +431,13 @@ ssize_t tas_readv(int sockfd, const struct iovec *iov, int iovlen)
   return tas_recvmsg(sockfd, &msg, 0);
 }
 
+ssize_t tas_pread(int sockfd, void *buf, size_t len, off_t offset)
+{
+  /* skipping zero chet for offset here */
+  return recv_simple(sockfd, buf, len, 0);
+}
+
+
 ssize_t tas_write(int sockfd, const void *buf, size_t len)
 {
   return send_simple(sockfd, buf, len, 0);
@@ -459,4 +466,10 @@ ssize_t tas_writev(int sockfd, const struct iovec *iov, int iovlen)
   msg.msg_flags = 0;
 
   return tas_sendmsg(sockfd, &msg, 0);
+}
+
+ssize_t tas_pwrite(int sockfd, const void *buf, size_t len, off_t offset)
+{
+  /* skipping zero chet for offset here */
+  return send_simple(sockfd, buf, len, 0);
 }
