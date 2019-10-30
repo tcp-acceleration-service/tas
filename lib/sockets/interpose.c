@@ -381,6 +381,19 @@ int epoll_pwait(int epfd, struct epoll_event *events, int maxevents,
   return tas_epoll_pwait(epfd, events, maxevents, timeout, sigmask);
 }
 
+int poll(struct pollfd *fds, nfds_t nfds, int timeout)
+{
+  ensure_init();
+  return tas_poll(fds, nfds, timeout);
+}
+
+int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
+    const sigset_t *sigmask)
+{
+  ensure_init();
+  return tas_ppoll(fds, nfds, tmo_p, sigmask);
+}
+
 /******************************************************************************/
 /* Helper functions */
 

@@ -66,6 +66,21 @@ int tas_pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
   return -1;
 }
 
+int tas_poll(struct pollfd *fds, nfds_t nfds, int timeout)
+{
+  assert(!"NYI");
+  errno = ENOTSUP;
+  return -1;
+}
+
+int tas_ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
+    const sigset_t *sigmask)
+{
+  assert(!"NYI");
+  errno = ENOTSUP;
+  return -1;
+}
+
 int tas_epoll_create(int size)
 {
   if (size <= 0) {

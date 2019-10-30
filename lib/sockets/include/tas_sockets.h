@@ -25,6 +25,7 @@
 #ifndef FLEXTCP_SOCKETS_H_
 #define FLEXTCP_SOCKETS_H_
 
+#include <poll.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
@@ -106,5 +107,11 @@ int tas_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
 
 int tas_pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     const struct timespec *timeout, const sigset_t *sigmask);
+
+
+int tas_poll(struct pollfd *fds, nfds_t nfds, int timeout);
+
+int tas_ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
+    const sigset_t *sigmask);
 
 #endif /* ndef FLEXTCP_SOCKETS_H_ */
