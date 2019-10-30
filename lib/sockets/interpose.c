@@ -338,39 +338,46 @@ ssize_t writev(int sockfd, const struct iovec *iov, int iovcnt)
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     struct timeval *timeout)
 {
+  ensure_init();
   return tas_select(nfds, readfds, writefds, exceptfds, timeout);
 }
 
 int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     const struct timespec *timeout, const sigset_t *sigmask)
 {
+  ensure_init();
   return tas_pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask);
 }
 
 int epoll_create(int size)
 {
+  ensure_init();
   return tas_epoll_create(size);
 }
 
 int epoll_create1(int flags)
 {
+  ensure_init();
   return tas_epoll_create1(flags);
 }
 
 int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 {
+  ensure_init();
   return tas_epoll_ctl(epfd, op, fd, event);
 }
 
 int epoll_wait(int epfd, struct epoll_event *events, int maxevents,
     int timeout)
 {
+  ensure_init();
   return tas_epoll_wait(epfd, events, maxevents, timeout);
 }
 
 int epoll_pwait(int epfd, struct epoll_event *events, int maxevents,
     int timeout, const sigset_t *sigmask)
 {
+  ensure_init();
   return tas_epoll_pwait(epfd, events, maxevents, timeout, sigmask);
 }
 
