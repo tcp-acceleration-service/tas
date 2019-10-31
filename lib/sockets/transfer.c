@@ -79,7 +79,9 @@ ssize_t tas_recvmsg(int sockfd, struct msghdr *msg, int flags)
 
     /* even if non-blocking we have to poll the context at least once to handle
      * busy polling loops of recvmsg */
+    socket_unlock(s);
     flextcp_sockctx_poll(ctx);
+    socket_lock(s);
 
     /* if non-blocking and nothing then we abort now */
     if ((s->flags & SOF_NONBLOCK) == SOF_NONBLOCK &&
@@ -123,7 +125,7 @@ ssize_t tas_recvmsg(int sockfd, struct msghdr *msg, int flags)
     flextcp_connection_rx_done(ctx, &s->data.connection.c, ret);
   }
 out:
-  flextcp_fd_release(sockfd);
+  flextcp_fd_srelease(sockfd, s);
   return ret;
 }
 
@@ -163,7 +165,9 @@ static inline ssize_t recv_simple(int sockfd, void *buf, size_t len, int flags)
 
     /* even if non-blocking we have to poll the context at least once to handle
      * busy polling loops of recvmsg */
+    socket_unlock(s);
     flextcp_sockctx_poll(ctx);
+    socket_lock(s);
 
     /* if non-blocking and nothing then we abort now */
     if ((s->flags & SOF_NONBLOCK) == SOF_NONBLOCK &&
@@ -202,7 +206,7 @@ static inline ssize_t recv_simple(int sockfd, void *buf, size_t len, int flags)
     flextcp_connection_rx_done(ctx, &s->data.connection.c, ret);
   }
 out:
-  flextcp_fd_release(sockfd);
+  flextcp_fd_srelease(sockfd, s);
   return ret;
 }
 
@@ -266,7 +270,9 @@ ssize_t tas_sendmsg(int sockfd, const struct msghdr *msg, int flags)
   /* if tx buffer allocation failed, either block or poll context at least once
    * to handle busy loops of send on non-blocking sockets. */
   while (ret == 0) {
+    socket_unlock(s);
     flextcp_sockctx_poll(ctx);
+    socket_lock(s);
 
     ret = flextcp_connection_tx_alloc2(&s->data.connection.c, len, &dst_1,
         &len_1, &dst_2);
@@ -296,11 +302,13 @@ ssize_t tas_sendmsg(int sockfd, const struct msghdr *msg, int flags)
   /* send out */
   /* TODO: this should not block for non-blocking sockets */
   while (flextcp_connection_tx_send(ctx, &s->data.connection.c, ret) != 0) {
+    socket_unlock(s);
     flextcp_sockctx_poll(ctx);
+    socket_lock(s);
   }
 
 out:
-  flextcp_fd_release(sockfd);
+  flextcp_fd_srelease(sockfd, s);
   return ret;
 }
 
@@ -356,7 +364,9 @@ static inline ssize_t send_simple(int sockfd, const void *buf, size_t len,
   /* if tx buffer allocation failed, either block or poll context at least once
    * to handle busy loops of send on non-blocking sockets. */
   while (ret == 0) {
+    socket_unlock(s);
     flextcp_sockctx_poll(ctx);
+    socket_lock(s);
 
     ret = flextcp_connection_tx_alloc2(&s->data.connection.c, len, &dst_1,
         &len_1, &dst_2);
@@ -378,11 +388,13 @@ static inline ssize_t send_simple(int sockfd, const void *buf, size_t len,
   /* send out */
   /* TODO: this should not block for non-blocking sockets */
   while (flextcp_connection_tx_send(ctx, &s->data.connection.c, ret) != 0) {
+    socket_unlock(s);
     flextcp_sockctx_poll(ctx);
+    socket_lock(s);
   }
 
 out:
-  flextcp_fd_release(sockfd);
+  flextcp_fd_srelease(sockfd, s);
   return ret;
 }
 

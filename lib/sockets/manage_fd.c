@@ -83,6 +83,8 @@ int flextcp_fd_salloc(struct socket **ps)
 
   s->type = SOCK_SOCKET;
   s->refcnt = 1;
+  s->sp_lock = 1;
+
   fhs[fd].data.s = s;
   fhs[fd].type = FH_SOCKET;
 
@@ -93,12 +95,16 @@ int flextcp_fd_salloc(struct socket **ps)
 
 int flextcp_fd_slookup(int fd, struct socket **ps)
 {
+  struct socket *s;
+
   if (fd >= MAXSOCK || fhs[fd].type != FH_SOCKET) {
     errno = EBADF;
     return -1;
   }
 
-  *ps = fhs[fd].data.s;
+  s = fhs[fd].data.s;
+  socket_lock(s);
+  *ps = s;
   return 0;
 }
 
@@ -120,6 +126,7 @@ int flextcp_fd_ealloc(struct epoll **pe, int fd)
   }
 
   e->refcnt = 1;
+  e->sp_lock = 1;
 
   fhs[fd].data.e = e;
   fhs[fd].type = FH_EPOLL;
@@ -131,17 +138,27 @@ int flextcp_fd_ealloc(struct epoll **pe, int fd)
 
 int flextcp_fd_elookup(int fd, struct epoll **pe)
 {
+  struct epoll *e;
+
   if (fd >= MAXSOCK || fhs[fd].type != FH_EPOLL) {
     errno = EBADF;
     return -1;
   }
 
-  *pe = fhs[fd].data.e;
+  e = fhs[fd].data.e;
+  epoll_lock(e);
+  *pe = e;
   return 0;
 }
 
-void flextcp_fd_release(int fd)
+void flextcp_fd_srelease(int fd, struct socket *s)
 {
+  socket_unlock(s);
+}
+
+void flextcp_fd_erelease(int fd, struct epoll *e)
+{
+  epoll_unlock(e);
 }
 
 void flextcp_fd_close(int fd)
@@ -187,7 +204,7 @@ static inline int internal_dup3(int oldfd, int newfd, int flags)
 
     s->refcnt++;
 
-    flextcp_fd_release(oldfd);
+    flextcp_fd_srelease(oldfd, s);
   } else if (flextcp_fd_elookup(oldfd, &ep) == 0) {
     /* oldfd is a tas epoll */
     fhs[newfd].type = FH_EPOLL;
@@ -195,7 +212,7 @@ static inline int internal_dup3(int oldfd, int newfd, int flags)
 
     ep->refcnt++;
 
-    flextcp_fd_release(oldfd);
+    flextcp_fd_srelease(oldfd, s);
   }
 
   return newfd;

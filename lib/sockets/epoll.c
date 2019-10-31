@@ -111,7 +111,7 @@ int tas_epoll_create1(int flags)
   ep->num_tas = 0;
   ep->linux_next = 0;
 
-  flextcp_fd_release(fd);
+  flextcp_fd_erelease(fd, ep);
   return fd;
 }
 
@@ -160,7 +160,7 @@ int tas_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
           (event->events & (~em)));
       errno = EINVAL;
       ret = -1;
-      goto out;
+      goto out_sock;
     }
   }
 
@@ -173,14 +173,14 @@ int tas_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
       /* socket not on this epoll */
       errno = EEXIST;
       ret = -1;
-      goto out;
+      goto out_sock;
     }
 
     /* allocate epoll_socket */
     if ((es = calloc(1, sizeof(*es))) == NULL) {
       errno = ENOMEM;
       ret = -1;
-      goto out;
+      goto out_sock;
     }
 
     es->ep = ep;
@@ -214,7 +214,7 @@ int tas_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
       /* socket not on this epoll */
       errno = ENOENT;
       ret = -1;
-      goto out;
+      goto out_sock;
     }
 
     es->mask = event->events | EPOLLERR;
@@ -229,7 +229,7 @@ int tas_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
       /* socket not on this epoll */
       errno = ENOENT;
       ret = -1;
-      goto out;
+      goto out_sock;
     }
 
     es_remove_sock(es);
@@ -239,10 +239,13 @@ int tas_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
     /* unknown operation */
     errno = EINVAL;
     ret = -1;
-    goto out;
+    goto out_sock;
   }
+
+out_sock:
+  flextcp_fd_srelease(fd, s);
 out:
-  flextcp_fd_release(epfd);
+  flextcp_fd_erelease(epfd, ep);
   return ret;
 }
 
@@ -260,7 +263,9 @@ static unsigned ep_poll_tas(struct flextcp_context *ctx, int epfd,
     /* make sure to poll for some events even if there is already enough on the
      * epoll */
 again:
+    epoll_unlock(ep);
     nevents = flextcp_sockctx_poll_n(ctx, maxevents);
+    epoll_lock(ep);
 
     static uint32_t __thread startwait = 0;
     if (LIKELY(nevents != 0))
@@ -278,6 +283,7 @@ again:
 
       /* check whether fd is actually active */
       s = es->s;
+      socket_lock(s);
       if ((s->ep_events & es->mask) != 0) {
         events[n].events = s->ep_events & es->mask;
         events[n].data = es->data;
@@ -286,6 +292,7 @@ again:
       } else {
         es_deactivate(es);
       }
+      socket_unlock(s);
     }
 
     // Block thread if nothing received for a while
@@ -298,7 +305,9 @@ again:
           startwait = cur_ts;
         } else if(cur_ts - startwait >= POLL_CYCLE) {
           // Idle -- wait for data from apps/flexnic
+          epoll_unlock(ep);
           flextcp_block(ctx, cur_ms - mtimeout);
+          epoll_lock(ep);
           // Gotta check again now that we woke up
           startwait = 0;
           goto again;
@@ -332,8 +341,8 @@ int tas_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
 
   if(ep->num_tas == 0) {
     /* no TAS fds on the epoll, go straight to linux */
-    ret = tas_libc_epoll_wait(epfd, events, maxevents, timeout);
-    goto out;
+    flextcp_fd_erelease(epfd, ep);
+    return tas_libc_epoll_wait(epfd, events, maxevents, timeout);
   }
 
   util_prefetch0(ep->active_first);
@@ -351,7 +360,10 @@ int tas_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
       n = ep_poll_tas(ctx, epfd, ep, events, maxevents, timeout, mtimeout);
     } else if (ep->linux_next) {
       /* start by polling linux and then TAS if there is space */
+      epoll_unlock(ep);
       n = tas_libc_epoll_wait(epfd, events, maxevents, 0);
+      epoll_lock(ep);
+
       if (n >= 0 && n < maxevents) {
         n += ep_poll_tas(ctx, epfd, ep, events + n, maxevents - n, 0, 0);
       }
@@ -360,7 +372,9 @@ int tas_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
       /* poll tas first */
       n = ep_poll_tas(ctx, epfd, ep, events, maxevents, 0, 0);
       if (n < maxevents) {
+        epoll_unlock(ep);
         ret = tas_libc_epoll_wait(epfd, events + n, maxevents - n, 0);
+        epoll_lock(ep);
         if (ret >= 0)
           n += ret;
       }
@@ -369,8 +383,7 @@ int tas_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
   } while (n == 0 && timeout != 0 && (timeout == -1 || mtimeout < get_msecs()));
 
   ret = n;
-out:
-  flextcp_fd_release(epfd);
+  flextcp_fd_erelease(epfd, ep);
   EPOLL_DEBUG("        = %d\n", ret);
   return ret;
 }

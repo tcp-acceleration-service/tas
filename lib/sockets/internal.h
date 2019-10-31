@@ -31,6 +31,7 @@
 #include <netinet/in.h>
 
 #include <tas_ll.h>
+#include <utils_sync.h>
 
 enum filehandle_type {
   SOCK_UNUSED = 0,
@@ -101,6 +102,7 @@ struct socket {
   uint8_t flags;
   uint8_t type;
   int refcnt;
+  volatile uint32_t sp_lock;
 
   /** epoll events currently active on this socket */
   uint32_t ep_events;
@@ -122,6 +124,7 @@ struct epoll {
   struct epoll_socket *active_last;
 
   int refcnt;
+  volatile uint32_t sp_lock;
 
   uint32_t num_linux;
   uint32_t num_tas;
@@ -149,7 +152,8 @@ int flextcp_fd_salloc(struct socket **ps);
 int flextcp_fd_ealloc(struct epoll **pe, int fd);
 int flextcp_fd_slookup(int fd, struct socket **ps);
 int flextcp_fd_elookup(int fd, struct epoll **pe);
-void flextcp_fd_release(int fd);
+void flextcp_fd_srelease(int fd, struct socket *s);
+void flextcp_fd_erelease(int fd, struct epoll *ep);
 void flextcp_fd_close(int fd);
 
 struct flextcp_context *flextcp_sockctx_get(void);
@@ -172,5 +176,25 @@ int tas_libc_epoll_wait(int epfd, struct epoll_event *events,
 int tas_libc_close(int fd);
 int tas_libc_dup(int oldfd);
 int tas_libc_dup3(int oldfd, int newfd, int flags);
+
+static inline void socket_lock(struct socket *s)
+{
+  util_spin_lock(&s->sp_lock);
+}
+
+static inline void socket_unlock(struct socket *s)
+{
+  util_spin_unlock(&s->sp_lock);
+}
+
+static inline void epoll_lock(struct epoll *ep)
+{
+  util_spin_lock(&ep->sp_lock);
+}
+
+static inline void epoll_unlock(struct epoll *ep)
+{
+  util_spin_unlock(&ep->sp_lock);
+}
 
 #endif /* ndef INTERNAL_H_ */

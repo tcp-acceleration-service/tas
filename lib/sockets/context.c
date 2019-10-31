@@ -170,6 +170,8 @@ static inline void ev_listen_open(struct flextcp_context *ctx,
   s = (struct socket *)
     ((uint8_t *) l - offsetof(struct socket, data.listener.l));
 
+  socket_lock(s);
+
   assert(s->type == SOCK_LISTENER);
   assert(s->data.listener.status == SOL_OPENING);
   if (ev->ev.listen_open.status == 0) {
@@ -177,6 +179,8 @@ static inline void ev_listen_open(struct flextcp_context *ctx,
   } else {
     s->data.listener.status = SOL_FAILED;
   }
+
+  socket_unlock(s);
 }
 
 static inline void ev_listen_newconn(struct flextcp_context *ctx,
@@ -189,9 +193,13 @@ static inline void ev_listen_newconn(struct flextcp_context *ctx,
   s = (struct socket *)
     ((uint8_t *) l - offsetof(struct socket, data.listener.l));
 
+  socket_lock(s);
+
   assert(s->type == SOCK_LISTENER);
 
   flextcp_epoll_set(s, EPOLLIN);
+
+  socket_unlock(s);
 }
 
 static inline void ev_listen_accept(struct flextcp_context *ctx,
@@ -203,6 +211,8 @@ static inline void ev_listen_accept(struct flextcp_context *ctx,
   c = ev->ev.listen_accept.conn;
   s = (struct socket *)
     ((uint8_t *) c - offsetof(struct socket, data.connection.c));
+
+  socket_lock(s);
 
   assert(s->type == SOCK_CONNECTION);
   assert(s->data.connection.status == SOC_CONNECTING);
@@ -219,6 +229,7 @@ static inline void ev_listen_accept(struct flextcp_context *ctx,
     flextcp_epoll_set(s, EPOLLERR);
   }
 
+  socket_unlock(s);
 }
 
 static inline void ev_conn_open(struct flextcp_context *ctx,
@@ -231,6 +242,8 @@ static inline void ev_conn_open(struct flextcp_context *ctx,
   s = (struct socket *)
     ((uint8_t *) c - offsetof(struct socket, data.connection.c));
 
+  socket_lock(s);
+
   assert(s->type == SOCK_CONNECTION);
   assert(s->data.connection.status == SOC_CONNECTING);
 
@@ -242,6 +255,7 @@ static inline void ev_conn_open(struct flextcp_context *ctx,
     flextcp_epoll_set(s, EPOLLERR);
   }
 
+  socket_unlock(s);
 }
 
 static inline void ev_conn_received(struct flextcp_context *ctx,
@@ -255,6 +269,8 @@ static inline void ev_conn_received(struct flextcp_context *ctx,
   c = ev->ev.conn_received.conn;
   s = (struct socket *)
     ((uint8_t *) c - offsetof(struct socket, data.connection.c));
+
+  socket_lock(s);
 
   assert(s->type == SOCK_CONNECTION);
   assert(s->data.connection.status == SOC_CONNECTED);
@@ -329,6 +345,8 @@ static inline void ev_conn_received(struct flextcp_context *ctx,
   }
 
   flextcp_epoll_set(s, EPOLLIN);
+
+  socket_unlock(s);
 }
 
 static inline void ev_conn_sendbuf(struct flextcp_context *ctx,
@@ -341,10 +359,14 @@ static inline void ev_conn_sendbuf(struct flextcp_context *ctx,
   s = (struct socket *)
     ((uint8_t *) c - offsetof(struct socket, data.connection.c));
 
+  socket_lock(s);
+
   assert(s->type == SOCK_CONNECTION);
   assert(s->data.connection.status == SOC_CONNECTED);
 
   flextcp_epoll_set(s, EPOLLOUT);
+
+  socket_unlock(s);
 }
 
 static inline void ev_conn_moved(struct flextcp_context *ctx,
@@ -357,10 +379,14 @@ static inline void ev_conn_moved(struct flextcp_context *ctx,
   s = (struct socket *)
     ((uint8_t *) c - offsetof(struct socket, data.connection.c));
 
+  socket_lock(s);
+
   assert(s->type == SOCK_CONNECTION);
   assert(s->data.connection.status == SOC_CONNECTED);
 
   s->data.connection.move_status = ev->ev.conn_moved.status;
+
+  socket_unlock(s);
 }
 
 static inline void ev_conn_rxclosed(struct flextcp_context *ctx,
@@ -372,6 +398,8 @@ static inline void ev_conn_rxclosed(struct flextcp_context *ctx,
   c = ev->ev.conn_rxclosed.conn;
   s = (struct socket *)
     ((uint8_t *) c - offsetof(struct socket, data.connection.c));
+
+  socket_lock(s);
 
   assert(s->type == SOCK_CONNECTION);
   assert(s->data.connection.status == SOC_CONNECTED ||
@@ -387,6 +415,8 @@ static inline void ev_conn_rxclosed(struct flextcp_context *ctx,
      * close. */
     flextcp_sockclose_finish(ctx, s);
   }
+
+  socket_unlock(s);
 }
 
 static inline void ev_conn_txclosed(struct flextcp_context *ctx,
@@ -398,6 +428,8 @@ static inline void ev_conn_txclosed(struct flextcp_context *ctx,
   c = ev->ev.conn_txclosed.conn;
   s = (struct socket *)
     ((uint8_t *) c - offsetof(struct socket, data.connection.c));
+
+  socket_lock(s);
 
   assert(s->type == SOCK_CONNECTION);
   assert(s->data.connection.status == SOC_CONNECTED ||
@@ -412,6 +444,8 @@ static inline void ev_conn_txclosed(struct flextcp_context *ctx,
      * close. */
     flextcp_sockclose_finish(ctx, s);
   }
+
+  socket_unlock(s);
 }
 
 static inline void ev_conn_closed(struct flextcp_context *ctx,
@@ -423,6 +457,8 @@ static inline void ev_conn_closed(struct flextcp_context *ctx,
   c = ev->ev.conn_closed.conn;
   s = (struct socket *)
     ((uint8_t *) c - offsetof(struct socket, data.connection.c));
+
+  socket_lock(s);
 
   assert(s->type == SOCK_CONNECTION);
   assert(s->data.connection.status == SOC_CLOSED);
