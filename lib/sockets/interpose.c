@@ -31,6 +31,7 @@
 #include <pthread.h>
 #include <sys/select.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <utils.h>
 #include <tas_sockets.h>
@@ -171,17 +172,80 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 int fcntl(int sockfd, int cmd, ...)
 {
-  int ret, arg;
+  int ret, arg_i;
+  void *arg_p;
   va_list val;
   ensure_init();
 
+  /* this is pretty ugly, but unfortunately there is no other way to interpose
+   * on variadic functions and pass along all arguments. */
   va_start(val, cmd);
-  arg = va_arg(val, int);
+  switch (cmd) {
+    /* these take no argument */
+    case F_GETFD:
+    case F_GETFL:
+    case F_GETOWN:
+    case F_GETSIG:
+    case F_GETLEASE:
+    case F_GETPIPE_SZ:
+#ifdef F_GET_SEALS
+    case F_GET_SEALS:
+#endif
+      if ((ret = tas_fcntl(sockfd, cmd)) == -1 && errno == EBADF)
+        ret = libc_fcntl(sockfd, cmd);
+      break;
+
+
+    /* these take int as an argument */
+    case F_DUPFD:
+    case F_DUPFD_CLOEXEC:
+    case F_SETFD:
+    case F_SETFL:
+    case F_SETOWN:
+    case F_SETSIG:
+    case F_SETLEASE:
+    case F_NOTIFY:
+    case F_SETPIPE_SZ:
+#ifdef F_ADD_SEALS
+    case F_ADD_SEALS:
+#endif
+      arg_i = va_arg(val, int);
+      if ((ret = tas_fcntl(sockfd, cmd, arg_i)) == -1 && errno == EBADF)
+        ret = libc_fcntl(sockfd, cmd, arg_i);
+      break;
+
+
+    /* these take a pointer as an argument */
+    case F_SETLK:
+    case F_SETLKW:
+    case F_GETLK:
+    case F_OFD_SETLK:
+    case F_OFD_SETLKW:
+    case F_OFD_GETLK:
+    case F_GETOWN_EX:
+    case F_SETOWN_EX:
+#ifdef F_GET_RW_HINT
+    case F_GET_RW_HINT:
+    case F_SET_RW_HINT:
+#endif
+#ifdef F_GET_FILE_RW_HINT
+    case F_GET_FILE_RW_HINT:
+    case F_SET_FILE_RW_HINT:
+#endif
+      arg_p = va_arg(val, void *);
+      if ((ret = tas_fcntl(sockfd, cmd, arg_p)) == -1 && errno == EBADF)
+        ret = libc_fcntl(sockfd, cmd, arg_p);
+      break;
+
+    /* unsupported */
+    default:
+      fprintf(stderr, "tas fcntl wrapper: unsupported cmd (%u)\n", cmd);
+      errno = EINVAL;
+      ret = -1;
+      break;
+  }
   va_end(val);
 
-  if ((ret = tas_fcntl(sockfd, cmd, arg)) == -1 && errno == EBADF) {
-    return libc_fcntl(sockfd, cmd, arg);
-  }
   return ret;
 }
 
