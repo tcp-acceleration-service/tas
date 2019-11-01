@@ -194,7 +194,34 @@ static inline int internal_dup3(int oldfd, int newfd, int flags)
     abort();
   }
 
-  assert(fhs[newfd].type == FH_UNUSED);
+  /* close any previous socket or epoll at newfd */
+  if (fhs[newfd].type  == FH_SOCKET) {
+    s = fhs[newfd].data.s;
+
+    /* close socket */
+    socket_lock(s);
+    s->refcnt--;
+    if (s->refcnt == 0)
+      tas_sock_close(s);
+    else
+      socket_unlock(s);
+
+    fhs[newfd].data.s = NULL;
+    fhs[newfd].type = FH_UNUSED;
+  } else if (fhs[newfd].type  == FH_EPOLL) {
+    ep = fhs[newfd].data.e;
+
+    /* close epoll */
+    epoll_lock(ep);
+    ep->refcnt--;
+    if (ep->refcnt == 0)
+      flextcp_epoll_destroy(ep);
+    else
+      epoll_unlock(ep);
+
+    fhs[newfd].data.e = NULL;
+    fhs[newfd].type = FH_UNUSED;
+  }
 
   /* next dup the underlying TAS socket and epoll if necessary */
   if (flextcp_fd_slookup(oldfd, &s) == 0) {
@@ -216,7 +243,6 @@ static inline int internal_dup3(int oldfd, int newfd, int flags)
   }
 
   return newfd;
-
 }
 
 int tas_dup(int oldfd)
@@ -233,7 +259,16 @@ int tas_dup(int oldfd)
 
 int tas_dup2(int oldfd, int newfd)
 {
-  return tas_dup3(oldfd, newfd, 0);
+  /* either way we want to dup the linux fd */
+  newfd = tas_libc_dup2(oldfd, newfd);
+  if (newfd < 0)
+    return newfd;
+
+  /* for dup2 this acts as a nop */
+  if (newfd == oldfd)
+    return newfd;
+
+  return internal_dup3(oldfd, newfd, 0);
 }
 
 int tas_dup3(int oldfd, int newfd, int flags)

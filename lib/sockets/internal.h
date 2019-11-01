@@ -168,6 +168,7 @@ void flextcp_epoll_set(struct socket *s, uint32_t evts);
 void flextcp_epoll_clear(struct socket *s, uint32_t evts);
 void flextcp_epoll_destroy(struct epoll *ep);
 
+int tas_sock_close(struct socket *sock);
 int tas_sock_move(struct socket *s);
 
 int tas_libc_epoll_create1(int flags);
@@ -177,6 +178,7 @@ int tas_libc_epoll_wait(int epfd, struct epoll_event *events,
     int maxevents, int timeout);
 int tas_libc_close(int fd);
 int tas_libc_dup(int oldfd);
+int tas_libc_dup2(int oldfd, int newfd);
 int tas_libc_dup3(int oldfd, int newfd, int flags);
 
 static inline void socket_lock(struct socket *s)

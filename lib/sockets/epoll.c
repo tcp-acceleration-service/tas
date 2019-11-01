@@ -457,6 +457,8 @@ void flextcp_epoll_destroy(struct epoll *ep)
 {
   struct epoll_socket *es;
 
+  assert(ep->refcnt == 0);
+
   /* remove inactive epoll socket bindings */
   while((es = ep->active_first) != NULL){
     es = ep->active_first;

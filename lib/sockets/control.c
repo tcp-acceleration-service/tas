@@ -94,7 +94,6 @@ int tas_close(int sockfd)
 {
   struct socket *s;
   struct epoll *ep;
-  struct flextcp_context *ctx;
 
   if (flextcp_fd_slookup(sockfd, &s) == 0) {
     flextcp_fd_close(sockfd);
@@ -105,15 +104,7 @@ int tas_close(int sockfd)
       return 0;
     }
 
-    /* remove from epoll */
-    flextcp_epoll_sockclose(s);
-
-    ctx = flextcp_sockctx_get();
-    if (s->type == SOCK_CONNECTION) {
-      conn_close(ctx, s);
-    } else {
-      fprintf(stderr, "TODO: close for non-connections. (leak)\n");
-    }
+    tas_sock_close(s);
   } else if (flextcp_fd_elookup(sockfd, &ep) == 0) {
     flextcp_fd_close(sockfd);
 
@@ -128,6 +119,25 @@ int tas_close(int sockfd)
   } else {
     errno = EBADF;
     return -1;
+  }
+
+  return 0;
+}
+
+int tas_sock_close(struct socket *s)
+{
+  struct flextcp_context *ctx;
+
+  assert(s->refcnt == 0);
+
+  /* remove from epoll */
+  flextcp_epoll_sockclose(s);
+
+  ctx = flextcp_sockctx_get();
+  if (s->type == SOCK_CONNECTION) {
+    conn_close(ctx, s);
+  } else {
+    fprintf(stderr, "TODO: close for non-connections. (leak)\n");
   }
 
   return 0;
