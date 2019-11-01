@@ -274,7 +274,6 @@ ssize_t tas_sendmsg(int sockfd, const struct msghdr *msg, int flags)
       fprintf(stderr, "sendmsg: flextcp_connection_tx_alloc failed\n");
       abort();
     } else if (ret == 0 && (s->flags & SOF_NONBLOCK) == SOF_NONBLOCK) {
-      fprintf(stderr, "EAGAIN because alloc failed\n");
       errno = EAGAIN;
       ret = -1;
       goto out;
@@ -365,7 +364,6 @@ static inline ssize_t send_simple(int sockfd, const void *buf, size_t len,
       fprintf(stderr, "sendmsg: flextcp_connection_tx_alloc failed\n");
       abort();
     } else if (ret == 0 && (s->flags & SOF_NONBLOCK) == SOF_NONBLOCK) {
-      fprintf(stderr, "EAGAIN because alloc failed\n");
       errno = EAGAIN;
       ret = -1;
       goto out;
