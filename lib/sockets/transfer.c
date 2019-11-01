@@ -50,6 +50,8 @@ ssize_t tas_recvmsg(int sockfd, struct msghdr *msg, int flags)
     return -1;
   }
 
+  tas_sock_move(s);
+
   /* not a connection, or not connected */
   if (s->type != SOCK_CONNECTION ||
       s->data.connection.status != SOC_CONNECTED)
@@ -141,6 +143,8 @@ static inline ssize_t recv_simple(int sockfd, void *buf, size_t len, int flags)
     return -1;
   }
 
+  tas_sock_move(s);
+
   /* not a connection, or not connected */
   if (s->type != SOCK_CONNECTION ||
       s->data.connection.status != SOC_CONNECTED)
@@ -226,6 +230,8 @@ ssize_t tas_sendmsg(int sockfd, const struct msghdr *msg, int flags)
     errno = EBADF;
     return -1;
   }
+
+  tas_sock_move(s);
 
   /* not a connection, or not connected */
   if (s->type != SOCK_CONNECTION ||
@@ -325,6 +331,8 @@ static inline ssize_t send_simple(int sockfd, const void *buf, size_t len,
     errno = EBADF;
     return -1;
   }
+
+  tas_sock_move(s);
 
   /* not a connection, or not connected */
   if (s->type != SOCK_CONNECTION ||

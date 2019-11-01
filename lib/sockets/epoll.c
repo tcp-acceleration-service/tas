@@ -122,6 +122,7 @@ int tas_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
   struct epoll_socket *es;
   int ret = 0;
   uint32_t em;
+  int linux_fd = 0;
 
   EPOLL_DEBUG("flextcp_epoll_ctl(%d, %d, %d, {events=%x})\n", epfd, op,
       fd, (event != NULL ? event->events : -1));
@@ -133,6 +134,7 @@ int tas_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 
   /* handle linux fds */
   if (flextcp_fd_slookup(fd, &s) != 0) {
+    linux_fd = 1;
     /* this is a linux fd */
     if ((ret = tas_libc_epoll_ctl(epfd, op, fd, event)) != 0) {
       goto out;
@@ -246,6 +248,10 @@ out_sock:
   flextcp_fd_srelease(fd, s);
 out:
   flextcp_fd_erelease(epfd, ep);
+
+  if (!linux_fd)
+    tas_move_conn(fd);
+
   return ret;
 }
 

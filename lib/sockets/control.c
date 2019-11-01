@@ -180,6 +180,8 @@ int tas_shutdown(int sockfd, int how)
     return -1;
   }
 
+  tas_sock_move(s);
+
   if (s->type != SOCK_CONNECTION) {
     /* TODO: probably the wrong thing for listeners */
     errno = ENOTSOCK;
@@ -564,6 +566,8 @@ int tas_fcntl(int sockfd, int cmd, ...)
     return -1;
   }
 
+  tas_sock_move(s);
+
   switch (cmd) {
     case F_GETFL:
       /* return flags */
@@ -618,6 +622,8 @@ int tas_getsockopt(int sockfd, int level, int optname, void *optval,
     errno = EBADF;
     return -1;
   }
+
+  tas_sock_move(s);
 
   if(level == IPPROTO_TCP && optname == TCP_NODELAY) {
     /* check nodelay flag: always set */
@@ -699,6 +705,8 @@ int tas_setsockopt(int sockfd, int level, int optname, const void *optval,
     return -1;
   }
 
+  tas_sock_move(s);
+
   if(level == IPPROTO_TCP && optname == TCP_NODELAY) {
     /* do nothing */
     if (optlen != sizeof(int)) {
@@ -774,6 +782,8 @@ int tas_getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     return -1;
   }
 
+  tas_sock_move(s);
+
   if ((s->flags & SOF_BOUND) == SOF_BOUND) {
     sin = s->addr;
   } else if (s->type == SOCK_CONNECTION &&
@@ -811,6 +821,8 @@ int tas_getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     return -1;
   }
 
+  tas_sock_move(s);
+
   /* if not connection or not currently connected then there is no peername */
   if (s->type != SOCK_CONNECTION ||
       s->data.connection.status != SOC_CONNECTED)
@@ -839,35 +851,42 @@ int tas_move_conn(int sockfd)
 {
   struct socket *s;
   int ret = 0;
-  struct flextcp_context *ctx;
 
   if (flextcp_fd_slookup(sockfd, &s) != 0) {
     errno = EBADF;
     return -1;
   }
 
+  ret = tas_sock_move(s);
+
+  flextcp_fd_srelease(sockfd, s);
+  return ret;
+}
+
+int tas_sock_move(struct socket *s)
+{
+  int ret;
+  struct flextcp_context *ctx;
+
   /* if not connection or not currently connected then there is no peername */
   if (s->type != SOCK_CONNECTION ||
       s->data.connection.status != SOC_CONNECTED)
   {
     errno = ENOTCONN;
-    ret = -1;
-    goto out;
+    return -1;
   }
 
+  /* no-op if already on the right core */
   ctx = flextcp_sockctx_get();
   if (s->data.connection.ctx == ctx) {
-    errno = EISCONN;
-    ret = -1;
-    goto out;
+    return 0;
   }
 
   s->data.connection.move_status = INT_MIN;
   if (flextcp_connection_move(ctx, &s->data.connection.c) != 0) {
     /* TODO */
     errno = EINVAL;
-    ret = -1;
-    goto out;
+    return -1;
   }
 
   do {
@@ -880,7 +899,5 @@ int tas_move_conn(int sockfd)
     s->data.connection.ctx = ctx;
   }
 
-out:
-  flextcp_fd_srelease(sockfd, s);
   return ret;
 }
