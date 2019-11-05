@@ -7,7 +7,7 @@ INCDIR ?= $(PREFIX)/include
 
 RTE_SDK ?= /usr/
 
-CFLAGS += -std=gnu99 -O3 -g -Wall -Werror -I. -Iinclude/ -march=native -fno-omit-frame-pointer
+CFLAGS += -std=gnu99 -O3 -g -Wall -Wno-address-of-packed-member -Werror -I. -Iinclude/ -march=native -fno-omit-frame-pointer
 LDFLAGS += -pthread -g
 
 RTE_SDK ?= $(HOME)/dpdk/x86_64-native-linuxapp-gcc

@@ -32,6 +32,7 @@
 #include <rte_cycles.h>
 
 #include <tas_memif.h>
+#include <utils_log.h>
 
 #include "internal.h"
 #include "fastemu.h"
@@ -142,6 +143,8 @@ void dataplane_loop(struct dataplane_context *ctx)
   uint32_t ts, startwait = 0;
   uint64_t cyc, prev_cyc;
   int was_idle = 1;
+
+  TAS_LOG(INFO, MAIN, "lcore %d: Entering dataplane_loop()\n", rte_lcore_id());
 
   while (!exited) {
     unsigned n = 0;
