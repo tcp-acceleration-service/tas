@@ -162,6 +162,8 @@ void dataplane_loop(struct dataplane_context *ctx)
     n += poll_rx(ctx, ts);
     STATS_TS(rx);
     tx_flush(ctx);
+    STATS_TS(acktx);
+    STATS_TSADD(ctx, cyc_tx, acktx - rx);
 
     n += poll_qman_fwd(ctx, ts);
 
@@ -173,9 +175,13 @@ void dataplane_loop(struct dataplane_context *ctx)
     STATS_TS(qs);
     STATS_TSADD(ctx, cyc_qs, qs - qm);
     n += poll_kernel(ctx, ts);
+    STATS_TS(sp);
+    STATS_TSADD(ctx, cyc_sp, sp - qs);
 
     /* flush transmit buffer */
     tx_flush(ctx);
+    STATS_TS(tx);
+    STATS_TSADD(ctx, cyc_tx, tx - sp);
 
     if (ctx->id == 0)
       poll_scale(ctx);
@@ -238,19 +244,29 @@ void dataplane_dump_stats(void)
 
   for (i = 0; i < fp_cores_max; i++) {
     ctx = ctxs[i];
+    if (ctx == NULL)
+      continue;
+
     fprintf(stderr, "dp stats %u: "
         "qm=(%"PRIu64",%"PRIu64",%"PRIu64")  "
         "rx=(%"PRIu64",%"PRIu64",%"PRIu64")  "
         "qs=(%"PRIu64",%"PRIu64",%"PRIu64")  "
-        "cyc=(%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64")\n", i,
+        "sp=(%"PRIu64",%"PRIu64",%"PRIu64")  "
+        "tx=(%"PRIu64",%"PRIu64",%"PRIu64")  "
+        "cyc=(%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64")\n", i,
         read_stat(&ctx->stat_qm_poll), read_stat(&ctx->stat_qm_empty),
         read_stat(&ctx->stat_qm_total),
         read_stat(&ctx->stat_rx_poll), read_stat(&ctx->stat_rx_empty),
         read_stat(&ctx->stat_rx_total),
         read_stat(&ctx->stat_qs_poll), read_stat(&ctx->stat_qs_empty),
         read_stat(&ctx->stat_qs_total),
+        read_stat(&ctx->stat_sp_poll), read_stat(&ctx->stat_sp_empty),
+        read_stat(&ctx->stat_sp_total),
+        read_stat(&ctx->stat_tx_poll), read_stat(&ctx->stat_tx_empty),
+        read_stat(&ctx->stat_tx_total),
         read_stat(&ctx->stat_cyc_db), read_stat(&ctx->stat_cyc_qm),
-        read_stat(&ctx->stat_cyc_rx), read_stat(&ctx->stat_cyc_qs));
+        read_stat(&ctx->stat_cyc_rx), read_stat(&ctx->stat_cyc_qs),
+        read_stat(&ctx->stat_cyc_sp), read_stat(&ctx->stat_cyc_tx));
   }
 }
 #endif
@@ -371,7 +387,7 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
 
   STATS_ADD(ctx, qs_total, total);
   if (total == 0)
-    STATS_ADD(ctx, qs_empty, total);
+    STATS_ADD(ctx, qs_empty, 1);
 
   return total;
 }
@@ -404,6 +420,10 @@ static unsigned poll_kernel(struct dataplane_context *ctx, uint32_t ts)
 
   /* apply buffer reservations */
   bufcache_alloc(ctx, k);
+
+  STATS_ADD(ctx, sp_total, total);
+  if (total == 0)
+    STATS_ADD(ctx, sp_empty, 1);
 
   return total;
 }
@@ -551,6 +571,8 @@ static inline void tx_flush(struct dataplane_context *ctx)
     return;
   }
 
+  STATS_TSADD(ctx, tx_poll, 1);
+
   /* try to send out packets */
   ret = network_send(&ctx->net, ctx->tx_num, ctx->tx_handles);
 
@@ -564,6 +586,10 @@ static inline void tx_flush(struct dataplane_context *ctx)
     }
     ctx->tx_num -= ret;
   }
+
+  STATS_TSADD(ctx, tx_total, ret);
+  if (ret == 0)
+    STATS_TSADD(ctx, tx_empty, 1);
 }
 
 static void poll_scale(struct dataplane_context *ctx)

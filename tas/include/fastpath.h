@@ -110,10 +110,20 @@ struct dataplane_context {
   uint64_t stat_qs_empty;
   uint64_t stat_qs_total;
 
+  uint64_t stat_sp_poll;
+  uint64_t stat_sp_empty;
+  uint64_t stat_sp_total;
+
+  uint64_t stat_tx_poll;
+  uint64_t stat_tx_empty;
+  uint64_t stat_tx_total;
+
   uint64_t stat_cyc_db;
   uint64_t stat_cyc_qm;
   uint64_t stat_cyc_rx;
   uint64_t stat_cyc_qs;
+  uint64_t stat_cyc_sp;
+  uint64_t stat_cyc_tx;
 #endif
 };
 

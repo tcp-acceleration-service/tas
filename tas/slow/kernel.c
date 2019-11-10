@@ -37,6 +37,9 @@
 static void timeout_trigger(struct timeout *to, uint8_t type, void *opaque);
 static void signal_tas_ready(void);
 void flexnic_loadmon(uint32_t cur_ts);
+#ifdef DATAPLANE_STATS
+extern void dataplane_dump_stats(void);
+#endif
 
 struct timeout_manager timeout_mgr;
 static int exited = 0;
@@ -189,6 +192,9 @@ int slowpath_main(void)
             PRIu64"\n", kstats.drops, kstats.kernel_rexmit, kstats.ecn_marked,
             kstats.acks);
         fflush(stdout);
+#ifdef DATAPLANE_STATS
+        dataplane_dump_stats();
+#endif
       }
       last_print = cur_ts;
     }
