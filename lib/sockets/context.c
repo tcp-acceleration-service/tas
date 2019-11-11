@@ -145,7 +145,7 @@ int flextcp_sockctx_poll(struct flextcp_context *ctx)
     }
   }
 
-#ifdef TCP_CONNECTION_STATS
+#ifdef CONNECTION_STATS
   /* Report the stats roughly every 1s on a 2GHz processor*/
   uint64_t now = util_rdtsc();
   if (now - ctx->stats_last_ts > 2000000000ull)
