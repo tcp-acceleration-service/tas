@@ -15,7 +15,7 @@ DPDK_PMDS ?= ixgbe i40e tap virtio
 
 CFLAGS+= -I$(RTE_SDK)/include -I$(RTE_SDK)/include/dpdk
 CFLAGS+= -I$(RTE_SDK)/include/x86_64-linux-gnu/dpdk/
-CFLAGS+= -DDATAPLANE_STATS
+CFLAGS+= -DDATAPLANE_STATS -DCONNECTION_STATS -DAPPQUEUE_STATS
 LDFLAGS+= -L$(RTE_SDK)/lib/
 
 LIBS_DPDK= -Wl,--whole-archive

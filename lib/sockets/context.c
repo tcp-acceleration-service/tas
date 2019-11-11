@@ -145,6 +145,23 @@ int flextcp_sockctx_poll(struct flextcp_context *ctx)
     }
   }
 
+#ifdef TCP_CONNECTION_STATS
+  /* Report the stats roughly every 1s on a 2GHz processor*/
+  uint64_t now = util_rdtsc();
+  if (now - ctx->stats_last_ts > 2000000000ull)
+  {
+    fprintf(stderr, "[STATS] connect() cycles=%lu count=%lu\n",
+                      ctx->connect_cycles, ctx->connect_count);
+    fprintf(stderr, "[STATS] listen() cycles=%lu count=%lu\n",
+                      ctx->listen_cycles, ctx->listen_count);
+    fprintf(stderr, "[STATS] accept() cycles=%lu count=%lu\n",
+                      ctx->accept_cycles, ctx->accept_count);
+    fprintf(stderr, "[STATS] close() cycles=%lu count=%lu\n",
+                      ctx->close_cycles, ctx->close_count);
+    ctx->stats_last_ts = now;
+  }
+#endif
+
   return num;
 }
 
@@ -174,6 +191,10 @@ static inline void ev_listen_open(struct flextcp_context *ctx,
   assert(s->data.listener.status == SOL_OPENING);
   if (ev->ev.listen_open.status == 0) {
     s->data.listener.status = SOL_OPEN;
+#ifdef CONNECTION_STATS
+    ctx->listen_cycles += util_rdtsc() - s->ts;
+    ctx->listen_count += 1;
+#endif
   } else {
     s->data.listener.status = SOL_FAILED;
   }
@@ -214,6 +235,10 @@ static inline void ev_listen_accept(struct flextcp_context *ctx,
   if (ev->ev.listen_accept.status == 0) {
     s->data.connection.status = SOC_CONNECTED;
     flextcp_epoll_set(s, EPOLLOUT);
+#ifdef CONNECTION_STATS
+    ctx->accept_cycles += (util_rdtsc() - s->ts);
+    ctx->accept_count += 1;
+#endif
   } else {
     s->data.connection.status = SOC_FAILED;
     flextcp_epoll_set(s, EPOLLERR);
@@ -237,6 +262,10 @@ static inline void ev_conn_open(struct flextcp_context *ctx,
   if (ev->ev.conn_open.status == 0) {
     s->data.connection.status = SOC_CONNECTED;
     flextcp_epoll_set(s, EPOLLOUT);
+#ifdef CONNECTION_STATS
+    ctx->connect_cycles += util_rdtsc() - s->ts;
+    ctx->connect_count += 1;
+#endif
   } else {
     s->data.connection.status = SOC_FAILED;
     flextcp_epoll_set(s, EPOLLERR);
@@ -426,6 +455,11 @@ static inline void ev_conn_closed(struct flextcp_context *ctx,
 
   assert(s->type == SOCK_CONNECTION);
   assert(s->data.connection.status == SOC_CLOSED);
+
+#ifdef CONNECTION_STATS
+    ctx->close_cycles += (util_rdtsc() - s->ts);
+    ctx->close_count += 1;
+#endif
 
   free(s);
 }

@@ -149,6 +149,7 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
   int ret;
   struct connection *conn;
   uint16_t local_port;
+  uint64_t ts = util_rdtsc();
 
   /* allocate connection struct */
   if ((conn = conn_alloc()) == NULL) {
@@ -183,6 +184,8 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
   conn->comp.notify_fd = -1;
   conn->comp.status = 0;
 
+  conn->state_ts[CONN_ARP_PENDING] = ts;
+
 
   /* resolve IP to mac */
   ret = routing_resolve(&conn->comp, remote_ip, &conn->remote_mac);
@@ -194,6 +197,7 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
     CONN_DEBUG0(conn, "routing_resolve succeeded immediately\n");
     conn_register(conn);
 
+    conn->arp_immediate = 1;
     ret = conn_arp_done(conn);
   } else {
     CONN_DEBUG0(conn, "routing_resolve pending\n");
@@ -517,7 +521,7 @@ static void conn_packet(struct connection *c, const struct pkt_tcp *p,
 static int conn_arp_done(struct connection *conn)
 {
   CONN_DEBUG0(conn, "arp resolution done\n");
-
+  conn->state_ts[CONN_SYN_SENT] = util_rdtsc();
   conn->status = CONN_SYN_SENT;
 
   /* arm timeout */
@@ -579,7 +583,6 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
   }
 
   CONN_DEBUG0(c, "conn_syn_sent_packet: connection registered\n");
-
   c->status = CONN_OPEN;
 
   /* send ACK */
@@ -589,6 +592,7 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
 
   appif_conn_opened(c, 0);
 
+  c->state_ts[CONN_OPEN] = util_rdtsc();
   return 0;
 }
 
@@ -606,7 +610,7 @@ static int conn_reg_synack(struct connection *c)
   send_control(c, TCP_SYN | TCP_ACK | ecn_flags, 1, c->syn_ts, TCP_MSS);
 
   appif_accept_conn(c, 0);
-
+  c->state_ts[CONN_OPEN] = util_rdtsc();
   return 0;
 }
 

@@ -541,6 +541,16 @@ struct connection {
   uint32_t flags;
   /** Flow group (RSS bucket for steering). */
   uint16_t flow_group;
+
+  /**
+   * @name Stats
+   * @{
+   */
+  /** Timestamps at various connection states */
+  uint64_t state_ts[8];
+  uint16_t arp_immediate: 1;
+  uint16_t padding: 15;
+  /**@}*/
 };
 
 /** TCP listener  */

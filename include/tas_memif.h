@@ -74,13 +74,14 @@ struct flexnic_info {
 /** Kernel RX queue entry */
 struct flextcp_pl_krx {
   uint64_t addr;
+  uint64_t ts;
   union {
     struct {
       uint16_t len;
       uint16_t fn_core;
       uint16_t flow_group;
     } packet;
-    uint8_t raw[55];
+    uint8_t raw[64 - sizeof(uint8_t) - sizeof(uint64_t) - sizeof(uint64_t)];
   } __attribute__((packed)) msg;
   volatile uint8_t type;
 } __attribute__((packed));
@@ -106,8 +107,9 @@ struct flextcp_pl_ktx {
     struct {
       uint32_t flow_id;
     } connretran;
-    uint8_t raw[63];
+    uint8_t raw[64 - sizeof(uint8_t) - sizeof(uint64_t)];
   } __attribute__((packed)) msg;
+  uint64_t ts;
   volatile uint8_t type;
 } __attribute__((packed));
 

@@ -82,6 +82,11 @@ static volatile struct flextcp_pl_ktx **txq_base;
 static uint32_t txq_len;
 static uint32_t *txq_tail;
 
+#ifdef CONNECTION_STATS
+extern uint64_t stats_kout_cycles;
+extern uint64_t stats_kout_count;
+#endif
+
 int nicif_init(void)
 {
   rte_hash_crc_init_alg();
@@ -341,6 +346,7 @@ int nicif_connection_retransmit(uint32_t f_id, uint16_t flow_group)
 
   ktx->msg.connretran.flow_id = f_id;
   MEM_BARRIER();
+  ktx->ts = util_rdtsc();
   ktx->type = FLEXTCP_PL_KTX_CONNRETRAN;
 
   util_flexnic_kick(&fp_state->kctx[core], util_timeout_time_us());
@@ -371,6 +377,7 @@ void nicif_tx_send(uint32_t opaque, int no_ts)
   volatile struct flextcp_pl_ktx *ktx = &txq_base[0][tail];
 
   MEM_BARRIER();
+  ktx->ts = util_rdtsc();
   ktx->type = (!no_ts ? FLEXTCP_PL_KTX_PACKET : FLEXTCP_PL_KTX_PACKET_NOTS);
   txq_tail[0] = opaque;
   
@@ -501,6 +508,10 @@ static inline int rxq_poll(void)
   if (type == FLEXTCP_PL_KRX_INVALID) {
     return -1;
   }
+#ifdef CONNECTION_STATS
+  stats_kout_cycles += (util_rdtsc() - krx->ts);
+  stats_kout_count += 1;
+#endif
 
   /* update tail */
   tail = tail + 1;

@@ -41,6 +41,11 @@ void flexnic_loadmon(uint32_t cur_ts);
 extern void dataplane_dump_stats(void);
 #endif
 
+#ifdef CONNECTION_STATS
+uint64_t stats_kout_cycles = 0;
+uint64_t stats_kout_count = 0;
+#endif
+
 struct timeout_manager timeout_mgr;
 static int exited = 0;
 struct kernel_statistics kstats;

@@ -48,6 +48,17 @@ static int kin_accept_conn(struct application *app, struct app_context *ctx,
 static int kin_req_scale(struct application *app, struct app_context *ctx,
     volatile struct kernel_appout *kin, volatile struct kernel_appin *kout);
 
+#ifdef APPQUEUE_STATS
+static uint64_t stats_appin_cycles = 0;
+static uint64_t stats_appin_count = 0;
+
+void appqueue_stats_dump()
+{
+  fprintf(stderr, "appqin stats: cyc=%lu count=%lu\n",
+            stats_appin_cycles, stats_appin_count);
+}
+#endif
+
 static void appif_ctx_kick(struct app_context *ctx)
 {
   assert(ctx->evfd != 0);
@@ -98,6 +109,7 @@ void appif_conn_opened(struct connection *c, int status)
   }
 
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_CONN_OPENED;
   appif_ctx_kick(ctx);
 
@@ -128,6 +140,7 @@ void appif_conn_closed(struct connection *c, int status)
   kout->data.status.status = status;
 
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_STATUS_CONN_CLOSE;
   appif_ctx_kick(ctx);
 
@@ -170,6 +183,7 @@ void appif_listen_newconn(struct listener *l, uint32_t remote_ip,
   kout->data.listen_newconn.remote_ip = remote_ip;
   kout->data.listen_newconn.remote_port = remote_port;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_LISTEN_NEWCONN;
   appif_ctx_kick(ctx);
 
@@ -219,6 +233,7 @@ void appif_accept_conn(struct connection *c, int status)
   }
 
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_ACCEPTED_CONN;
   appif_ctx_kick(ctx);
 
@@ -249,6 +264,14 @@ unsigned appif_ctx_poll(struct application *app, struct app_context *ctx)
 
   type = kin->type;
   MEM_BARRIER();
+
+#ifdef APPQUEUE_STATS
+  if (type != KERNEL_APPOUT_INVALID)
+  {
+    stats_appin_cycles += (util_rdtsc() - kin->ts);
+    stats_appin_count += 1;
+  }
+#endif
 
   switch (type) {
     case KERNEL_APPOUT_INVALID:
@@ -303,6 +326,7 @@ unsigned appif_ctx_poll(struct application *app, struct app_context *ctx)
 
   /* update kout queue position if the entry was used */
   if (kout_inc > 0) {
+    kout->ts = util_rdtsc();
     kout_pos += kout_inc;
     if (kout_pos >= ctx->kout_len) {
       kout_pos = 0;

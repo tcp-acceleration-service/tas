@@ -129,6 +129,7 @@ struct kernel_appout_req_scale {
 
 /** Common struct for events on kernel -> app queue */
 struct kernel_appout {
+  uint64_t ts;
   union {
     struct kernel_appout_conn_open    conn_open;
     struct kernel_appout_conn_close   conn_close;
@@ -140,7 +141,7 @@ struct kernel_appout {
 
     struct kernel_appout_req_scale    req_scale;
 
-    uint8_t raw[63];
+    uint8_t raw[64 - sizeof(uint64_t) - sizeof(uint8_t)];
   } __attribute__((packed)) data;
   uint8_t type;
 } __attribute__((packed));
@@ -172,8 +173,8 @@ struct kernel_appin_status {
 /** New connection opened */
 struct kernel_appin_conn_opened {
   uint64_t opaque;
-  uint64_t rx_off;
-  uint64_t tx_off;
+  uint32_t rx_off;
+  uint32_t tx_off;
   uint32_t rx_len;
   uint32_t tx_len;
   int32_t  status;
@@ -195,8 +196,8 @@ struct kernel_appin_listen_newconn {
 /** Accepted connection on listener */
 struct kernel_appin_accept_conn {
   uint64_t opaque;
-  uint64_t rx_off;
-  uint64_t tx_off;
+  uint32_t rx_off;
+  uint32_t tx_off;
   uint32_t rx_len;
   uint32_t tx_len;
   int32_t  status;
@@ -211,12 +212,13 @@ struct kernel_appin_accept_conn {
 
 /** Common struct for events on app -> kernel queue */
 struct kernel_appin {
+  uint64_t ts;
   union {
     struct kernel_appin_status          status;
     struct kernel_appin_conn_opened     conn_opened;
     struct kernel_appin_listen_newconn  listen_newconn;
     struct kernel_appin_accept_conn     accept_connection;
-    uint8_t raw[63];
+    uint8_t raw[64 - sizeof(uint64_t) - sizeof(uint8_t)];
   } __attribute__((packed)) data;
   uint8_t type;
 } __attribute__((packed));

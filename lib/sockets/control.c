@@ -269,6 +269,7 @@ int tas_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
   /* open flextcp connection */
   ctx = flextcp_sockctx_get();
+  s->ts = util_rdtsc();
   if (flextcp_connection_open(ctx, &s->data.connection.c,
         ntohl(sin->sin_addr.s_addr), ntohs(sin->sin_port)))
   {
@@ -350,6 +351,7 @@ int tas_listen(int sockfd, int backlog)
 
   /* open flextcp listener */
   ctx = flextcp_sockctx_get();
+  s->ts = util_rdtsc();
   if (flextcp_listen_open(ctx, &s->data.listener.l, ntohs(s->addr.sin_port),
         backlog, flags))
   {
@@ -452,6 +454,7 @@ int tas_accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
     sp->next = NULL;
 
     /* send accept request to kernel */
+    ns->ts = util_rdtsc();
     if (flextcp_listen_accept(ctx, &s->data.listener.l,
           &ns->data.connection.c) != 0)
     {

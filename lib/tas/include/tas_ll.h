@@ -45,6 +45,21 @@
  *   - notification queue pair to flexnic
  */
 struct flextcp_context {
+#ifdef CONNECTION_STATS
+  uint64_t connect_cycles;
+  uint64_t connect_count;
+
+  uint64_t listen_cycles;
+  uint64_t listen_count;
+
+  uint64_t accept_cycles;
+  uint64_t accept_count;
+
+  uint64_t close_cycles;
+  uint64_t close_count;
+
+  uint64_t stats_last_ts;
+#endif
   /* incoming queue from the kernel */
   void *kin_base;
   uint32_t kin_len;

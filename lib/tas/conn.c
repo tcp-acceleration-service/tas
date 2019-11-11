@@ -145,6 +145,7 @@ int flextcp_connection_open(struct flextcp_context *ctx,
   kin->data.conn_open.flags = f;
   MEM_BARRIER();
   kin->type = KERNEL_APPOUT_CONN_OPEN;
+  kin->ts = util_rdtsc();
   flextcp_kernel_kick();
 
   pos = pos + 1;

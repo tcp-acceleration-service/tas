@@ -124,6 +124,9 @@ struct dataplane_context {
   uint64_t stat_cyc_qs;
   uint64_t stat_cyc_sp;
   uint64_t stat_cyc_tx;
+
+  uint64_t stat_kin_cycles;
+  uint64_t stat_kin_count;
 #endif
 };
 
