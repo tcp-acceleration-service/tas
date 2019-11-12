@@ -82,7 +82,7 @@ static volatile struct flextcp_pl_ktx **txq_base;
 static uint32_t txq_len;
 static uint32_t *txq_tail;
 
-#ifdef CONNECTION_STATS
+#ifdef APPQUEUE_STATS
 extern uint64_t stats_kout_cycles;
 extern uint64_t stats_kout_count;
 #endif
@@ -508,7 +508,7 @@ static inline int rxq_poll(void)
   if (type == FLEXTCP_PL_KRX_INVALID) {
     return -1;
   }
-#ifdef CONNECTION_STATS
+#ifdef APPQUEUE_STATS
   stats_kout_cycles += (util_rdtsc() - krx->ts);
   stats_kout_count += 1;
 #endif

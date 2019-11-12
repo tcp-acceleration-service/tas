@@ -33,6 +33,8 @@
 #include <utils.h>
 #include <tas.h>
 #include "internal.h"
+#include <stats.h>
+#include <utils_log.h>
 
 static void timeout_trigger(struct timeout *to, uint8_t type, void *opaque);
 static void signal_tas_ready(void);
@@ -41,7 +43,14 @@ void flexnic_loadmon(uint32_t cur_ts);
 extern void dataplane_dump_stats(void);
 #endif
 
-#ifdef CONNECTION_STATS
+struct kernel_context
+{
+  struct controlplane_stats stats;
+};
+
+static struct kernel_context slowpath_ctx;
+
+#ifdef APPQUEUE_STATS
 uint64_t stats_kout_cycles = 0;
 uint64_t stats_kout_count = 0;
 #endif
@@ -52,6 +61,52 @@ struct kernel_statistics kstats;
 uint32_t cur_ts;
 static uint32_t startwait = 0;
 int kernel_notifyfd = 0;
+
+#ifdef CONTROLPLANE_STATS
+void controlplane_dump_stats(void)
+{
+  struct kernel_context *ctx = &slowpath_ctx;
+  TAS_LOG(INFO, MAIN, "CP [%u]> (POLL, EMPTY, TOTAL)", 0);
+/*
+  TAS_LOG(INFO, MAIN, "rx=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+          STATS_FETCH(ctx, rx_poll),
+          STATS_FETCH(ctx, rx_empty),
+          STATS_FETCH(ctx, rx_total));
+  TAS_LOG(INFO, MAIN, "cc=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+          STATS_FETCH(ctx, cc_poll),
+          STATS_FETCH(ctx, cc_empty),
+          STATS_FETCH(ctx, cc_total));
+  TAS_LOG(INFO, MAIN, "ax=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+          STATS_FETCH(ctx, ax_poll),
+          STATS_FETCH(ctx, ax_empty),
+          STATS_FETCH(ctx, ax_total));
+  TAS_LOG(INFO, MAIN, "ac=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+          STATS_FETCH(ctx, ac_poll),
+          STATS_FETCH(ctx, ac_empty),
+          STATS_FETCH(ctx, ac_total));
+  TAS_LOG(INFO, MAIN, "kni=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+          STATS_FETCH(ctx, kni_poll),
+          STATS_FETCH(ctx, kni_empty),
+          STATS_FETCH(ctx, kni_total));
+  TAS_LOG(INFO, MAIN, "tcp=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+          STATS_FETCH(ctx, tcp_poll),
+          STATS_FETCH(ctx, tcp_empty),
+          STATS_FETCH(ctx, tcp_total));
+*/
+  TAS_LOG(INFO, MAIN, "cyc=(%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64") \n",
+          STATS_FETCH(ctx, cyc_rx),
+          STATS_FETCH(ctx, cyc_cc),
+          STATS_FETCH(ctx, cyc_ax),
+          STATS_FETCH(ctx, cyc_ac),
+          STATS_FETCH(ctx, cyc_kni),
+          STATS_FETCH(ctx, cyc_tcp));
+}
+#else
+void controlplane_dump_stats(void)
+{
+  return;
+}
+#endif
 
 int slowpath_main(void)
 {
@@ -121,15 +176,29 @@ int slowpath_main(void)
 
   signal_tas_ready();
 
+  struct kernel_context *ctx = &slowpath_ctx;
+
   while (exited == 0) {
     unsigned n = 0;
 
     cur_ts = util_timeout_time_us();
+
+    STATS_TS(start);
     n += nicif_poll();
+    STATS_TS(cc);
+    STATS_ADD(ctx, cyc_rx, cc - start);
     n += cc_poll(cur_ts);
+    STATS_TS(ax);
+    STATS_ADD(ctx, cyc_cc, ax - cc);
     n += appif_poll();
+    STATS_TS(kni);
+    STATS_ADD(ctx, cyc_ax, kni - ax);
     n += kni_poll();
+    STATS_TS(tcp);
+    STATS_ADD(ctx, cyc_kni, tcp - kni);
     tcp_poll();
+    STATS_TS(end);
+    STATS_ADD(ctx, cyc_tcp, end - tcp);
     util_timeout_poll_ts(&timeout_mgr, cur_ts);
 
     if (config.fp_autoscale && cur_ts - loadmon_ts >= 10000) {
@@ -197,8 +266,9 @@ int slowpath_main(void)
             PRIu64"\n", kstats.drops, kstats.kernel_rexmit, kstats.ecn_marked,
             kstats.acks);
         fflush(stdout);
-#ifdef DATAPLANE_STATS
+#ifdef PROFILING
         dataplane_dump_stats();
+        controlplane_dump_stats();
 #endif
       }
       last_print = cur_ts;

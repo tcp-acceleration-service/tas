@@ -52,7 +52,7 @@ int fast_kernel_poll(struct dataplane_context *ctx,
     return -1;
 
   ktx = dma_pointer(kctx->tx_base + kctx->tx_head, sizeof(*ktx));
-#ifdef CONNECTION_STATS
+#ifdef APPQUEUE_STATS
   if (ktx->type != 0)
   {
     ctx->stat_kin_cycles += (util_rdtsc() - ktx->ts);

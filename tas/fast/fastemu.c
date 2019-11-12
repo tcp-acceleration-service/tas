@@ -37,23 +37,6 @@
 #include "internal.h"
 #include "fastemu.h"
 
-#define DATAPLANE_TSCS
-
-#ifdef DATAPLANE_STATS
-# ifdef DATAPLANE_TSCS
-#   define STATS_TS(n) uint64_t n = rte_get_tsc_cycles()
-#   define STATS_TSADD(c, f, n) __sync_fetch_and_add(&c->stat_##f, n)
-# else
-#   define STATS_TS(n) do { } while (0)
-#   define STATS_TSADD(c, f, n) do { } while (0)
-# endif
-#   define STATS_ADD(c, f, n) __sync_fetch_and_add(&c->stat_##f, n)
-#else
-#   define STATS_TS(n) do { } while (0)
-#   define STATS_TSADD(c, f, n) do { } while (0)
-#   define STATS_ADD(c, f, n) do { } while (0)
-#endif
-
 
 static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
 static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)  __attribute__((noinline));
@@ -163,25 +146,25 @@ void dataplane_loop(struct dataplane_context *ctx)
     STATS_TS(rx);
     tx_flush(ctx);
     STATS_TS(acktx);
-    STATS_TSADD(ctx, cyc_tx, acktx - rx);
+    STATS_ATOMIC_ADD(ctx, cyc_tx, acktx - rx);
 
     n += poll_qman_fwd(ctx, ts);
 
-    STATS_TSADD(ctx, cyc_rx, rx - start);
+    STATS_ATOMIC_ADD(ctx, cyc_rx, rx - start);
     n += poll_qman(ctx, ts);
     STATS_TS(qm);
-    STATS_TSADD(ctx, cyc_qm, qm - rx);
+    STATS_ATOMIC_ADD(ctx, cyc_qm, qm - rx);
     n += poll_queues(ctx, ts);
     STATS_TS(qs);
-    STATS_TSADD(ctx, cyc_qs, qs - qm);
+    STATS_ATOMIC_ADD(ctx, cyc_qs, qs - qm);
     n += poll_kernel(ctx, ts);
     STATS_TS(sp);
-    STATS_TSADD(ctx, cyc_sp, sp - qs);
+    STATS_ATOMIC_ADD(ctx, cyc_sp, sp - qs);
 
     /* flush transmit buffer */
     tx_flush(ctx);
     STATS_TS(tx);
-    STATS_TSADD(ctx, cyc_tx, tx - sp);
+    STATS_ATOMIC_ADD(ctx, cyc_tx, tx - sp);
 
     if (ctx->id == 0)
       poll_scale(ctx);
@@ -232,11 +215,6 @@ void dataplane_loop(struct dataplane_context *ctx)
 }
 
 #ifdef DATAPLANE_STATS
-static inline uint64_t read_stat(uint64_t *p)
-{
-  return __sync_lock_test_and_set(p, 0);
-}
-
 void dataplane_dump_stats(void)
 {
   struct dataplane_context *ctx;
@@ -247,27 +225,39 @@ void dataplane_dump_stats(void)
     if (ctx == NULL)
       continue;
 
-    fprintf(stderr, "dp stats %u: "
-        "qm=(%"PRIu64",%"PRIu64",%"PRIu64")  "
-        "rx=(%"PRIu64",%"PRIu64",%"PRIu64")  "
-        "qs=(%"PRIu64",%"PRIu64",%"PRIu64")  "
-        "sp=(%"PRIu64",%"PRIu64",%"PRIu64")  "
-        "tx=(%"PRIu64",%"PRIu64",%"PRIu64")  "
-        "cyc=(%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64")\n", i,
-        read_stat(&ctx->stat_qm_poll), read_stat(&ctx->stat_qm_empty),
-        read_stat(&ctx->stat_qm_total),
-        read_stat(&ctx->stat_rx_poll), read_stat(&ctx->stat_rx_empty),
-        read_stat(&ctx->stat_rx_total),
-        read_stat(&ctx->stat_qs_poll), read_stat(&ctx->stat_qs_empty),
-        read_stat(&ctx->stat_qs_total),
-        read_stat(&ctx->stat_sp_poll), read_stat(&ctx->stat_sp_empty),
-        read_stat(&ctx->stat_sp_total),
-        read_stat(&ctx->stat_tx_poll), read_stat(&ctx->stat_tx_empty),
-        read_stat(&ctx->stat_tx_total),
-        read_stat(&ctx->stat_cyc_db), read_stat(&ctx->stat_cyc_qm),
-        read_stat(&ctx->stat_cyc_rx), read_stat(&ctx->stat_cyc_qs),
-        read_stat(&ctx->stat_cyc_sp), read_stat(&ctx->stat_cyc_tx));
+    TAS_LOG(INFO, MAIN, "DP [%u]> (POLL, EMPTY, TOTAL)", i);
+    TAS_LOG(INFO, MAIN, "qm=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+            STATS_ATOMIC_FETCH(ctx, qm_poll),
+            STATS_ATOMIC_FETCH(ctx, qm_empty),
+            STATS_ATOMIC_FETCH(ctx, qm_total));
+    TAS_LOG(INFO, MAIN, "rx=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+            STATS_ATOMIC_FETCH(ctx, rx_poll),
+            STATS_ATOMIC_FETCH(ctx, rx_empty),
+            STATS_ATOMIC_FETCH(ctx, rx_total));
+    TAS_LOG(INFO, MAIN, "qs=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+            STATS_ATOMIC_FETCH(ctx, qs_poll),
+            STATS_ATOMIC_FETCH(ctx, qs_empty),
+            STATS_ATOMIC_FETCH(ctx, qs_total));
+    TAS_LOG(INFO, MAIN, "sp=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+            STATS_ATOMIC_FETCH(ctx, sp_poll),
+            STATS_ATOMIC_FETCH(ctx, sp_empty),
+            STATS_ATOMIC_FETCH(ctx, sp_total));
+    TAS_LOG(INFO, MAIN, "tx=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+            STATS_ATOMIC_FETCH(ctx, tx_poll),
+            STATS_ATOMIC_FETCH(ctx, tx_empty),
+            STATS_ATOMIC_FETCH(ctx, tx_total));
+    TAS_LOG(INFO, MAIN, "cyc=(%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64") \n",
+            STATS_ATOMIC_FETCH(ctx, cyc_qm),
+            STATS_ATOMIC_FETCH(ctx, cyc_rx),
+            STATS_ATOMIC_FETCH(ctx, cyc_qs),
+            STATS_ATOMIC_FETCH(ctx, cyc_sp),
+            STATS_ATOMIC_FETCH(ctx, cyc_tx));
   }
+}
+#else
+void dataplane_dump_stats(void)
+{
+  return;
 }
 #endif
 
@@ -571,7 +561,7 @@ static inline void tx_flush(struct dataplane_context *ctx)
     return;
   }
 
-  STATS_TSADD(ctx, tx_poll, 1);
+  STATS_ATOMIC_ADD(ctx, tx_poll, 1);
 
   /* try to send out packets */
   ret = network_send(&ctx->net, ctx->tx_num, ctx->tx_handles);
@@ -587,9 +577,9 @@ static inline void tx_flush(struct dataplane_context *ctx)
     ctx->tx_num -= ret;
   }
 
-  STATS_TSADD(ctx, tx_total, ret);
+  STATS_ATOMIC_ADD(ctx, tx_total, ret);
   if (ret == 0)
-    STATS_TSADD(ctx, tx_empty, 1);
+    STATS_ATOMIC_ADD(ctx, tx_empty, 1);
 }
 
 static void poll_scale(struct dataplane_context *ctx)
