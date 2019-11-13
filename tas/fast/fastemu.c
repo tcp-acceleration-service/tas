@@ -225,7 +225,7 @@ void dataplane_dump_stats(void)
     if (ctx == NULL)
       continue;
 
-    TAS_LOG(INFO, MAIN, "DP [%u]> (POLL, EMPTY, TOTAL)", i);
+    TAS_LOG(INFO, MAIN, "DP [%u]> (POLL, EMPTY, TOTAL)\n", i);
     TAS_LOG(INFO, MAIN, "qm=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
             STATS_ATOMIC_FETCH(ctx, qm_poll),
             STATS_ATOMIC_FETCH(ctx, qm_empty),

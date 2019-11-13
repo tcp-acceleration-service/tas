@@ -108,6 +108,20 @@ void appif_conn_opened(struct connection *c, int status)
     kout->data.conn_opened.flow_id = c->flow_id;
     kout->data.conn_opened.fn_core = c->fn_core;
   } else {
+    /* remove from app connection list */
+    struct application *app = ctx->app;
+    if (app->conns == c) {
+      app->conns = c->app_next;
+    } else {
+      struct connection *c_crwl;
+      for (c_crwl = app->conns; c_crwl != NULL && c_crwl->app_next != c;
+        c_crwl = c_crwl->app_next);
+      if (c_crwl == NULL) {
+        fprintf(stderr, "appif_conn_closed: connection not found\n");
+        abort();
+      }
+      c_crwl->app_next = c->app_next;
+    }
     tcp_destroy(c);
   }
 

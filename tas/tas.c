@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
   }
 
   /* initialize dpdk */
-  rte_log_set_global_level(RTE_LOG_ERR);
+  rte_log_set_global_level(RTE_LOG_INFO);
   if (rte_eal_init(config.dpdk_argc, config.dpdk_argv) < 0) {
     fprintf(stderr, "dpdk init failed\n");
     goto error_exit;

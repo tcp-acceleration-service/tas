@@ -61,8 +61,8 @@ int kernel_notifyfd = 0;
 #ifdef CONTROLPLANE_STATS
 void controlplane_dump_stats(void)
 {
-  struct kernel_context *ctx = slowpath_ctx;
-  TAS_LOG(INFO, MAIN, "CP [%u]> (POLL, EMPTY, TOTAL)", 0);
+  struct kernel_context *ctx = &slowpath_ctx;
+  TAS_LOG(INFO, MAIN, "CP [%u]> (POLL, EMPTY, TOTAL)\n", 0);
 
   TAS_LOG(INFO, MAIN, "rx=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
           STATS_FETCH(ctx, rx_poll),
@@ -260,7 +260,7 @@ int slowpath_main(void)
       startwait = 0;
     }
 
-    if (cur_ts - last_print >= 1000000) {
+    if (cur_ts - last_print >= 10000000) {
       if (!config.quiet) {
         printf("stats: drops=%"PRIu64" k_rexmit=%"PRIu64" ecn=%"PRIu64" acks=%"
             PRIu64"\n", kstats.drops, kstats.kernel_rexmit, kstats.ecn_marked,
