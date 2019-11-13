@@ -252,6 +252,11 @@ void dataplane_dump_stats(void)
             STATS_ATOMIC_FETCH(ctx, cyc_qs),
             STATS_ATOMIC_FETCH(ctx, cyc_sp),
             STATS_ATOMIC_FETCH(ctx, cyc_tx));
+#ifdef QUEUE_STATS
+    TAS_LOG(INFO, MAIN, "kin=(%"PRIu64",%"PRIu64") \n", 
+            STATS_ATOMIC_FETCH(ctx, kin_cycles),
+            STATS_ATOMIC_FETCH(ctx, kin_count));
+#endif
   }
 }
 #else

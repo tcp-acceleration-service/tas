@@ -28,6 +28,7 @@
 #include <utils.h>
 
 #include <tas.h>
+#include <slowpath.h>
 #include "internal.h"
 
 #define CONF_MSS 1400
@@ -90,6 +91,8 @@ unsigned cc_poll(uint32_t cur_ts)
   uint32_t diff_ts;
   uint32_t last;
   unsigned n = 0;
+
+  STATS_ADD(slowpath_ctx, cc_poll, 1);
 
   diff_ts = cur_ts - last_ts;
   if (0 && diff_ts < config.cc_control_granularity)
@@ -169,6 +172,11 @@ unsigned cc_poll(uint32_t cur_ts)
 
   next_conn = c;
   last_ts = cur_ts;
+
+  if (n == 0)
+    STATS_ADD(slowpath_ctx, cc_empty, 1);
+
+  STATS_ADD(slowpath_ctx, cc_total, n);
   return n;
 }
 

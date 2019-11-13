@@ -52,11 +52,11 @@ int fast_kernel_poll(struct dataplane_context *ctx,
     return -1;
 
   ktx = dma_pointer(kctx->tx_base + kctx->tx_head, sizeof(*ktx));
-#ifdef APPQUEUE_STATS
+#ifdef QUEUE_STATS
   if (ktx->type != 0)
   {
-    ctx->stat_kin_cycles += (util_rdtsc() - ktx->ts);
-    ctx->stat_kin_count += 1;
+    STATS_ATOMIC_ADD(ctx, kin_cycles, (util_rdtsc() - ktx->ts));
+    STATS_ATOMIC_ADD(ctx, kin_count, 1);
   }
 #endif
 

@@ -33,6 +33,9 @@
 #include <utils.h>
 #include <utils_timeout.h>
 #include <utils_sync.h>
+#include <utils_log.h>
+#include <stats.h>
+#include <slowpath.h>
 #include "internal.h"
 
 #include <rte_config.h>
@@ -82,9 +85,15 @@ static volatile struct flextcp_pl_ktx **txq_base;
 static uint32_t txq_len;
 static uint32_t *txq_tail;
 
-#ifdef APPQUEUE_STATS
-extern uint64_t stats_kout_cycles;
-extern uint64_t stats_kout_count;
+#ifdef QUEUE_STATS
+/* Fastpath -> Slowpath queue delay */
+void kqueue_stats_dump()
+{
+  TAS_LOG(INFO, MAIN, "kin stats: cyc=%lu count=%lu\n",
+          STATS_FETCH(slowpath_ctx, kout_cycles),
+          STATS_FETCH(slowpath_ctx, kout_count));
+}
+
 #endif
 
 int nicif_init(void)
@@ -118,6 +127,8 @@ unsigned nicif_poll(void)
   unsigned i, ret = 0/*, nonsuc = 0*/;
   int x;
 
+  STATS_ADD(slowpath_ctx, rx_poll, 1);
+
   for (i = 0; i < 512; i++) {
     x = rxq_poll();
     /*if (x == -1 && ++nonsuc > 2 * fn_cores)
@@ -128,6 +139,10 @@ unsigned nicif_poll(void)
     ret += (x == -1 ? 0 : 1);
   }
 
+  if (ret == 0)
+    STATS_ADD(slowpath_ctx, rx_idle, 1);
+
+  STATS_ADD(slowpath_ctx, rx_total, ret);
   return ret;
 }
 
@@ -508,9 +523,9 @@ static inline int rxq_poll(void)
   if (type == FLEXTCP_PL_KRX_INVALID) {
     return -1;
   }
-#ifdef APPQUEUE_STATS
-  stats_kout_cycles += (util_rdtsc() - krx->ts);
-  stats_kout_count += 1;
+#ifdef QUEUE_STATS
+  STATS_ADD(slowpath_ctx, kout_cycles, (util_rdtsc() - krx->ts));
+  STATS_ADD(slowpath_ctx, kout_count, 1);
 #endif
 
   /* update tail */

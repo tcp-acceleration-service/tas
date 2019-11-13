@@ -36,6 +36,7 @@
 #include <packet_defs.h>
 #include <utils.h>
 #include <utils_rng.h>
+#include <slowpath.h>
 #include "internal.h"
 
 #define TCP_MSS 1460
@@ -124,8 +125,11 @@ void tcp_poll(void)
   struct connection *conn;
   uint8_t *p;
   int ret;
+  unsigned n = 0;
+  STATS_ADD(slowpath_ctx, tcp_poll, 1);
 
   while ((p = nbqueue_deq(&conn_async_q)) != NULL) {
+    n += 1;
     conn = (struct connection *) (p - offsetof(struct connection, comp.el));
     if (conn->status == CONN_ARP_PENDING) {
       if ((ret = conn->comp.status) != 0 || (ret = conn_arp_done(conn)) != 0) {
@@ -141,6 +145,11 @@ void tcp_poll(void)
       fprintf(stderr, "tcp_poll: unexpected conn state %u\n", conn->status);
     }
   }
+
+  if (n == 0)
+    STATS_ADD(slowpath_ctx, tcp_idle, 1);
+  
+  STATS_ADD(slowpath_ctx, tcp_total, n);
 }
 
 int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,

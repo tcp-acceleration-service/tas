@@ -36,6 +36,10 @@
 #include "internal.h"
 #include "../tas/internal.h"
 
+#ifdef QUEUE_STATS
+extern void appqueue_stats_dump();
+#endif
+
 static inline void ev_listen_open(struct flextcp_context *ctx,
     struct flextcp_event *ev);
 static inline void ev_listen_newconn(struct flextcp_context *ctx,
@@ -159,6 +163,10 @@ int flextcp_sockctx_poll(struct flextcp_context *ctx)
     fprintf(stderr, "[STATS] close() cycles=%lu count=%lu\n",
                       ctx->close_cycles, ctx->close_count);
     ctx->stats_last_ts = now;
+
+#ifdef QUEUE_STATS
+    appqueue_stats_dump();
+#endif
   }
 #endif
 

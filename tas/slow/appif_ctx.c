@@ -32,6 +32,7 @@
 #include <unistd.h>
 
 #include <tas.h>
+#include <slowpath.h>
 #include "internal.h"
 #include "appif.h"
 
@@ -48,14 +49,12 @@ static int kin_accept_conn(struct application *app, struct app_context *ctx,
 static int kin_req_scale(struct application *app, struct app_context *ctx,
     volatile struct kernel_appout *kin, volatile struct kernel_appin *kout);
 
-#ifdef APPQUEUE_STATS
-static uint64_t stats_appin_cycles = 0;
-static uint64_t stats_appin_count = 0;
-
+#ifdef QUEUE_STATS
 void appqueue_stats_dump()
 {
-  fprintf(stderr, "appqin stats: cyc=%lu count=%lu\n",
-            stats_appin_cycles, stats_appin_count);
+  TAS_LOG(INFO, MAIN, "appqin stats: cyc=%lu count=%lu\n",
+          STATS_FETCH(slowpath_ctx, appin_cycles),
+          STATS_FETCH(slowpath_ctx, appin_count));
 }
 #endif
 
@@ -265,11 +264,11 @@ unsigned appif_ctx_poll(struct application *app, struct app_context *ctx)
   type = kin->type;
   MEM_BARRIER();
 
-#ifdef APPQUEUE_STATS
+#ifdef QUEUE_STATS
   if (type != KERNEL_APPOUT_INVALID)
   {
-    stats_appin_cycles += (util_rdtsc() - kin->ts);
-    stats_appin_count += 1;
+    STATS_ADD(slowpath_ctx, appin_cycles, (util_rdtsc() - kin->ts));
+    STATS_ADD(slowpath_ctx, appin_count, 1);
   }
 #endif
 

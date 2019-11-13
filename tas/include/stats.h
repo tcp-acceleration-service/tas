@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#define PROFILING
 
 #ifdef PROFILING
 #define DATAPLANE_STATS 1
@@ -17,7 +18,7 @@
 
 #define STATS_ATOMIC_FETCHRESET(c, f) (__sync_lock_test_and_set(&c->stats.stat_##f, 0))
 #define STATS_ATOMIC_FETCH(c, f) STATS_ATOMIC_ADD(c, f, 0)
-#define STATS_FETCH(c, f) (&c->stats.stat_##f)
+#define STATS_FETCH(c, f) (c->stats.stat_##f)
 
 #else
 
@@ -74,6 +75,12 @@ struct dataplane_stats
   uint64_t stat_cyc_sp;
   uint64_t stat_cyc_tx;
 
+#ifdef QUEUE_STATS
+  /* Kernel -> Fastpath queue delay statistics */
+  uint64_t stat_kin_cycles;
+  uint64_t stat_kin_count;
+#endif
+
 #endif
 };
 
@@ -123,6 +130,14 @@ struct controlplane_stats
   uint64_t stat_cyc_ac;
   uint64_t stat_cyc_kni;
   uint64_t stat_cyc_tcp;
+
+  /* Fastpath -> Slowpath queuing delays */
+  uint64_t stat_kout_cycles;
+  uint64_t stat_kout_count;
+
+  /* Lib -> Slowpath queueing delays */
+  uint64_t stat_appin_cycles;
+  uint64_t stat_appin_count;
 #endif
 };
 

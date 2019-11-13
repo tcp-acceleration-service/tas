@@ -43,16 +43,11 @@ void flexnic_loadmon(uint32_t cur_ts);
 extern void dataplane_dump_stats(void);
 #endif
 
-struct kernel_context
-{
-  struct controlplane_stats stats;
-};
+struct kernel_context* slowpath_ctx;
 
-static struct kernel_context slowpath_ctx;
-
-#ifdef APPQUEUE_STATS
-uint64_t stats_kout_cycles = 0;
-uint64_t stats_kout_count = 0;
+#ifdef QUEUE_STATS
+extern void appqueue_stats_dump();
+extern void kqueue_stats_dump();
 #endif
 
 struct timeout_manager timeout_mgr;
@@ -65,9 +60,9 @@ int kernel_notifyfd = 0;
 #ifdef CONTROLPLANE_STATS
 void controlplane_dump_stats(void)
 {
-  struct kernel_context *ctx = &slowpath_ctx;
+  struct kernel_context *ctx = slowpath_ctx;
   TAS_LOG(INFO, MAIN, "CP [%u]> (POLL, EMPTY, TOTAL)", 0);
-/*
+
   TAS_LOG(INFO, MAIN, "rx=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
           STATS_FETCH(ctx, rx_poll),
           STATS_FETCH(ctx, rx_empty),
@@ -84,15 +79,17 @@ void controlplane_dump_stats(void)
           STATS_FETCH(ctx, ac_poll),
           STATS_FETCH(ctx, ac_empty),
           STATS_FETCH(ctx, ac_total));
+/*
   TAS_LOG(INFO, MAIN, "kni=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
           STATS_FETCH(ctx, kni_poll),
           STATS_FETCH(ctx, kni_empty),
           STATS_FETCH(ctx, kni_total));
+*/    
   TAS_LOG(INFO, MAIN, "tcp=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
           STATS_FETCH(ctx, tcp_poll),
           STATS_FETCH(ctx, tcp_empty),
           STATS_FETCH(ctx, tcp_total));
-*/
+
   TAS_LOG(INFO, MAIN, "cyc=(%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64") \n",
           STATS_FETCH(ctx, cyc_rx),
           STATS_FETCH(ctx, cyc_cc),
@@ -112,6 +109,8 @@ int slowpath_main(void)
 {
   uint32_t last_print = 0;
   uint32_t loadmon_ts = 0;
+
+  slowpath_ctx = calloc(1, sizeof(struct kernel_context));
 
   kernel_notifyfd = eventfd(0, 0);
   assert(kernel_notifyfd != -1);
@@ -176,7 +175,7 @@ int slowpath_main(void)
 
   signal_tas_ready();
 
-  struct kernel_context *ctx = &slowpath_ctx;
+  struct kernel_context *ctx = slowpath_ctx;
 
   while (exited == 0) {
     unsigned n = 0;
@@ -269,6 +268,10 @@ int slowpath_main(void)
 #ifdef PROFILING
         dataplane_dump_stats();
         controlplane_dump_stats();
+#ifdef QUEUE_STATS
+        appqueue_stats_dump();
+        kqueue_stats_dump();
+#endif
 #endif
       }
       last_print = cur_ts;
