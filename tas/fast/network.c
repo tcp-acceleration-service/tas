@@ -125,6 +125,15 @@ int network_init(unsigned n_threads)
   rte_eth_macaddr_get(net_port_id, &eth_addr);
   rte_eth_dev_info_get(net_port_id, &eth_devinfo);
 
+  if (eth_devinfo.max_rx_queues < n_threads ||
+      eth_devinfo.max_tx_queues < n_threads)
+  {
+    fprintf(stderr, "Error: NIC does not support enough hw queues (rx=%u tx=%u)"
+        " for the requested number of cores (%u)\n", eth_devinfo.max_rx_queues,
+        eth_devinfo.max_tx_queues, n_threads);
+    goto error_exit;
+  }
+
   /* mask unsupported RSS hash functions */
   if ((port_conf.rx_adv_conf.rss_conf.rss_hf &
        eth_devinfo.flow_type_rss_offloads) !=
