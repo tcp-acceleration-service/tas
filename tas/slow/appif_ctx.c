@@ -32,6 +32,7 @@
 #include <unistd.h>
 
 #include <tas.h>
+#include <utils_log.h>
 #include <slowpath.h>
 #include "internal.h"
 #include "appif.h"

@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-#define PROFILING
-
 #ifdef PROFILING
 #define DATAPLANE_STATS 1
 #define CONTROLPLANE_STATS 1
@@ -95,32 +93,32 @@ struct controlplane_stats
 
   /* NIC RX */
   uint64_t stat_rx_poll;
-  uint64_t stat_rx_idle;
+  uint64_t stat_rx_empty;
   uint64_t stat_rx_total;
 
   /* Congestion Control */
   uint64_t stat_cc_poll;
-  uint64_t stat_cc_idle;
+  uint64_t stat_cc_empty;
   uint64_t stat_cc_total;
 
   /* Application */
   uint64_t stat_ax_poll;
-  uint64_t stat_ax_idle;
+  uint64_t stat_ax_empty;
   uint64_t stat_ax_total;
 
   /* Application context */
   uint64_t stat_ac_poll;
-  uint64_t stat_ac_idle;
+  uint64_t stat_ac_empty;
   uint64_t stat_ac_total;
 
   /* Kernel Native Interface */
   uint64_t stat_kni_poll;
-  uint64_t stat_kni_idle;
+  uint64_t stat_kni_empty;
   uint64_t stat_kni_total;
 
   /* TCP States */
   uint64_t stat_tcp_poll;
-  uint64_t stat_tcp_idle;
+  uint64_t stat_tcp_empty;
   uint64_t stat_tcp_total;
 
   /* Cycles consumed in processing by modules */

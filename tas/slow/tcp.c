@@ -147,7 +147,7 @@ void tcp_poll(void)
   }
 
   if (n == 0)
-    STATS_ADD(slowpath_ctx, tcp_idle, 1);
+    STATS_ADD(slowpath_ctx, tcp_empty, 1);
   
   STATS_ADD(slowpath_ctx, tcp_total, n);
 }

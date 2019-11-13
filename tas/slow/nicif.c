@@ -140,7 +140,7 @@ unsigned nicif_poll(void)
   }
 
   if (ret == 0)
-    STATS_ADD(slowpath_ctx, rx_idle, 1);
+    STATS_ADD(slowpath_ctx, rx_empty, 1);
 
   STATS_ADD(slowpath_ctx, rx_total, ret);
   return ret;

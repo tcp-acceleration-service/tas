@@ -186,10 +186,10 @@ unsigned appif_poll(void)
   }
 
   if (m == 0)
-    STATS_ADD(slowpath_ctx, ax_idle, 1);
+    STATS_ADD(slowpath_ctx, ax_empty, 1);
   
   if (n == 0)
-    STATS_ADD(slowpath_ctx, ac_idle, 1);
+    STATS_ADD(slowpath_ctx, ac_empty, 1);
 
   STATS_ADD(slowpath_ctx, ax_total, m);
   STATS_ADD(slowpath_ctx, ac_total, n);

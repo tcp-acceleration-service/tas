@@ -35,7 +35,7 @@ struct kernel_context
 extern struct kernel_context* slowpath_ctx;
 
 #ifdef CONTROLPLANE_STATS
-void controlplane_dump_stats(void)
+void controlplane_dump_stats(void);
 #endif
 
 #endif /* ndef SLOWPATH_H_ */

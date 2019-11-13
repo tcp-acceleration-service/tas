@@ -31,6 +31,7 @@
 #include <errno.h>
 
 #include <utils.h>
+#include <slowpath.h>
 #include <tas.h>
 #include "internal.h"
 #include <stats.h>
