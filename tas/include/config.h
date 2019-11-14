@@ -121,6 +121,8 @@ struct configuration {
   uint32_t fp_autoscale;
   /** FP: use huge pages for internal and buffer memory */
   uint32_t fp_hugepages;
+  /** FP: enable vlan stripping */
+  uint32_t fp_vlan_strip;
   /** SP: kni interface name */
   char *kni_name;
   /** Ready signal fd */

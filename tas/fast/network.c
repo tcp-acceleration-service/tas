@@ -259,6 +259,16 @@ int network_thread_init(struct dataplane_context *ctx)
       goto error_tx_queue;
     }
 
+    /* enable vlan stripping if configured */
+    if (config.fp_vlan_strip) {
+      ret = rte_eth_dev_get_vlan_offload(net_port_id);
+      ret |= ETH_VLAN_STRIP_OFFLOAD;
+      if (rte_eth_dev_set_vlan_offload(net_port_id, ret)) {
+        fprintf(stderr, "network_thread_init: vlan off set failed\n");
+        goto error_tx_queue;
+      }
+    }
+
     /* setting up RETA failed */
     if (config.fp_autoscale) {
       if (reta_setup() != 0) {
