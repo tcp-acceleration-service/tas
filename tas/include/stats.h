@@ -2,6 +2,7 @@
 #define TASSTATS_H_
 
 #include <stdint.h>
+#include <rte_cycles.h>
 
 #ifdef PROFILING
 #define DATAPLANE_STATS 1
