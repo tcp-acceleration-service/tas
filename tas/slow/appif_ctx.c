@@ -448,6 +448,7 @@ error:
   kout->data.status.opaque = kin->data.conn_move.opaque;
   kout->data.status.status = -1;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_STATUS_CONN_MOVE;
   appif_ctx_kick(ctx);
   return 1;
@@ -511,6 +512,7 @@ static int kin_listen_open(struct application *app, struct app_context *ctx,
   kout->data.status.opaque = kin->data.listen_open.opaque;
   kout->data.status.status = 0;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_STATUS_LISTEN_OPEN;
   appif_ctx_kick(ctx);
 
@@ -552,6 +554,7 @@ error:
   kout->data.accept_connection.opaque = kin->data.accept_conn.conn_opaque;
   kout->data.accept_connection.status = -1;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_ACCEPTED_CONN;
   kout->ts = util_rdtsc();
   appif_ctx_kick(ctx);

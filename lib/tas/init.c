@@ -153,8 +153,9 @@ static uint64_t stats_appout_count = 0;
 
 void appqueue_stats_dump()
 {
-  fprintf(stderr, "appqout stats: cyc=%lu count=%lu\n",
-            stats_appout_cycles, stats_appout_count);
+  fprintf(stderr, "slow -> app stats: cyc=%lu count=%lu avg_queuing_delay=%lF\n",
+            stats_appout_cycles, stats_appout_count,
+            ((double) stats_appout_cycles/ stats_appout_count));
 }
 #endif
 

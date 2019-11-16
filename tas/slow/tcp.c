@@ -988,7 +988,6 @@ out:
     l->backlog_pos -= l->backlog_len;
   }
 
-  util_spin_unlock(&l->lock);
   STATS_TS(end);
   STATS_ADD(slowpath_ctx, cyc_la, end - start);
 }
