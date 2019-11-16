@@ -181,7 +181,10 @@ unsigned appif_poll(void)
       if (ctx->ready == 0) {
         continue;
       }
+      STATS_TS(ac_begin);
       n += appif_ctx_poll(app, ctx);
+      STATS_TS(ac_end);
+      STATS_ADD(slowpath_ctx, cyc_ac, ac_end - ac_begin);
     }
   }
 
