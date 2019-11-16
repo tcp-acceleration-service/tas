@@ -336,6 +336,7 @@ int tcp_accept(struct app_context *ctx, uint64_t opaque,
 {
   struct connection *conn;
 
+  STATS_TS(start);
   /* allocate listener struct */
   if ((conn = conn_alloc()) == NULL) {
     fprintf(stderr, "tcp_accept: conn_alloc failed\n");
@@ -356,6 +357,8 @@ int tcp_accept(struct app_context *ctx, uint64_t opaque,
   if (listen->backlog_used > 0) {
     listener_accept(listen);
   }
+  STATS_TS(end);
+  STATS_ADD(slowpath_ctx, cyc_ta, end - start);
   return 0;
 }
 
@@ -403,6 +406,7 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
 
 int tcp_close(struct connection *conn)
 {
+  STATS_TS(tcp_close_start);
   uint32_t tx_seq, rx_seq;
   int tx_c, rx_c;
 
@@ -432,8 +436,15 @@ int tcp_close(struct connection *conn)
 
   /* set timer to free connection state */
   assert(conn->to_armed == 0);
+
+  STATS_TS(timeout_arm_start);
   util_timeout_arm(&timeout_mgr, &conn->to, 10000, TO_TCP_CLOSED);
+  STATS_TS(timeout_arm_end);
+
+  STATS_ADD(slowpath_ctx, cyc_timeout_arm, timeout_arm_end - timeout_arm_start);
   conn->to_armed = 1;
+  STATS_TS(tcp_close_end);
+  STATS_ADD(slowpath_ctx, cyc_tcp_close, tcp_close_end - tcp_close_start);
   return 0;
 }
 
@@ -460,7 +471,7 @@ void tcp_timeout(struct timeout *to, enum timeout_type type)
     abort();
   }
   if (c->status != CONN_SYN_SENT) {
-    fprintf(stderr, "tcp_timeout: unexpected connection state (%u)\n", c->status);
+    //fprintf(stderr, "tcp_timeout: unexpected connection state (%u)\n", c->status);
     abort();
   }
 
@@ -523,7 +534,8 @@ static void conn_packet(struct connection *c, const struct pkt_tcp *p,
     * why necessary*/
     send_control(c, TCP_ACK, 1, 0, 0);
   } else {
-    fprintf(stderr, "tcp_packet: unexpected connection state %u\n", c->status);
+    //fprintf(stderr, "tcp_packet: unexpected connection state %u\n", c->status);
+    tcp_close(c);
   }
 }
 
@@ -904,6 +916,7 @@ static void listener_packet(struct listener *l, const struct pkt_tcp *p,
 
 static void listener_accept(struct listener *l)
 {
+  STATS_TS(start);
   struct connection *c = l->wait_conns;
   struct backlog_slot *bls;
   const struct pkt_tcp *p;
@@ -974,6 +987,10 @@ out:
   if (l->backlog_pos >= l->backlog_len) {
     l->backlog_pos -= l->backlog_len;
   }
+
+  util_spin_unlock(&l->lock);
+  STATS_TS(end);
+  STATS_ADD(slowpath_ctx, cyc_la, end - start);
 }
 
 static inline int send_control_raw(uint64_t remote_mac, uint32_t remote_ip,

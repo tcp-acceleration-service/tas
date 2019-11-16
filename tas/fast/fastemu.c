@@ -144,19 +144,22 @@ void dataplane_loop(struct dataplane_context *ctx)
     STATS_TS(start);
     n += poll_rx(ctx, ts);
     STATS_TS(rx);
+    STATS_ATOMIC_ADD(ctx, cyc_rx, rx - start);
+
     tx_flush(ctx);
     STATS_TS(acktx);
     STATS_ATOMIC_ADD(ctx, cyc_tx, acktx - rx);
 
     n += poll_qman_fwd(ctx, ts);
 
-    STATS_ATOMIC_ADD(ctx, cyc_rx, rx - start);
+    STATS_TS(poll_qman_start);
     n += poll_qman(ctx, ts);
-    STATS_TS(qm);
-    STATS_ATOMIC_ADD(ctx, cyc_qm, qm - rx);
+    STATS_TS(poll_qman_end);
+    STATS_ATOMIC_ADD(ctx, cyc_qm, poll_qman_end - poll_qman_start);
+
     n += poll_queues(ctx, ts);
     STATS_TS(qs);
-    STATS_ATOMIC_ADD(ctx, cyc_qs, qs - qm);
+    STATS_ATOMIC_ADD(ctx, cyc_qs, qs - poll_qman_end);
     n += poll_kernel(ctx, ts);
     STATS_TS(sp);
     STATS_ATOMIC_ADD(ctx, cyc_sp, sp - qs);
@@ -252,10 +255,12 @@ void dataplane_dump_stats(void)
             STATS_ATOMIC_FETCH(ctx, cyc_qs),
             STATS_ATOMIC_FETCH(ctx, cyc_sp),
             STATS_ATOMIC_FETCH(ctx, cyc_tx));
+
 #ifdef QUEUE_STATS
-    TAS_LOG(INFO, MAIN, "kin=(%"PRIu64",%"PRIu64") \n", 
+    TAS_LOG(INFO, MAIN, "slow -> fast (%"PRIu64",%"PRIu64") avg_queuing_delay=%lF\n", 
             STATS_ATOMIC_FETCH(ctx, kin_cycles),
-            STATS_ATOMIC_FETCH(ctx, kin_count));
+            STATS_ATOMIC_FETCH(ctx, kin_count),
+            ((double) STATS_ATOMIC_FETCH(ctx, kin_cycles))/ STATS_ATOMIC_FETCH(ctx, kin_count));
 #endif
   }
 }
@@ -394,6 +399,8 @@ static unsigned poll_kernel(struct dataplane_context *ctx, uint32_t ts)
   uint16_t max, k = 0;
   int ret;
 
+  STATS_ADD(ctx, sp_poll, 1);
+
   max = BATCH_SIZE;
   if (TXBUF_SIZE - ctx->tx_num < max)
     max = TXBUF_SIZE - ctx->tx_num;
@@ -440,8 +447,11 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   /* allocate buffers contents */
   max = bufcache_prealloc(ctx, max, &handles);
 
+  //STATS_TS(start_qman_poll);
   /* poll queue manager */
   ret = qman_poll(&ctx->qman, max, q_ids, q_bytes);
+  //STATS_TS(end_qman_poll);
+
   if (ret <= 0) {
     STATS_ADD(ctx, qm_empty, 1);
     return 0;
@@ -467,7 +477,10 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   fast_flows_qman_pfbufs(ctx, q_ids, ret);
 
   for (i = 0; i < ret; i++) {
+    //STATS_TS(start_fast_flows_qman);
     use = fast_flows_qman(ctx, q_ids[i], handles[off], ts);
+    //STATS_TS(end_fast_flows_qman);
+    //STATS_ATOMIC_ADD(ctx, cyc_fast_flows_qman, );
 
     if (use == 0)
      off++;

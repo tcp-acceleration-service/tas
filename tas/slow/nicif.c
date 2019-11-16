@@ -89,9 +89,10 @@ static uint32_t *txq_tail;
 /* Fastpath -> Slowpath queue delay */
 void kqueue_stats_dump()
 {
-  TAS_LOG(INFO, MAIN, "kin stats: cyc=%lu count=%lu\n",
+  TAS_LOG(INFO, MAIN, "fast -> slow stats: cyc=%lu count=%lu avg_queuing_delay=%lF\n",
           STATS_FETCH(slowpath_ctx, kout_cycles),
-          STATS_FETCH(slowpath_ctx, kout_count));
+          STATS_FETCH(slowpath_ctx, kout_count),
+          ((double) STATS_FETCH(slowpath_ctx, kout_cycles))/STATS_FETCH(slowpath_ctx, kout_count));
 }
 
 #endif
@@ -270,9 +271,13 @@ int nicif_connection_add(uint32_t db, uint64_t mac_remote, uint32_t ip_local,
 int nicif_connection_disable(uint32_t f_id, uint32_t *tx_seq, uint32_t *rx_seq,
     int *tx_closed, int *rx_closed)
 {
+  //STATS_TS(nic_if_conn_disable_start);
   struct flextcp_pl_flowst *fs = &fp_state->flowst[f_id];
 
+  STATS_TS(start);
   util_spin_lock(&fs->lock);
+  STATS_TS(end);
+  STATS_ADD(slowpath_ctx, cyc_fs_lock, end - start);
 
   *tx_seq = fs->tx_next_seq;
   *rx_seq = fs->rx_next_seq;
@@ -284,8 +289,15 @@ int nicif_connection_disable(uint32_t f_id, uint32_t *tx_seq, uint32_t *rx_seq,
 
   util_spin_unlock(&fs->lock);
 
+ 
+  STATS_TS(flow_slot_clear_start); 
   flow_slot_clear(f_id, fs->local_ip, fs->local_port, fs->remote_ip,
       fs->remote_port);
+  STATS_TS(flow_slot_clear_end); 
+  STATS_ADD(slowpath_ctx, cyc_flow_slot_clear, flow_slot_clear_end - flow_slot_clear_start);
+
+  //STATS_TS(nic_if_conn_disable_end);
+  //STATS_ADD(slowpath_ctx, cyc_nic_if_conn_disable, nic_if_conn_disable_end - nic_if_conn_disable_start);
   return 0;
 }
 

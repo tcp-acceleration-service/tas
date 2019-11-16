@@ -217,6 +217,8 @@ void cc_conn_init(struct connection *conn)
 
 void cc_conn_remove(struct connection *conn)
 {
+  STATS_TS(cc_start);
+
   if (next_conn == conn) {
     next_conn = conn->cc_next;
   }
@@ -233,6 +235,8 @@ void cc_conn_remove(struct connection *conn)
     if (c_next != NULL)
       c_next->cc_prev = c_prev;
   }
+  STATS_TS(cc_end);
+  STATS_ADD(slowpath_ctx, cyc_cc_remove, cc_end - cc_start);
 }
 
 static inline void issue_retransmits(struct connection *c,

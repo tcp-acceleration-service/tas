@@ -122,6 +122,26 @@ struct controlplane_stats
   uint64_t stat_tcp_empty;
   uint64_t stat_tcp_total;
 
+  /* Accept States */
+  uint64_t stat_cyc_ta;
+  uint64_t stat_cyc_la;
+  uint64_t stat_cyc_kac;
+
+  /* Kernel app_if task cycles */
+  uint64_t stat_cyc_kclose;
+  uint64_t stat_cyc_kmove;
+  uint64_t stat_cyc_klopen;
+  uint64_t stat_cyc_kreq_scale;
+
+  /* Close sub task cycles */
+  uint64_t stat_cyc_fs_lock;
+  uint64_t stat_cyc_flow_slot_clear;
+  uint64_t stat_cyc_tcp_close;
+  uint64_t stat_cyc_conn_close_iter;
+  uint64_t stat_conn_close_cnt;
+  uint64_t stat_cyc_cc_remove;
+  uint64_t stat_cyc_timeout_arm;
+
   /* Cycles consumed in processing by modules */
   uint64_t stat_cyc_rx;
   uint64_t stat_cyc_cc;

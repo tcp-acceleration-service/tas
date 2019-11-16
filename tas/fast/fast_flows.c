@@ -354,8 +354,8 @@ int fast_flows_packet(struct dataplane_context *ctx,
       /* for SYN/SYN-ACK we'll let the kernel handle them out of band */
       no_permanent_sp = 1;
     } else {
-      fprintf(stderr, "dma_krx_pkt_fastpath: slow path because of flags (%x)\n",
-          TCPH_FLAGS(&p->tcp));
+      //fprintf(stderr, "dma_krx_pkt_fastpath: slow path because of flags (%x)\n",
+      //    TCPH_FLAGS(&p->tcp));
     }
     goto slowpath;
   }

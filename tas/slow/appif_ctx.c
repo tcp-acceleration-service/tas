@@ -56,9 +56,10 @@ extern struct connection *conn_ht_lookup(uint64_t opaque, uint32_t local_ip,
 #ifdef QUEUE_STATS
 void appqueue_stats_dump()
 {
-  TAS_LOG(INFO, MAIN, "appqin stats: cyc=%lu count=%lu\n",
+  TAS_LOG(INFO, MAIN, "app -> slow stats: cyc=%lu count=%lu avg_queuing_delay=%lf\n",
           STATS_FETCH(slowpath_ctx, appin_cycles),
-          STATS_FETCH(slowpath_ctx, appin_count));
+          STATS_FETCH(slowpath_ctx, appin_count),
+          (double) STATS_FETCH(slowpath_ctx, appin_cycles)/ STATS_FETCH(slowpath_ctx, appin_count));
 }
 #endif
 
@@ -267,6 +268,7 @@ void appif_accept_conn(struct connection *c, int status)
 
 unsigned appif_ctx_poll(struct application *app, struct app_context *ctx)
 {
+  STATS_TS(start);
   volatile struct kernel_appout *kin = ctx->kin_base;
   volatile struct kernel_appin *kout = ctx->kout_base;
   uint32_t kin_pos = ctx->kin_pos;
@@ -306,26 +308,37 @@ unsigned appif_ctx_poll(struct application *app, struct app_context *ctx)
     case KERNEL_APPOUT_CONN_MOVE:
       /* connection move request */
       kout_inc += kin_conn_move(app, ctx, kin, kout);
+      STATS_TS(end_move);
+      STATS_ADD(slowpath_ctx, cyc_kmove, end_move-start);
       break;
 
     case KERNEL_APPOUT_CONN_CLOSE:
       /* connection close request */
       kout_inc += kin_conn_close(app, ctx, kin, kout);
+      STATS_TS(end_close);
+      STATS_ADD(slowpath_ctx, cyc_kclose, end_close-start);
       break;
 
     case KERNEL_APPOUT_LISTEN_OPEN:
       /* listen request */
       kout_inc += kin_listen_open(app, ctx, kin, kout);
+      STATS_TS(end_lopen);
+      STATS_ADD(slowpath_ctx, cyc_klopen, end_lopen-start);
       break;
 
     case KERNEL_APPOUT_ACCEPT_CONN:
       /* accept request */
+      (void) app;
       kout_inc += kin_accept_conn(app, ctx, kin, kout);
+      STATS_TS(end);
+      STATS_ADD(slowpath_ctx, cyc_kac, end-start);
       break;
 
     case KERNEL_APPOUT_REQ_SCALE:
       /* scaling request */
       kout_inc += kin_req_scale(app, ctx, kin, kout);
+      STATS_TS(end_req_scale);
+      STATS_ADD(slowpath_ctx, cyc_kreq_scale, end_req_scale-start);
       break;
 
     case KERNEL_APPOUT_LISTEN_CLOSE:
@@ -445,11 +458,15 @@ static int kin_conn_close(struct application *app, struct app_context *ctx,
 {
   struct connection *conn;
 
+  STATS_TS(conn_close_iter_start);
   conn = conn_ht_lookup(kin->data.conn_move.opaque,
                     kin->data.conn_move.local_ip,
                     kin->data.conn_move.remote_ip,
                     kin->data.conn_move.local_port,
                     kin->data.conn_move.remote_port);
+  STATS_TS(conn_close_iter_end);
+  STATS_ADD(slowpath_ctx, cyc_conn_close_iter, conn_close_iter_end - conn_close_iter_start);
+  STATS_ADD(slowpath_ctx, conn_close_cnt, 1);
 
   if (conn == NULL) {
     fprintf(stderr, "kin_conn_close: connection not found\n");
@@ -464,6 +481,7 @@ static int kin_conn_close(struct application *app, struct app_context *ctx,
   return 0;
 
 error:
+  fprintf(stderr, "Error in kin_conn_close\n");
   kout->data.status.opaque = kin->data.conn_close.opaque;
   kout->data.status.status = -1;
   MEM_BARRIER();
@@ -521,7 +539,6 @@ static int kin_accept_conn(struct application *app, struct app_context *ctx,
       break;
     }
   }
-
   if (tcp_accept(ctx, kin->data.accept_conn.conn_opaque, listen,
         ctx->doorbell->id) != 0)
   {
