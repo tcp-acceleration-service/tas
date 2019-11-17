@@ -124,7 +124,6 @@ void appif_conn_closed(struct connection *c, int status)
 {
   struct app_context *ctx = c->ctx;
   struct application *app = ctx->app;
-  struct connection *c_i;
   volatile struct kernel_appin *kout = ctx->kout_base;
   uint32_t kout_pos = ctx->kout_pos;
 
@@ -153,14 +152,15 @@ void appif_conn_closed(struct connection *c, int status)
   /* remove from app connection list */
   if (app->conns == c) {
     app->conns = c->app_next;
+    c->app_prev = NULL;
   } else {
-    for (c_i = app->conns; c_i != NULL && c_i->app_next != c;
-        c_i = c_i->app_next);
-    if (c_i == NULL) {
-      fprintf(stderr, "appif_conn_closed: connection not found\n");
-      abort();
-    }
-    c_i->app_next = c->app_next;
+    struct connection* c_prev = c->app_prev;
+    struct connection* c_next = c->app_next;
+
+    if (c_prev != NULL)
+      c_prev->app_next = c->app_next;
+    if (c_next != NULL)
+      c_next->app_prev = c->app_prev;
   }
 }
 
@@ -227,6 +227,9 @@ void appif_accept_conn(struct connection *c, int status)
     kout->data.accept_connection.fn_core = c->fn_core;
 
     c->app_next = app->conns;
+    c->app_prev = NULL;
+    if (app->conns != NULL)
+      app->conns->app_prev = c;
     app->conns = c;
   } else {
     tcp_destroy(c);
@@ -349,6 +352,9 @@ static int kin_conn_open(struct application *app, struct app_context *ctx,
   }
 
   conn->app_next = app->conns;
+  conn->app_prev = NULL;
+  if (app->conns != NULL)
+    app->conns->app_prev = conn;
   app->conns = conn;
 
   return 0;

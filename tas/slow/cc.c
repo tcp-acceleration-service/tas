@@ -223,6 +223,7 @@ void cc_conn_remove(struct connection *conn)
 
   if (cc_conns == conn) {
     cc_conns = conn->cc_next;
+    conn->cc_prev = NULL;
   } else {
     struct connection *c_prev = conn->cc_prev;
     struct connection *c_next = conn->cc_next;

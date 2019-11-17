@@ -425,6 +425,7 @@ struct connection {
     struct app_context *new_ctx;
     /** Link list pointer for application connections. */
     struct connection *app_next;
+    struct connection *app_prev;
     /** Doorbell id. */
     uint32_t db_id;
   /**@}*/
