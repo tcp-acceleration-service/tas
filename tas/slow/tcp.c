@@ -1136,3 +1136,24 @@ static inline int parse_options(const struct pkt_tcp *p, uint16_t len,
 
   return 0;
 }
+
+struct connection *conn_ht_lookup(uint64_t opaque, uint32_t local_ip,
+           uint32_t remote_ip, uint16_t local_port, uint16_t remote_port)
+{
+  uint32_t h;
+  struct connection *c;
+
+  h = conn_hash(local_ip, remote_ip,
+              local_port, remote_port) % TCP_HTSIZE;
+
+  for (c = tcp_hashtable[h]; c != NULL; c = c->ht_next) {
+    if (remote_ip == c->remote_ip &&
+        local_port == c->local_port &&
+        remote_port == c->remote_port &&
+        opaque == c->opaque)
+    {
+      return c;
+    }
+  }
+  return NULL;
+}

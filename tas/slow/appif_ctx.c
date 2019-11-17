@@ -49,6 +49,9 @@ static int kin_accept_conn(struct application *app, struct app_context *ctx,
     volatile struct kernel_appout *kin, volatile struct kernel_appin *kout);
 static int kin_req_scale(struct application *app, struct app_context *ctx,
     volatile struct kernel_appout *kin, volatile struct kernel_appin *kout);
+extern struct connection *conn_ht_lookup(uint64_t opaque, uint32_t local_ip,
+           uint32_t remote_ip, uint16_t local_port, uint16_t remote_port);
+
 
 #ifdef QUEUE_STATS
 void appqueue_stats_dump()
@@ -375,16 +378,12 @@ static int kin_conn_move(struct application *app, struct app_context *ctx,
   struct connection *conn;
   struct app_context *new_ctx;
 
-  for (conn = app->conns; conn != NULL; conn = conn->app_next) {
-    if (conn->local_ip == kin->data.conn_move.local_ip &&
-        conn->remote_ip == kin->data.conn_move.remote_ip &&
-        conn->local_port == kin->data.conn_move.local_port &&
-        conn->remote_port == kin->data.conn_move.remote_port &&
-        conn->opaque == kin->data.conn_move.opaque)
-    {
-      break;
-    }
-  }
+  conn = conn_ht_lookup(kin->data.conn_move.opaque,
+                    kin->data.conn_move.local_ip,
+                    kin->data.conn_move.remote_ip,
+                    kin->data.conn_move.local_port,
+                    kin->data.conn_move.remote_port);
+
   if (conn == NULL) {
     fprintf(stderr, "kin_conn_move: connection not found\n");
     goto error;
@@ -432,16 +431,12 @@ static int kin_conn_close(struct application *app, struct app_context *ctx,
 {
   struct connection *conn;
 
-  for (conn = app->conns; conn != NULL; conn = conn->app_next) {
-    if (conn->local_ip == kin->data.conn_close.local_ip &&
-        conn->remote_ip == kin->data.conn_close.remote_ip &&
-        conn->local_port == kin->data.conn_close.local_port &&
-        conn->remote_port == kin->data.conn_close.remote_port &&
-        conn->opaque == kin->data.conn_close.opaque)
-    {
-      break;
-    }
-  }
+  conn = conn_ht_lookup(kin->data.conn_move.opaque,
+                    kin->data.conn_move.local_ip,
+                    kin->data.conn_move.remote_ip,
+                    kin->data.conn_move.local_port,
+                    kin->data.conn_move.remote_port);
+
   if (conn == NULL) {
     fprintf(stderr, "kin_conn_close: connection not found\n");
     goto error;
