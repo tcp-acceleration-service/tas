@@ -183,6 +183,7 @@ unsigned cc_poll(uint32_t cur_ts)
 void cc_conn_init(struct connection *conn)
 {
   conn->cc_next = cc_conns;
+  conn->cc_prev = NULL;
   cc_conns = conn;
 
   conn->cc_last_ts = cur_ts;
@@ -216,8 +217,6 @@ void cc_conn_init(struct connection *conn)
 
 void cc_conn_remove(struct connection *conn)
 {
-  struct connection *cp = NULL;
-
   if (next_conn == conn) {
     next_conn = conn->cc_next;
   }
@@ -225,14 +224,13 @@ void cc_conn_remove(struct connection *conn)
   if (cc_conns == conn) {
     cc_conns = conn->cc_next;
   } else {
-    for (cp = cc_conns; cp != NULL && cp->cc_next != conn;
-        cp = cp->cc_next);
-    if (cp == NULL) {
-      fprintf(stderr, "conn_unregister: connection not found\n");
-      abort();
-    }
+    struct connection *c_prev = conn->cc_prev;
+    struct connection *c_next = conn->cc_next;
 
-    cp->cc_next = conn->cc_next;
+    if (c_prev != NULL)
+      c_prev->cc_next = c_next;
+    if (c_next != NULL)
+      c_next->cc_prev = c_prev;
   }
 }
 

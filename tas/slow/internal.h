@@ -527,6 +527,7 @@ struct connection {
     uint32_t ts_tx_pending;
     /** Linked list for CC connection list. */
     struct connection *cc_next;
+    struct connection *cc_prev;
   /**@}*/
 
   /** Linked list in hash table. */
