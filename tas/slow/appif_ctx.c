@@ -326,7 +326,6 @@ unsigned appif_ctx_poll(struct application *app, struct app_context *ctx)
 
   /* update kout queue position if the entry was used */
   if (kout_inc > 0) {
-    kout->ts = util_rdtsc();
     kout_pos += kout_inc;
     if (kout_pos >= ctx->kout_len) {
       kout_pos = 0;
@@ -358,6 +357,7 @@ error:
   kout->data.conn_opened.opaque = kin->data.conn_open.opaque;
   kout->data.conn_opened.status = -1;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_CONN_OPENED;
   appif_ctx_kick(ctx);
   return 1;
@@ -407,6 +407,7 @@ static int kin_conn_move(struct application *app, struct app_context *ctx,
   kout->data.status.opaque = kin->data.conn_move.opaque;
   kout->data.status.status = 0;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_STATUS_CONN_MOVE;
   appif_ctx_kick(ctx);
   return 1;
@@ -451,6 +452,7 @@ error:
   kout->data.status.opaque = kin->data.conn_close.opaque;
   kout->data.status.status = -1;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_STATUS_CONN_CLOSE;
   appif_ctx_kick(ctx);
   return 1;
@@ -485,6 +487,7 @@ error:
   kout->data.status.opaque = kin->data.listen_open.opaque;
   kout->data.status.status = -1;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_STATUS_LISTEN_OPEN;
   appif_ctx_kick(ctx);
   return 1;
@@ -518,6 +521,7 @@ error:
   kout->data.accept_connection.status = -1;
   MEM_BARRIER();
   kout->type = KERNEL_APPIN_ACCEPTED_CONN;
+  kout->ts = util_rdtsc();
   appif_ctx_kick(ctx);
   return 1;
 }
