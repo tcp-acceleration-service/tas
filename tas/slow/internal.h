@@ -425,6 +425,7 @@ struct connection {
     struct app_context *new_ctx;
     /** Link list pointer for application connections. */
     struct connection *app_next;
+    struct connection *app_prev;
     /** Doorbell id. */
     uint32_t db_id;
   /**@}*/
@@ -527,6 +528,7 @@ struct connection {
     uint32_t ts_tx_pending;
     /** Linked list for CC connection list. */
     struct connection *cc_next;
+    struct connection *cc_prev;
   /**@}*/
 
   /** Linked list in hash table. */
@@ -541,6 +543,16 @@ struct connection {
   uint32_t flags;
   /** Flow group (RSS bucket for steering). */
   uint16_t flow_group;
+
+  /**
+   * @name Stats
+   * @{
+   */
+  /** Timestamps at various connection states */
+  uint64_t state_ts[8];
+  uint16_t arp_immediate: 1;
+  uint16_t padding: 15;
+  /**@}*/
 };
 
 /** TCP listener  */

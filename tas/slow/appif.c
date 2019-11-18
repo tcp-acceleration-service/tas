@@ -60,6 +60,7 @@
 #include <utils_nbqueue.h>
 #include <tas_memif.h>
 #include <fastpath.h>
+#include <slowpath.h>
 
 /** epoll data for listening socket */
 #define EP_LISTEN (NULL)
@@ -136,7 +137,10 @@ unsigned appif_poll(void)
   uint16_t i;
   uint64_t rxq_offs[tas_info->cores_num], txq_offs[tas_info->cores_num];
   uint64_t cnt = 1;
-  unsigned n = 0;
+  unsigned n = 0, m = 0;
+
+  STATS_ADD(slowpath_ctx, ax_poll, 1);
+  STATS_ADD(slowpath_ctx, ac_poll, 1);
 
   /* add new applications to list */
   while ((p = nbqueue_deq(&ux_to_poll)) != NULL) {
@@ -169,15 +173,29 @@ unsigned appif_poll(void)
       if (ret <= 0) {
         perror("appif_poll: error writing to notify fd");
       }
+
+      m += (ret > 0 ? 1 : 0);
     }
 
     for (ctx = app->contexts; ctx != NULL; ctx = ctx->next) {
       if (ctx->ready == 0) {
         continue;
       }
+      STATS_TS(ac_begin);
       n += appif_ctx_poll(app, ctx);
+      STATS_TS(ac_end);
+      STATS_ADD(slowpath_ctx, cyc_ac, ac_end - ac_begin);
     }
   }
+
+  if (m == 0)
+    STATS_ADD(slowpath_ctx, ax_empty, 1);
+  
+  if (n == 0)
+    STATS_ADD(slowpath_ctx, ac_empty, 1);
+
+  STATS_ADD(slowpath_ctx, ax_total, m);
+  STATS_ADD(slowpath_ctx, ac_total, n);
 
   return n;
 }

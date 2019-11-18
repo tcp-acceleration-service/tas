@@ -147,6 +147,17 @@ int flextcp_context_create(struct flextcp_context *ctx)
 #include <pthread.h>
 
 int debug_flextcp_on = 0;
+#ifdef QUEUE_STATS
+static uint64_t stats_appout_cycles = 0;
+static uint64_t stats_appout_count = 0;
+
+void appqueue_stats_dump()
+{
+  fprintf(stderr, "slow -> app stats: cyc=%lu count=%lu avg_queuing_delay=%lF\n",
+            stats_appout_cycles, stats_appout_count,
+            ((double) stats_appout_cycles/ stats_appout_count));
+}
+#endif
 
 static int kernel_poll(struct flextcp_context *ctx, int num,
     struct flextcp_event *events, int *used)
@@ -164,6 +175,13 @@ static int kernel_poll(struct flextcp_context *ctx, int num,
 
     type = kout->type;
     MEM_BARRIER();
+#ifdef QUEUE_STATS
+    if (type != KERNEL_APPIN_INVALID)
+    {
+      stats_appout_cycles += (util_rdtsc() - kout->ts);
+      stats_appout_count += 1;
+    }
+#endif
 
     if (type == KERNEL_APPIN_INVALID) {
       break;

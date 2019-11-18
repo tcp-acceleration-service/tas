@@ -74,6 +74,7 @@ int flextcp_listen_open(struct flextcp_context *ctx,
   kin->data.listen_open.flags = f;
   MEM_BARRIER();
   kin->type = KERNEL_APPOUT_LISTEN_OPEN;
+  kin->ts = util_rdtsc();
   flextcp_kernel_kick();
 
   pos = pos + 1;
@@ -109,6 +110,7 @@ int flextcp_listen_accept(struct flextcp_context *ctx,
   kin->data.accept_conn.local_port = lst->local_port;
   MEM_BARRIER();
   kin->type = KERNEL_APPOUT_ACCEPT_CONN;
+  kin->ts = util_rdtsc();
   flextcp_kernel_kick();
 
   pos = pos + 1;
@@ -145,6 +147,7 @@ int flextcp_connection_open(struct flextcp_context *ctx,
   kin->data.conn_open.flags = f;
   MEM_BARRIER();
   kin->type = KERNEL_APPOUT_CONN_OPEN;
+  kin->ts = util_rdtsc();
   flextcp_kernel_kick();
 
   pos = pos + 1;
@@ -209,6 +212,7 @@ int flextcp_connection_close(struct flextcp_context *ctx,
   kin->data.conn_close.flags = f;
   MEM_BARRIER();
   kin->type = KERNEL_APPOUT_CONN_CLOSE;
+  kin->ts = util_rdtsc();
   flextcp_kernel_kick();
 
   pos = pos + 1;
@@ -415,6 +419,7 @@ int flextcp_connection_move(struct flextcp_context *ctx,
   kin->data.conn_move.opaque = OPAQUE(conn);
   MEM_BARRIER();
   kin->type = KERNEL_APPOUT_CONN_MOVE;
+  kin->ts = util_rdtsc();
   flextcp_kernel_kick();
 
   pos = pos + 1;

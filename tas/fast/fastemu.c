@@ -32,26 +32,10 @@
 #include <rte_cycles.h>
 
 #include <tas_memif.h>
+#include <utils_log.h>
 
 #include "internal.h"
 #include "fastemu.h"
-
-#define DATAPLANE_TSCS
-
-#ifdef DATAPLANE_STATS
-# ifdef DATAPLANE_TSCS
-#   define STATS_TS(n) uint64_t n = rte_get_tsc_cycles()
-#   define STATS_TSADD(c, f, n) __sync_fetch_and_add(&c->stat_##f, n)
-# else
-#   define STATS_TS(n) do { } while (0)
-#   define STATS_TSADD(c, f, n) do { } while (0)
-# endif
-#   define STATS_ADD(c, f, n) __sync_fetch_and_add(&c->stat_##f, n)
-#else
-#   define STATS_TS(n) do { } while (0)
-#   define STATS_TSADD(c, f, n) do { } while (0)
-#   define STATS_ADD(c, f, n) do { } while (0)
-#endif
 
 
 static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
@@ -143,6 +127,8 @@ void dataplane_loop(struct dataplane_context *ctx)
   uint64_t cyc, prev_cyc;
   int was_idle = 1;
 
+  TAS_LOG(INFO, MAIN, "lcore %d: Entering dataplane_loop()\n", rte_lcore_id());
+
   while (!exited) {
     unsigned n = 0;
 
@@ -158,21 +144,30 @@ void dataplane_loop(struct dataplane_context *ctx)
     STATS_TS(start);
     n += poll_rx(ctx, ts);
     STATS_TS(rx);
+    STATS_ATOMIC_ADD(ctx, cyc_rx, rx - start);
+
     tx_flush(ctx);
+    STATS_TS(acktx);
+    STATS_ATOMIC_ADD(ctx, cyc_tx, acktx - rx);
 
     n += poll_qman_fwd(ctx, ts);
 
-    STATS_TSADD(ctx, cyc_rx, rx - start);
+    STATS_TS(poll_qman_start);
     n += poll_qman(ctx, ts);
-    STATS_TS(qm);
-    STATS_TSADD(ctx, cyc_qm, qm - rx);
+    STATS_TS(poll_qman_end);
+    STATS_ATOMIC_ADD(ctx, cyc_qm, poll_qman_end - poll_qman_start);
+
     n += poll_queues(ctx, ts);
     STATS_TS(qs);
-    STATS_TSADD(ctx, cyc_qs, qs - qm);
+    STATS_ATOMIC_ADD(ctx, cyc_qs, qs - poll_qman_end);
     n += poll_kernel(ctx, ts);
+    STATS_TS(sp);
+    STATS_ATOMIC_ADD(ctx, cyc_sp, sp - qs);
 
     /* flush transmit buffer */
     tx_flush(ctx);
+    STATS_TS(tx);
+    STATS_ATOMIC_ADD(ctx, cyc_tx, tx - sp);
 
     if (ctx->id == 0)
       poll_scale(ctx);
@@ -181,38 +176,39 @@ void dataplane_loop(struct dataplane_context *ctx)
       was_idle = 1;
 
       if(startwait == 0) {
-	startwait = ts;
+        startwait = ts;
       } else if (config.fp_interrupts && ts - startwait >= POLL_CYCLE) {
-	// Idle -- wait for interrupt or data from apps/kernel
-	int r = network_rx_interrupt_ctl(&ctx->net, 1);
+        // Idle -- wait for interrupt or data from apps/kernel
+        int r = network_rx_interrupt_ctl(&ctx->net, 1);
 
-	// Only if device running
-	if(r == 0) {
-	  uint32_t timeout_us = qman_next_ts(&ctx->qman, ts);
-	  /* fprintf(stderr, "[%u] fastemu idle - timeout %d ms\n", ctx->core, */
-	  /* 	  timeout_us == (uint32_t)-1 ? -1 : timeout_us / 1000); */
-	  struct rte_epoll_event event[2];
-	  int n = rte_epoll_wait(RTE_EPOLL_PER_THREAD, event, 2,
-				 timeout_us == (uint32_t)-1 ? -1 : timeout_us / 1000);
-	  assert(n != -1);
-	  /* fprintf(stderr, "[%u] fastemu busy - %u events\n", ctx->core, n); */
-	  for(int i = 0; i < n; i++) {
-	    if(event[i].fd == ctx->evfd) {
-	      /* fprintf(stderr, "[%u] fastemu - woken up by event FD = %d\n", */
-	      /* 	      ctx->core, event[i].fd); */
-	      uint64_t val;
-	      int r = read(ctx->evfd, &val, sizeof(uint64_t));
-	      assert(r == sizeof(uint64_t));
-	    /* } else { */
-	    /*   fprintf(stderr, "[%u] fastemu - woken up by RX interrupt FD = %d\n", */
-	    /* 	      ctx->core, event[i].fd); */
-	    }
-	  }
+        // Only if device running
+        if(r == 0) {
+          uint32_t timeout_us = qman_next_ts(&ctx->qman, ts);
+          /* fprintf(stderr, "[%u] fastemu idle - timeout %d ms\n", ctx->core, */
+          /* 	  timeout_us == (uint32_t)-1 ? -1 : timeout_us / 1000); */
+          struct rte_epoll_event event[2];
+          int n = rte_epoll_wait(RTE_EPOLL_PER_THREAD, event, 2,
+              timeout_us == (uint32_t)-1 ? -1 : timeout_us / 1000);
+          assert(n != -1);
+          /* fprintf(stderr, "[%u] fastemu busy - %u events\n", ctx->core, n); */
+          for(int i = 0; i < n; i++) {
+            if(event[i].fd == ctx->evfd) {
+              /* fprintf(stderr, "[%u] fastemu - woken up by event FD = %d\n", */
+              /* 	      ctx->core, event[i].fd); */
+              uint64_t val;
+              int r = read(ctx->evfd, &val, sizeof(uint64_t));
+              assert(r == sizeof(uint64_t));
+            /* } else { */
+            /*   fprintf(stderr, "[%u] fastemu - woken up by RX interrupt FD = %d\n", */
+            /* 	      ctx->core, event[i].fd); */
+            }
+          }
 
           /*fprintf(stderr, "dataplane_loop: woke up %u n=%u fd=%d evfd=%d\n", ctx->id, n, event[0].fd, ctx->evfd);*/
-	   network_rx_interrupt_ctl(&ctx->net, 0);
-	}
-      startwait = 0;
+          network_rx_interrupt_ctl(&ctx->net, 0);
+        }
+
+        startwait = 0;
       }
     } else {
       was_idle = 0;
@@ -222,11 +218,6 @@ void dataplane_loop(struct dataplane_context *ctx)
 }
 
 #ifdef DATAPLANE_STATS
-static inline uint64_t read_stat(uint64_t *p)
-{
-  return __sync_lock_test_and_set(p, 0);
-}
-
 void dataplane_dump_stats(void)
 {
   struct dataplane_context *ctx;
@@ -234,20 +225,49 @@ void dataplane_dump_stats(void)
 
   for (i = 0; i < fp_cores_max; i++) {
     ctx = ctxs[i];
-    fprintf(stderr, "dp stats %u: "
-        "qm=(%"PRIu64",%"PRIu64",%"PRIu64")  "
-        "rx=(%"PRIu64",%"PRIu64",%"PRIu64")  "
-        "qs=(%"PRIu64",%"PRIu64",%"PRIu64")  "
-        "cyc=(%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64")\n", i,
-        read_stat(&ctx->stat_qm_poll), read_stat(&ctx->stat_qm_empty),
-        read_stat(&ctx->stat_qm_total),
-        read_stat(&ctx->stat_rx_poll), read_stat(&ctx->stat_rx_empty),
-        read_stat(&ctx->stat_rx_total),
-        read_stat(&ctx->stat_qs_poll), read_stat(&ctx->stat_qs_empty),
-        read_stat(&ctx->stat_qs_total),
-        read_stat(&ctx->stat_cyc_db), read_stat(&ctx->stat_cyc_qm),
-        read_stat(&ctx->stat_cyc_rx), read_stat(&ctx->stat_cyc_qs));
+    if (ctx == NULL)
+      continue;
+
+    TAS_LOG(INFO, MAIN, "DP [%u]> (POLL, EMPTY, TOTAL)\n", i);
+    TAS_LOG(INFO, MAIN, "qm=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+            STATS_ATOMIC_FETCH(ctx, qm_poll),
+            STATS_ATOMIC_FETCH(ctx, qm_empty),
+            STATS_ATOMIC_FETCH(ctx, qm_total));
+    TAS_LOG(INFO, MAIN, "rx=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+            STATS_ATOMIC_FETCH(ctx, rx_poll),
+            STATS_ATOMIC_FETCH(ctx, rx_empty),
+            STATS_ATOMIC_FETCH(ctx, rx_total));
+    TAS_LOG(INFO, MAIN, "qs=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+            STATS_ATOMIC_FETCH(ctx, qs_poll),
+            STATS_ATOMIC_FETCH(ctx, qs_empty),
+            STATS_ATOMIC_FETCH(ctx, qs_total));
+    TAS_LOG(INFO, MAIN, "sp=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+            STATS_ATOMIC_FETCH(ctx, sp_poll),
+            STATS_ATOMIC_FETCH(ctx, sp_empty),
+            STATS_ATOMIC_FETCH(ctx, sp_total));
+    TAS_LOG(INFO, MAIN, "tx=(%"PRIu64",%"PRIu64",%"PRIu64")  \n",
+            STATS_ATOMIC_FETCH(ctx, tx_poll),
+            STATS_ATOMIC_FETCH(ctx, tx_empty),
+            STATS_ATOMIC_FETCH(ctx, tx_total));
+    TAS_LOG(INFO, MAIN, "cyc=(%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64") \n",
+            STATS_ATOMIC_FETCH(ctx, cyc_qm),
+            STATS_ATOMIC_FETCH(ctx, cyc_rx),
+            STATS_ATOMIC_FETCH(ctx, cyc_qs),
+            STATS_ATOMIC_FETCH(ctx, cyc_sp),
+            STATS_ATOMIC_FETCH(ctx, cyc_tx));
+
+#ifdef QUEUE_STATS
+    TAS_LOG(INFO, MAIN, "slow -> fast (%"PRIu64",%"PRIu64") avg_queuing_delay=%lF\n", 
+            STATS_ATOMIC_FETCH(ctx, kin_cycles),
+            STATS_ATOMIC_FETCH(ctx, kin_count),
+            ((double) STATS_ATOMIC_FETCH(ctx, kin_cycles))/ STATS_ATOMIC_FETCH(ctx, kin_count));
+#endif
   }
+}
+#else
+void dataplane_dump_stats(void)
+{
+  return;
 }
 #endif
 
@@ -367,7 +387,7 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
 
   STATS_ADD(ctx, qs_total, total);
   if (total == 0)
-    STATS_ADD(ctx, qs_empty, total);
+    STATS_ADD(ctx, qs_empty, 1);
 
   return total;
 }
@@ -379,6 +399,8 @@ static unsigned poll_kernel(struct dataplane_context *ctx, uint32_t ts)
   uint16_t max, k = 0;
   int ret;
 
+  STATS_ADD(ctx, sp_poll, 1);
+
   max = BATCH_SIZE;
   if (TXBUF_SIZE - ctx->tx_num < max)
     max = TXBUF_SIZE - ctx->tx_num;
@@ -389,7 +411,7 @@ static unsigned poll_kernel(struct dataplane_context *ctx, uint32_t ts)
 
   for (k = 0; k < max;) {
     ret = fast_kernel_poll(ctx, handles[k], ts);
- 
+
     if (ret == 0)
       k++;
     else if (ret < 0)
@@ -400,6 +422,10 @@ static unsigned poll_kernel(struct dataplane_context *ctx, uint32_t ts)
 
   /* apply buffer reservations */
   bufcache_alloc(ctx, k);
+
+  STATS_ADD(ctx, sp_total, total);
+  if (total == 0)
+    STATS_ADD(ctx, sp_empty, 1);
 
   return total;
 }
@@ -421,8 +447,11 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   /* allocate buffers contents */
   max = bufcache_prealloc(ctx, max, &handles);
 
+  //STATS_TS(start_qman_poll);
   /* poll queue manager */
   ret = qman_poll(&ctx->qman, max, q_ids, q_bytes);
+  //STATS_TS(end_qman_poll);
+
   if (ret <= 0) {
     STATS_ADD(ctx, qm_empty, 1);
     return 0;
@@ -448,7 +477,10 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   fast_flows_qman_pfbufs(ctx, q_ids, ret);
 
   for (i = 0; i < ret; i++) {
+    //STATS_TS(start_fast_flows_qman);
     use = fast_flows_qman(ctx, q_ids[i], handles[off], ts);
+    //STATS_TS(end_fast_flows_qman);
+    //STATS_ATOMIC_ADD(ctx, cyc_fast_flows_qman, );
 
     if (use == 0)
      off++;
@@ -547,6 +579,8 @@ static inline void tx_flush(struct dataplane_context *ctx)
     return;
   }
 
+  STATS_ATOMIC_ADD(ctx, tx_poll, 1);
+
   /* try to send out packets */
   ret = network_send(&ctx->net, ctx->tx_num, ctx->tx_handles);
 
@@ -560,6 +594,10 @@ static inline void tx_flush(struct dataplane_context *ctx)
     }
     ctx->tx_num -= ret;
   }
+
+  STATS_ATOMIC_ADD(ctx, tx_total, ret);
+  if (ret == 0)
+    STATS_ATOMIC_ADD(ctx, tx_empty, 1);
 }
 
 static void poll_scale(struct dataplane_context *ctx)

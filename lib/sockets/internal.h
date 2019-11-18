@@ -97,6 +97,7 @@ struct socket {
     struct socket_conn connection;
     struct socket_listen listener;
   } data;
+  uint64_t ts;
   struct sockaddr_in addr;
   uint8_t flags;
   uint8_t type;

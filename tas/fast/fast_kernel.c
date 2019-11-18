@@ -52,6 +52,13 @@ int fast_kernel_poll(struct dataplane_context *ctx,
     return -1;
 
   ktx = dma_pointer(kctx->tx_base + kctx->tx_head, sizeof(*ktx));
+#ifdef QUEUE_STATS
+  if (ktx->type != 0)
+  {
+    STATS_ATOMIC_ADD(ctx, kin_cycles, (util_rdtsc() - ktx->ts));
+    STATS_ATOMIC_ADD(ctx, kin_count, 1);
+  }
+#endif
 
   if (ktx->type == 0) {
     return -1;
@@ -153,6 +160,7 @@ void fast_kernel_packet(struct dataplane_context *ctx,
   krx->msg.packet.fn_core = ctx->id;
   MEM_BARRIER();
 
+  krx->ts = util_rdtsc();
   /* krx queue header */
   krx->type = FLEXTCP_PL_KRX_PACKET;
   fast_kernel_kick();

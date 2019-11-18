@@ -7,7 +7,7 @@ INCDIR ?= $(PREFIX)/include
 
 RTE_SDK ?= /usr/
 
-CFLAGS += -std=gnu99 -O3 -g -Wall -Werror -I. -Iinclude/ -march=native -fno-omit-frame-pointer
+CFLAGS += -std=gnu99 -O3 -g -Wall -Wno-address-of-packed-member -Werror -I. -Iinclude/ -march=native -fno-omit-frame-pointer
 LDFLAGS += -pthread -g
 
 RTE_SDK ?= $(HOME)/dpdk/x86_64-native-linuxapp-gcc
@@ -15,6 +15,7 @@ DPDK_PMDS ?= ixgbe i40e tap virtio
 
 CFLAGS+= -I$(RTE_SDK)/include -I$(RTE_SDK)/include/dpdk
 CFLAGS+= -I$(RTE_SDK)/include/x86_64-linux-gnu/dpdk/
+CFLAGS+= -DCONNECTION_STATS -DQUEUE_STATS -DPROFILING
 LDFLAGS+= -L$(RTE_SDK)/lib/
 
 LIBS_DPDK= -Wl,--whole-archive

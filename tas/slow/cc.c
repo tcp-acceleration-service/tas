@@ -28,6 +28,7 @@
 #include <utils.h>
 
 #include <tas.h>
+#include <slowpath.h>
 #include "internal.h"
 
 #define CONF_MSS 1400
@@ -90,6 +91,8 @@ unsigned cc_poll(uint32_t cur_ts)
   uint32_t diff_ts;
   uint32_t last;
   unsigned n = 0;
+
+  STATS_ADD(slowpath_ctx, cc_poll, 1);
 
   diff_ts = cur_ts - last_ts;
   if (0 && diff_ts < config.cc_control_granularity)
@@ -169,12 +172,18 @@ unsigned cc_poll(uint32_t cur_ts)
 
   next_conn = c;
   last_ts = cur_ts;
+
+  if (n == 0)
+    STATS_ADD(slowpath_ctx, cc_empty, 1);
+
+  STATS_ADD(slowpath_ctx, cc_total, n);
   return n;
 }
 
 void cc_conn_init(struct connection *conn)
 {
   conn->cc_next = cc_conns;
+  conn->cc_prev = NULL;
   cc_conns = conn;
 
   conn->cc_last_ts = cur_ts;
@@ -208,7 +217,7 @@ void cc_conn_init(struct connection *conn)
 
 void cc_conn_remove(struct connection *conn)
 {
-  struct connection *cp = NULL;
+  STATS_TS(cc_start);
 
   if (next_conn == conn) {
     next_conn = conn->cc_next;
@@ -216,16 +225,18 @@ void cc_conn_remove(struct connection *conn)
 
   if (cc_conns == conn) {
     cc_conns = conn->cc_next;
+    conn->cc_prev = NULL;
   } else {
-    for (cp = cc_conns; cp != NULL && cp->cc_next != conn;
-        cp = cp->cc_next);
-    if (cp == NULL) {
-      fprintf(stderr, "conn_unregister: connection not found\n");
-      abort();
-    }
+    struct connection *c_prev = conn->cc_prev;
+    struct connection *c_next = conn->cc_next;
 
-    cp->cc_next = conn->cc_next;
+    if (c_prev != NULL)
+      c_prev->cc_next = c_next;
+    if (c_next != NULL)
+      c_next->cc_prev = c_prev;
   }
+  STATS_TS(cc_end);
+  STATS_ADD(slowpath_ctx, cyc_cc_remove, cc_end - cc_start);
 }
 
 static inline void issue_retransmits(struct connection *c,

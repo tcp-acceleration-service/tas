@@ -32,6 +32,7 @@
 
 #include <tas_memif.h>
 #include <utils_rng.h>
+#include <stats.h>
 
 #define BATCH_SIZE 16
 #define BUFCACHE_SIZE 128
@@ -95,26 +96,10 @@ struct dataplane_context {
   uint64_t loadmon_cyc_busy;
 
   uint64_t kernel_drop;
-#ifdef DATAPLANE_STATS
+
   /********************************************************/
   /* Stats */
-  uint64_t stat_qm_poll;
-  uint64_t stat_qm_empty;
-  uint64_t stat_qm_total;
-
-  uint64_t stat_rx_poll;
-  uint64_t stat_rx_empty;
-  uint64_t stat_rx_total;
-
-  uint64_t stat_qs_poll;
-  uint64_t stat_qs_empty;
-  uint64_t stat_qs_total;
-
-  uint64_t stat_cyc_db;
-  uint64_t stat_cyc_qm;
-  uint64_t stat_cyc_rx;
-  uint64_t stat_cyc_qs;
-#endif
+  struct dataplane_stats stats;
 };
 
 extern struct dataplane_context **ctxs;

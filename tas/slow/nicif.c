@@ -33,6 +33,9 @@
 #include <utils.h>
 #include <utils_timeout.h>
 #include <utils_sync.h>
+#include <utils_log.h>
+#include <stats.h>
+#include <slowpath.h>
 #include "internal.h"
 
 #include <rte_config.h>
@@ -82,6 +85,18 @@ static volatile struct flextcp_pl_ktx **txq_base;
 static uint32_t txq_len;
 static uint32_t *txq_tail;
 
+#ifdef QUEUE_STATS
+/* Fastpath -> Slowpath queue delay */
+void kqueue_stats_dump()
+{
+  TAS_LOG(INFO, MAIN, "fast -> slow stats: cyc=%lu count=%lu avg_queuing_delay=%lF\n",
+          STATS_FETCH(slowpath_ctx, kout_cycles),
+          STATS_FETCH(slowpath_ctx, kout_count),
+          ((double) STATS_FETCH(slowpath_ctx, kout_cycles))/STATS_FETCH(slowpath_ctx, kout_count));
+}
+
+#endif
+
 int nicif_init(void)
 {
   rte_hash_crc_init_alg();
@@ -113,6 +128,8 @@ unsigned nicif_poll(void)
   unsigned i, ret = 0/*, nonsuc = 0*/;
   int x;
 
+  STATS_ADD(slowpath_ctx, rx_poll, 1);
+
   for (i = 0; i < 512; i++) {
     x = rxq_poll();
     /*if (x == -1 && ++nonsuc > 2 * fn_cores)
@@ -123,6 +140,10 @@ unsigned nicif_poll(void)
     ret += (x == -1 ? 0 : 1);
   }
 
+  if (ret == 0)
+    STATS_ADD(slowpath_ctx, rx_empty, 1);
+
+  STATS_ADD(slowpath_ctx, rx_total, ret);
   return ret;
 }
 
@@ -250,9 +271,13 @@ int nicif_connection_add(uint32_t db, uint64_t mac_remote, uint32_t ip_local,
 int nicif_connection_disable(uint32_t f_id, uint32_t *tx_seq, uint32_t *rx_seq,
     int *tx_closed, int *rx_closed)
 {
+  //STATS_TS(nic_if_conn_disable_start);
   struct flextcp_pl_flowst *fs = &fp_state->flowst[f_id];
 
+  STATS_TS(start);
   util_spin_lock(&fs->lock);
+  STATS_TS(end);
+  STATS_ADD(slowpath_ctx, cyc_fs_lock, end - start);
 
   *tx_seq = fs->tx_next_seq;
   *rx_seq = fs->rx_next_seq;
@@ -264,8 +289,15 @@ int nicif_connection_disable(uint32_t f_id, uint32_t *tx_seq, uint32_t *rx_seq,
 
   util_spin_unlock(&fs->lock);
 
+ 
+  STATS_TS(flow_slot_clear_start); 
   flow_slot_clear(f_id, fs->local_ip, fs->local_port, fs->remote_ip,
       fs->remote_port);
+  STATS_TS(flow_slot_clear_end); 
+  STATS_ADD(slowpath_ctx, cyc_flow_slot_clear, flow_slot_clear_end - flow_slot_clear_start);
+
+  //STATS_TS(nic_if_conn_disable_end);
+  //STATS_ADD(slowpath_ctx, cyc_nic_if_conn_disable, nic_if_conn_disable_end - nic_if_conn_disable_start);
   return 0;
 }
 
@@ -341,6 +373,7 @@ int nicif_connection_retransmit(uint32_t f_id, uint16_t flow_group)
 
   ktx->msg.connretran.flow_id = f_id;
   MEM_BARRIER();
+  ktx->ts = util_rdtsc();
   ktx->type = FLEXTCP_PL_KTX_CONNRETRAN;
 
   util_flexnic_kick(&fp_state->kctx[core], util_timeout_time_us());
@@ -371,6 +404,7 @@ void nicif_tx_send(uint32_t opaque, int no_ts)
   volatile struct flextcp_pl_ktx *ktx = &txq_base[0][tail];
 
   MEM_BARRIER();
+  ktx->ts = util_rdtsc();
   ktx->type = (!no_ts ? FLEXTCP_PL_KTX_PACKET : FLEXTCP_PL_KTX_PACKET_NOTS);
   txq_tail[0] = opaque;
   
@@ -501,6 +535,10 @@ static inline int rxq_poll(void)
   if (type == FLEXTCP_PL_KRX_INVALID) {
     return -1;
   }
+#ifdef QUEUE_STATS
+  STATS_ADD(slowpath_ctx, kout_cycles, (util_rdtsc() - krx->ts));
+  STATS_ADD(slowpath_ctx, kout_count, 1);
+#endif
 
   /* update tail */
   tail = tail + 1;

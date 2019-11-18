@@ -273,6 +273,7 @@ int flextcp_kernel_reqscale(struct flextcp_context *ctx, uint32_t cores)
   kin->data.req_scale.num_cores = cores;
   MEM_BARRIER();
   kin->type = KERNEL_APPOUT_REQ_SCALE;
+  kin->ts = util_rdtsc();
   flextcp_kernel_kick();
 
   pos = pos + 1;

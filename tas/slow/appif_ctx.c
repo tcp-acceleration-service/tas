@@ -32,6 +32,8 @@
 #include <unistd.h>
 
 #include <tas.h>
+#include <utils_log.h>
+#include <slowpath.h>
 #include "internal.h"
 #include "appif.h"
 
@@ -47,6 +49,19 @@ static int kin_accept_conn(struct application *app, struct app_context *ctx,
     volatile struct kernel_appout *kin, volatile struct kernel_appin *kout);
 static int kin_req_scale(struct application *app, struct app_context *ctx,
     volatile struct kernel_appout *kin, volatile struct kernel_appin *kout);
+extern struct connection *conn_ht_lookup(uint64_t opaque, uint32_t local_ip,
+           uint32_t remote_ip, uint16_t local_port, uint16_t remote_port);
+
+
+#ifdef QUEUE_STATS
+void appqueue_stats_dump()
+{
+  TAS_LOG(INFO, MAIN, "app -> slow stats: cyc=%lu count=%lu avg_queuing_delay=%lf\n",
+          STATS_FETCH(slowpath_ctx, appin_cycles),
+          STATS_FETCH(slowpath_ctx, appin_count),
+          (double) STATS_FETCH(slowpath_ctx, appin_cycles)/ STATS_FETCH(slowpath_ctx, appin_count));
+}
+#endif
 
 static void appif_ctx_kick(struct app_context *ctx)
 {
@@ -94,10 +109,25 @@ void appif_conn_opened(struct connection *c, int status)
     kout->data.conn_opened.flow_id = c->flow_id;
     kout->data.conn_opened.fn_core = c->fn_core;
   } else {
+    /* remove from app connection list */
+    struct application *app = ctx->app;
+    if (app->conns == c) {
+      app->conns = c->app_next;
+    } else {
+      struct connection *c_crwl;
+      for (c_crwl = app->conns; c_crwl != NULL && c_crwl->app_next != c;
+        c_crwl = c_crwl->app_next);
+      if (c_crwl == NULL) {
+        fprintf(stderr, "appif_conn_closed: connection not found\n");
+        abort();
+      }
+      c_crwl->app_next = c->app_next;
+    }
     tcp_destroy(c);
   }
 
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_CONN_OPENED;
   appif_ctx_kick(ctx);
 
@@ -112,7 +142,6 @@ void appif_conn_closed(struct connection *c, int status)
 {
   struct app_context *ctx = c->ctx;
   struct application *app = ctx->app;
-  struct connection *c_i;
   volatile struct kernel_appin *kout = ctx->kout_base;
   uint32_t kout_pos = ctx->kout_pos;
 
@@ -128,6 +157,7 @@ void appif_conn_closed(struct connection *c, int status)
   kout->data.status.status = status;
 
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_STATUS_CONN_CLOSE;
   appif_ctx_kick(ctx);
 
@@ -140,14 +170,15 @@ void appif_conn_closed(struct connection *c, int status)
   /* remove from app connection list */
   if (app->conns == c) {
     app->conns = c->app_next;
+    c->app_prev = NULL;
   } else {
-    for (c_i = app->conns; c_i != NULL && c_i->app_next != c;
-        c_i = c_i->app_next);
-    if (c_i == NULL) {
-      fprintf(stderr, "appif_conn_closed: connection not found\n");
-      abort();
-    }
-    c_i->app_next = c->app_next;
+    struct connection* c_prev = c->app_prev;
+    struct connection* c_next = c->app_next;
+
+    if (c_prev != NULL)
+      c_prev->app_next = c->app_next;
+    if (c_next != NULL)
+      c_next->app_prev = c->app_prev;
   }
 }
 
@@ -170,6 +201,7 @@ void appif_listen_newconn(struct listener *l, uint32_t remote_ip,
   kout->data.listen_newconn.remote_ip = remote_ip;
   kout->data.listen_newconn.remote_port = remote_port;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_LISTEN_NEWCONN;
   appif_ctx_kick(ctx);
 
@@ -213,12 +245,16 @@ void appif_accept_conn(struct connection *c, int status)
     kout->data.accept_connection.fn_core = c->fn_core;
 
     c->app_next = app->conns;
+    c->app_prev = NULL;
+    if (app->conns != NULL)
+      app->conns->app_prev = c;
     app->conns = c;
   } else {
     tcp_destroy(c);
   }
 
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_ACCEPTED_CONN;
   appif_ctx_kick(ctx);
 
@@ -232,6 +268,7 @@ void appif_accept_conn(struct connection *c, int status)
 
 unsigned appif_ctx_poll(struct application *app, struct app_context *ctx)
 {
+  STATS_TS(start);
   volatile struct kernel_appout *kin = ctx->kin_base;
   volatile struct kernel_appin *kout = ctx->kout_base;
   uint32_t kin_pos = ctx->kin_pos;
@@ -250,6 +287,14 @@ unsigned appif_ctx_poll(struct application *app, struct app_context *ctx)
   type = kin->type;
   MEM_BARRIER();
 
+#ifdef QUEUE_STATS
+  if (type != KERNEL_APPOUT_INVALID)
+  {
+    STATS_ADD(slowpath_ctx, appin_cycles, (util_rdtsc() - kin->ts));
+    STATS_ADD(slowpath_ctx, appin_count, 1);
+  }
+#endif
+
   switch (type) {
     case KERNEL_APPOUT_INVALID:
       /* nothing yet */
@@ -263,26 +308,37 @@ unsigned appif_ctx_poll(struct application *app, struct app_context *ctx)
     case KERNEL_APPOUT_CONN_MOVE:
       /* connection move request */
       kout_inc += kin_conn_move(app, ctx, kin, kout);
+      STATS_TS(end_move);
+      STATS_ADD(slowpath_ctx, cyc_kmove, end_move-start);
       break;
 
     case KERNEL_APPOUT_CONN_CLOSE:
       /* connection close request */
       kout_inc += kin_conn_close(app, ctx, kin, kout);
+      STATS_TS(end_close);
+      STATS_ADD(slowpath_ctx, cyc_kclose, end_close-start);
       break;
 
     case KERNEL_APPOUT_LISTEN_OPEN:
       /* listen request */
       kout_inc += kin_listen_open(app, ctx, kin, kout);
+      STATS_TS(end_lopen);
+      STATS_ADD(slowpath_ctx, cyc_klopen, end_lopen-start);
       break;
 
     case KERNEL_APPOUT_ACCEPT_CONN:
       /* accept request */
+      (void) app;
       kout_inc += kin_accept_conn(app, ctx, kin, kout);
+      STATS_TS(end);
+      STATS_ADD(slowpath_ctx, cyc_kac, end-start);
       break;
 
     case KERNEL_APPOUT_REQ_SCALE:
       /* scaling request */
       kout_inc += kin_req_scale(app, ctx, kin, kout);
+      STATS_TS(end_req_scale);
+      STATS_ADD(slowpath_ctx, cyc_kreq_scale, end_req_scale-start);
       break;
 
     case KERNEL_APPOUT_LISTEN_CLOSE:
@@ -326,6 +382,9 @@ static int kin_conn_open(struct application *app, struct app_context *ctx,
   }
 
   conn->app_next = app->conns;
+  conn->app_prev = NULL;
+  if (app->conns != NULL)
+    app->conns->app_prev = conn;
   app->conns = conn;
 
   return 0;
@@ -334,6 +393,7 @@ error:
   kout->data.conn_opened.opaque = kin->data.conn_open.opaque;
   kout->data.conn_opened.status = -1;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_CONN_OPENED;
   appif_ctx_kick(ctx);
   return 1;
@@ -345,16 +405,12 @@ static int kin_conn_move(struct application *app, struct app_context *ctx,
   struct connection *conn;
   struct app_context *new_ctx;
 
-  for (conn = app->conns; conn != NULL; conn = conn->app_next) {
-    if (conn->local_ip == kin->data.conn_move.local_ip &&
-        conn->remote_ip == kin->data.conn_move.remote_ip &&
-        conn->local_port == kin->data.conn_move.local_port &&
-        conn->remote_port == kin->data.conn_move.remote_port &&
-        conn->opaque == kin->data.conn_move.opaque)
-    {
-      break;
-    }
-  }
+  conn = conn_ht_lookup(kin->data.conn_move.opaque,
+                    kin->data.conn_move.local_ip,
+                    kin->data.conn_move.remote_ip,
+                    kin->data.conn_move.local_port,
+                    kin->data.conn_move.remote_port);
+
   if (conn == NULL) {
     fprintf(stderr, "kin_conn_move: connection not found\n");
     goto error;
@@ -383,6 +439,7 @@ static int kin_conn_move(struct application *app, struct app_context *ctx,
   kout->data.status.opaque = kin->data.conn_move.opaque;
   kout->data.status.status = 0;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_STATUS_CONN_MOVE;
   appif_ctx_kick(ctx);
   return 1;
@@ -391,6 +448,7 @@ error:
   kout->data.status.opaque = kin->data.conn_move.opaque;
   kout->data.status.status = -1;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_STATUS_CONN_MOVE;
   appif_ctx_kick(ctx);
   return 1;
@@ -401,16 +459,16 @@ static int kin_conn_close(struct application *app, struct app_context *ctx,
 {
   struct connection *conn;
 
-  for (conn = app->conns; conn != NULL; conn = conn->app_next) {
-    if (conn->local_ip == kin->data.conn_close.local_ip &&
-        conn->remote_ip == kin->data.conn_close.remote_ip &&
-        conn->local_port == kin->data.conn_close.local_port &&
-        conn->remote_port == kin->data.conn_close.remote_port &&
-        conn->opaque == kin->data.conn_close.opaque)
-    {
-      break;
-    }
-  }
+  STATS_TS(conn_close_iter_start);
+  conn = conn_ht_lookup(kin->data.conn_move.opaque,
+                    kin->data.conn_move.local_ip,
+                    kin->data.conn_move.remote_ip,
+                    kin->data.conn_move.local_port,
+                    kin->data.conn_move.remote_port);
+  STATS_TS(conn_close_iter_end);
+  STATS_ADD(slowpath_ctx, cyc_conn_close_iter, conn_close_iter_end - conn_close_iter_start);
+  STATS_ADD(slowpath_ctx, conn_close_cnt, 1);
+
   if (conn == NULL) {
     fprintf(stderr, "kin_conn_close: connection not found\n");
     goto error;
@@ -424,9 +482,11 @@ static int kin_conn_close(struct application *app, struct app_context *ctx,
   return 0;
 
 error:
+  fprintf(stderr, "Error in kin_conn_close\n");
   kout->data.status.opaque = kin->data.conn_close.opaque;
   kout->data.status.status = -1;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_STATUS_CONN_CLOSE;
   appif_ctx_kick(ctx);
   return 1;
@@ -452,6 +512,7 @@ static int kin_listen_open(struct application *app, struct app_context *ctx,
   kout->data.status.opaque = kin->data.listen_open.opaque;
   kout->data.status.status = 0;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_STATUS_LISTEN_OPEN;
   appif_ctx_kick(ctx);
 
@@ -461,6 +522,7 @@ error:
   kout->data.status.opaque = kin->data.listen_open.opaque;
   kout->data.status.status = -1;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_STATUS_LISTEN_OPEN;
   appif_ctx_kick(ctx);
   return 1;
@@ -479,7 +541,6 @@ static int kin_accept_conn(struct application *app, struct app_context *ctx,
       break;
     }
   }
-
   if (tcp_accept(ctx, kin->data.accept_conn.conn_opaque, listen,
         ctx->doorbell->id) != 0)
   {
@@ -493,7 +554,9 @@ error:
   kout->data.accept_connection.opaque = kin->data.accept_conn.conn_opaque;
   kout->data.accept_connection.status = -1;
   MEM_BARRIER();
+  kout->ts = util_rdtsc();
   kout->type = KERNEL_APPIN_ACCEPTED_CONN;
+  kout->ts = util_rdtsc();
   appif_ctx_kick(ctx);
   return 1;
 }

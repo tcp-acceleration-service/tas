@@ -36,6 +36,7 @@
 #include <packet_defs.h>
 #include <utils.h>
 #include <utils_rng.h>
+#include <slowpath.h>
 #include "internal.h"
 
 #define TCP_MSS 1460
@@ -124,8 +125,11 @@ void tcp_poll(void)
   struct connection *conn;
   uint8_t *p;
   int ret;
+  unsigned n = 0;
+  STATS_ADD(slowpath_ctx, tcp_poll, 1);
 
   while ((p = nbqueue_deq(&conn_async_q)) != NULL) {
+    n += 1;
     conn = (struct connection *) (p - offsetof(struct connection, comp.el));
     if (conn->status == CONN_ARP_PENDING) {
       if ((ret = conn->comp.status) != 0 || (ret = conn_arp_done(conn)) != 0) {
@@ -141,6 +145,11 @@ void tcp_poll(void)
       fprintf(stderr, "tcp_poll: unexpected conn state %u\n", conn->status);
     }
   }
+
+  if (n == 0)
+    STATS_ADD(slowpath_ctx, tcp_empty, 1);
+  
+  STATS_ADD(slowpath_ctx, tcp_total, n);
 }
 
 int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
@@ -149,6 +158,7 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
   int ret;
   struct connection *conn;
   uint16_t local_port;
+  uint64_t ts = util_rdtsc();
 
   /* allocate connection struct */
   if ((conn = conn_alloc()) == NULL) {
@@ -183,6 +193,8 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
   conn->comp.notify_fd = -1;
   conn->comp.status = 0;
 
+  conn->state_ts[CONN_ARP_PENDING] = ts;
+
 
   /* resolve IP to mac */
   ret = routing_resolve(&conn->comp, remote_ip, &conn->remote_mac);
@@ -194,6 +206,7 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
     CONN_DEBUG0(conn, "routing_resolve succeeded immediately\n");
     conn_register(conn);
 
+    conn->arp_immediate = 1;
     ret = conn_arp_done(conn);
   } else {
     CONN_DEBUG0(conn, "routing_resolve pending\n");
@@ -323,6 +336,7 @@ int tcp_accept(struct app_context *ctx, uint64_t opaque,
 {
   struct connection *conn;
 
+  STATS_TS(start);
   /* allocate listener struct */
   if ((conn = conn_alloc()) == NULL) {
     fprintf(stderr, "tcp_accept: conn_alloc failed\n");
@@ -343,6 +357,8 @@ int tcp_accept(struct app_context *ctx, uint64_t opaque,
   if (listen->backlog_used > 0) {
     listener_accept(listen);
   }
+  STATS_TS(end);
+  STATS_ADD(slowpath_ctx, cyc_ta, end - start);
   return 0;
 }
 
@@ -390,6 +406,7 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
 
 int tcp_close(struct connection *conn)
 {
+  STATS_TS(tcp_close_start);
   uint32_t tx_seq, rx_seq;
   int tx_c, rx_c;
 
@@ -419,8 +436,15 @@ int tcp_close(struct connection *conn)
 
   /* set timer to free connection state */
   assert(conn->to_armed == 0);
+
+  STATS_TS(timeout_arm_start);
   util_timeout_arm(&timeout_mgr, &conn->to, 10000, TO_TCP_CLOSED);
+  STATS_TS(timeout_arm_end);
+
+  STATS_ADD(slowpath_ctx, cyc_timeout_arm, timeout_arm_end - timeout_arm_start);
   conn->to_armed = 1;
+  STATS_TS(tcp_close_end);
+  STATS_ADD(slowpath_ctx, cyc_tcp_close, tcp_close_end - tcp_close_start);
   return 0;
 }
 
@@ -447,7 +471,7 @@ void tcp_timeout(struct timeout *to, enum timeout_type type)
     abort();
   }
   if (c->status != CONN_SYN_SENT) {
-    fprintf(stderr, "tcp_timeout: unexpected connection state (%u)\n", c->status);
+    //fprintf(stderr, "tcp_timeout: unexpected connection state (%u)\n", c->status);
     abort();
   }
 
@@ -510,14 +534,15 @@ static void conn_packet(struct connection *c, const struct pkt_tcp *p,
     * why necessary*/
     send_control(c, TCP_ACK, 1, 0, 0);
   } else {
-    fprintf(stderr, "tcp_packet: unexpected connection state %u\n", c->status);
+    //fprintf(stderr, "tcp_packet: unexpected connection state %u\n", c->status);
+    tcp_close(c);
   }
 }
 
 static int conn_arp_done(struct connection *conn)
 {
   CONN_DEBUG0(conn, "arp resolution done\n");
-
+  conn->state_ts[CONN_SYN_SENT] = util_rdtsc();
   conn->status = CONN_SYN_SENT;
 
   /* arm timeout */
@@ -579,7 +604,6 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
   }
 
   CONN_DEBUG0(c, "conn_syn_sent_packet: connection registered\n");
-
   c->status = CONN_OPEN;
 
   /* send ACK */
@@ -589,6 +613,7 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
 
   appif_conn_opened(c, 0);
 
+  c->state_ts[CONN_OPEN] = util_rdtsc();
   return 0;
 }
 
@@ -606,7 +631,7 @@ static int conn_reg_synack(struct connection *c)
   send_control(c, TCP_SYN | TCP_ACK | ecn_flags, 1, c->syn_ts, TCP_MSS);
 
   appif_accept_conn(c, 0);
-
+  c->state_ts[CONN_OPEN] = util_rdtsc();
   return 0;
 }
 
@@ -891,6 +916,7 @@ static void listener_packet(struct listener *l, const struct pkt_tcp *p,
 
 static void listener_accept(struct listener *l)
 {
+  STATS_TS(start);
   struct connection *c = l->wait_conns;
   struct backlog_slot *bls;
   const struct pkt_tcp *p;
@@ -961,6 +987,9 @@ out:
   if (l->backlog_pos >= l->backlog_len) {
     l->backlog_pos -= l->backlog_len;
   }
+
+  STATS_TS(end);
+  STATS_ADD(slowpath_ctx, cyc_la, end - start);
 }
 
 static inline int send_control_raw(uint64_t remote_mac, uint32_t remote_ip,
@@ -1122,4 +1151,25 @@ static inline int parse_options(const struct pkt_tcp *p, uint16_t len,
   }
 
   return 0;
+}
+
+struct connection *conn_ht_lookup(uint64_t opaque, uint32_t local_ip,
+           uint32_t remote_ip, uint16_t local_port, uint16_t remote_port)
+{
+  uint32_t h;
+  struct connection *c;
+
+  h = conn_hash(local_ip, remote_ip,
+              local_port, remote_port) % TCP_HTSIZE;
+
+  for (c = tcp_hashtable[h]; c != NULL; c = c->ht_next) {
+    if (remote_ip == c->remote_ip &&
+        local_port == c->local_port &&
+        remote_port == c->remote_port &&
+        opaque == c->opaque)
+    {
+      return c;
+    }
+  }
+  return NULL;
 }
