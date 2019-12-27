@@ -41,6 +41,8 @@ enum config_cc_algorithm {
 
 /** Struct containing the parsed configuration parameters */
 struct configuration {
+  /* shared memory size */
+  uint64_t shm_len;
   /** Kernel nic receive queue length. */
   uint64_t nic_rx_len;
   /** Kernel nic transmit queue length. */

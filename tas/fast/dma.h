@@ -38,7 +38,7 @@ void dma_dump_stats(void);
 
 static inline void dma_read(uintptr_t addr, size_t len, void *buf)
 {
-  assert(addr + len >= addr && addr + len <= FLEXNIC_DMA_MEM_SIZE);
+  assert(addr + len >= addr && addr + len <= config.shm_len);
 
   rte_memcpy(buf, (uint8_t *) tas_shm + addr, len);
 
@@ -54,7 +54,7 @@ static inline void dma_read(uintptr_t addr, size_t len, void *buf)
 
 static inline void dma_write(uintptr_t addr, size_t len, const void *buf)
 {
-  assert(addr + len >= addr && addr + len <= FLEXNIC_DMA_MEM_SIZE);
+  assert(addr + len >= addr && addr + len <= config.shm_len);
 
   rte_memcpy((uint8_t *) tas_shm + addr, buf, len);
 
@@ -71,7 +71,7 @@ static inline void dma_write(uintptr_t addr, size_t len, const void *buf)
 static inline void *dma_pointer(uintptr_t addr, size_t len)
 {
   /* validate address */
-  assert(addr + len >= addr && addr + len <= FLEXNIC_DMA_MEM_SIZE);
+  assert(addr + len >= addr && addr + len <= config.shm_len);
 
   return (uint8_t *) tas_shm + addr;
 }

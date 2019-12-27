@@ -34,6 +34,7 @@
 #include <config.h>
 
 enum cfg_params {
+  CP_SHM_LEN,
   CP_NIC_RX_LEN,
   CP_NIC_TX_LEN,
   CP_APP_KIN_LEN,
@@ -79,6 +80,9 @@ enum cfg_params {
 };
 
 static struct option opts[] = {
+    { .name = "shm-len",
+      .has_arg = required_argument,
+      .val = CP_SHM_LEN },
     { .name = "nic-rx-len",
       .has_arg = required_argument,
       .val = CP_NIC_RX_LEN },
@@ -232,6 +236,12 @@ int config_parse(struct configuration *c, int argc, char *argv[])
   while (!done) {
     ret = getopt_long(argc, argv, "", opts, NULL);
     switch (ret) {
+      case CP_SHM_LEN:
+        if (parse_int64(optarg, &c->shm_len) != 0) {
+          fprintf(stderr, "shm len parsing failed\n");
+          goto failed;
+        }
+        break;
       case CP_NIC_RX_LEN:
         if (parse_int64(optarg, &c->nic_rx_len) != 0) {
           fprintf(stderr, "nic rx len parsing failed\n");
@@ -513,6 +523,7 @@ failed:
 static int config_defaults(struct configuration *c, char *progname)
 {
   c->ip = 0;
+  c->shm_len = 1024 * 1024 * 1024;
   c->nic_rx_len = 16 * 1024;
   c->nic_tx_len = 16 * 1024;
   c->app_kin_len = 1024 * 1024;
@@ -567,7 +578,9 @@ static void print_usage(struct configuration *c, char *progname)
 {
   fprintf(stderr, "Usage: %s [OPTION]... --ip-addr=IP[/PREFIXLEN]\n"
       "\n"
-      "Kernel queues:\n"
+      "Memory Sizes:\n"
+      "  --shm-len=LEN               Shared memory len "
+          "[default: %"PRIu64"]\n"
       "  --nic-rx-len=LEN            Kernel rx queue len "
           "[default: %"PRIu64"]\n"
       "  --nic-tx-len=LEN            Kernel tx queue len "
@@ -659,7 +672,7 @@ static void print_usage(struct configuration *c, char *progname)
       "  --ready-fd=FD               File descriptor to signal readiness "
           "[default: disabled]\n"
       "\n",
-      progname,
+      progname, c->shm_len,
       c->nic_rx_len, c->nic_tx_len, c->app_kin_len, c->app_kout_len,
       c->tcp_rtt_init, c->tcp_link_bw, c->tcp_rxbuf_len, c->tcp_txbuf_len,
       c->tcp_handshake_to, c->tcp_handshake_retries,
