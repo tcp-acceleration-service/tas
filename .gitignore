@@ -23,5 +23,7 @@ statetool
 scaletool
 doc/latex
 doc/html
+doc/xml
+doc/_build
 .dockerwrap
 Makefile.local
