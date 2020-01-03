@@ -27,11 +27,11 @@
 
 /**
  * @file tas_ll.h
- * @brief Public low-level interface for application flextcp stack.
+ * @brief Public low-level application interface for TAS.
  *
- * @addtogroup app-stack
- * @brief Application library flextcp stack (low-level interface)
- */
+ * @addtogroup libtas-ll
+ * @brief Application library for TAS lowlevel interface.
+ * @{ */
 
 #include <stdint.h>
 
@@ -294,5 +294,7 @@ int flextcp_connection_tx_possible(struct flextcp_context *ctx,
 /** Move connection to specfied context */
 int flextcp_connection_move(struct flextcp_context *ctx,
         struct flextcp_connection *conn);
+
+/** @} */
 
 #endif /* ndef TAS_LL_H_ */

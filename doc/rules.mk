@@ -1,7 +1,7 @@
 include mk/subdir_pre.mk
 
 docs:
-	cd doc && doxygen
+	doxygen doc/Doxyfile
 
 CLEAN += doc/html doc/latex
 

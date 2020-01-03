@@ -30,6 +30,13 @@
 #include <sys/socket.h>
 #include <sys/epoll.h>
 
+/**
+ * @file tas_sockets.h
+ * @brief TAS sockets emulation.
+ *
+ * @addtogroup libtas-sockets
+ * @brief TAS sockets emulation library.
+ * @{ */
 
 int tas_init(void);
 
@@ -126,5 +133,7 @@ int tas_dup(int oldfd);
 int tas_dup2(int oldfd, int newfd);
 
 int tas_dup3(int oldfd, int newfd, int flags);
+
+/** @} */
 
 #endif /* ndef FLEXTCP_SOCKETS_H_ */

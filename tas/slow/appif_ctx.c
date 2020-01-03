@@ -25,7 +25,7 @@
 /**
  * @brief Handling application context kernel queues.
  * @file appif_ctx.c
- * @addtogroup kernel-appif
+ * @addtogroup tas-sp-appif
  */
 #include <stdio.h>
 #include <stdlib.h>

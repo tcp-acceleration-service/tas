@@ -25,8 +25,9 @@
 #ifndef INTERNAL_H_
 #define INTERNAL_H_
 
-/** @addtogroup kernel
- *  @brief Kernel */
+/** @addtogroup tas-sp
+ *  @brief TAS Slow Path
+ *  @ingroup tas */
 
 #include <stdint.h>
 
@@ -80,9 +81,9 @@ enum timeout_type {
 
 /*****************************************************************************/
 /**
- * @addtogroup kernel-nicif
+ * @addtogroup tas-sp-nicif
  * @brief NIC Interface
- * @ingroup kernel
+ * @ingroup tas-sp
  * @{ */
 
 /** Initialize NIC interface */
@@ -253,9 +254,9 @@ void nicif_tx_send(uint32_t opaque, int no_ts);
 
 /*****************************************************************************/
 /**
- * @addtogroup kernel-packetmem
+ * @addtogroup tas-sp-packetmem
  * @brief Packet Memory Manager.
- * @ingroup kernel
+ * @ingroup tas-sp
  *
  * Manages memory region that can be used by FlexNIC for DMA.
  * @{ */
@@ -292,9 +293,9 @@ void packetmem_free(struct packetmem_handle *handle);
 
 /*****************************************************************************/
 /**
- * @addtogroup kernel-appif
+ * @addtogroup tas-sp-appif
  * @brief Application Interface.
- * @ingroup kernel
+ * @ingroup tas-sp
  *
  * This is implemented in appif.c and appif_ctx.c
  * @{ */
@@ -343,9 +344,9 @@ void appif_accept_conn(struct connection *c, int status);
 
 /*****************************************************************************/
 /**
- * @addtogroup kernel-tcp
+ * @addtogroup tas-sp-tcp
  * @brief TCP Protocol Handling
- * @ingroup kernel
+ * @ingroup tas-sp
  * @{ */
 
 /** TCP connection state machine state. */
@@ -682,9 +683,9 @@ void tcp_timeout(struct timeout *to, enum timeout_type type);
 
 /*****************************************************************************/
 /**
- * @addtogroup kernel-cc
+ * @addtogroup tas-sp-cc
  * @brief Congestion Control
- * @ingroup kernel
+ * @ingroup tas-sp
  * @{ */
 
 /** Initialize congestion control management */
@@ -717,9 +718,9 @@ void cc_conn_remove(struct connection *conn);
 
 /*****************************************************************************/
 /**
- * @addtogroup kernel-arp
+ * @addtogroup tas-sp-arp
  * @brief ARP Protocol Handling
- * @ingroup kernel
+ * @ingroup tas-sp
  * @{ */
 
 /** Initialize ARP subsystem */
@@ -761,9 +762,9 @@ void arp_timeout(struct timeout *to, enum timeout_type type);
 
 /*****************************************************************************/
 /**
- * @addtogroup kernel-routing
+ * @addtogroup tas-sp-routing
  * @brief IP routing
- * @ingroup kernel
+ * @ingroup tas-sp
  * @{ */
 
 /** Initialize IP routing subsystem */
@@ -787,9 +788,9 @@ int routing_resolve(struct nicif_completion *comp, uint32_t ip, uint64_t *mac);
 
 /*****************************************************************************/
 /**
- * @addtogroup kernel-kni
+ * @addtogroup tas-sp-kni
  * @brief Host Kernel Interface.
- * @ingroup kernel
+ * @ingroup tas-sp
  *
  * This is implemented in kni.c
  * @{ */
@@ -803,5 +804,7 @@ void kni_packet(const void *pkt, uint16_t len);
 
 /** Poll kni */
 unsigned kni_poll(void);
+
+/** @} */
 
 #endif // ndef INTERNAL_H_

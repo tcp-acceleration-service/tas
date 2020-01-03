@@ -28,6 +28,10 @@
 #include <config.h>
 #include <packet_defs.h>
 
+/** @addtogroup tas
+ *  @brief TAS.
+ */
+
 extern struct configuration config;
 
 extern void *tas_shm;

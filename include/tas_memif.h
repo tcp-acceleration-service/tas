@@ -29,6 +29,11 @@
 #include <utils.h>
 #include <packet_defs.h>
 
+/**
+ * @addtogroup tas-fp
+ * @brief TAS Fast Path
+ * @ingroup tas
+ * @{ */
 
 #define FLEXNIC_HUGE_PREFIX "/dev/hugepages"
 
@@ -342,5 +347,7 @@ struct flextcp_pl_mem {
 
 
 void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us);
+
+/** @} */
 
 #endif /* ndef FLEXTCP_PLIF_H_ */
