@@ -12,7 +12,7 @@ design and its rationale.
 ## Building
 Requirements:
   * TAS is built on top of Intel DPDK for direct access to the NIC. We have
-    tested this version with dpdk-17.11.4
+    tested this version with dpdk versions (17.11.9, 18.11.5, 19.11).
 
 Assuming that dpdk is installed in `~/dpdk-inst` TAS can be built as follows:
 ```

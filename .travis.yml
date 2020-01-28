@@ -4,9 +4,9 @@ language: generic
 compiler:
 - gcc
 env:
-- DPDK_VER=17.11.6
-- DPDK_VER=18.11.2
-- DPDK_VER=19.08
+- DPDK_VER=17.11.9
+- DPDK_VER=18.11.5
+- DPDK_VER=19.11
 cache:
   directories:
     - $HOME/dpdk/
