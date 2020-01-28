@@ -1,6 +1,9 @@
 API
 ###################################
 
+The full API documentation extracted by doxygen can be found
+`here <https://tas.readthedocs.io/en/latest/_static/doxygen/>`_.
+
 
 TAS Low-Level Application API
 ******************************
