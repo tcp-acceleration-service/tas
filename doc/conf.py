@@ -21,7 +21,10 @@
 # -- Project information -----------------------------------------------------
 
 project = 'TAS'
-copyright = '2020, Antoine Kaufmann'
+copyright = '2020, University of Washington, ' + \
+        'Max Planck Institute for Software Systems, ' + \
+        'and The University of Texas at Austin'
+
 author = 'Antoine Kaufmann'
 
 # The short X.Y version
