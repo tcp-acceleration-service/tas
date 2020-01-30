@@ -26,14 +26,16 @@ TESTS_AUTO := \
   tests/libtas/tas_sockets \
   tests/tas_unit/fastpath
 
-# full unit tests
-TESTS_AUTO_FULL := \
-  tests/full/tas_linux \
-
-TESTS := $(TESTS_NONE) $(TESTS_LIBTAS) $(TESTS_SOCKETS) $(TESTS_AUTO) \
-  $(TESTS_AUTO_FULL)
+TESTS := $(TESTS_NONE) $(TESTS_LIBTAS) $(TESTS_SOCKETS) $(TESTS_AUTO)
 TEST_OBJS := $(addsuffix .o, $(TESTS)) \
-  tests/testutils.o tests/libtas/harness.o tests/full/fulltest.o
+  tests/testutils.o tests/libtas/harness.o
+
+#########################
+
+dir := $(d)/full
+include $(dir)/rules.mk
+
+#########################
 
 # tests linking against libtas
 $(TESTS_LIBTAS): CPPFLAGS += -Ilib/tas/include/
@@ -59,9 +61,6 @@ tests/tas_unit/fastpath: LDLIBS+= -lrte_eal
 tests/tas_unit/fastpath: tests/tas_unit/fastpath.o tests/testutils.o \
   tas/fast/fast_flows.o
 
-tests/full/%.o: CPPFLAGS+=-Ilib/tas/include
-tests/full/tas_linux: tests/full/tas_linux.o tests/full/fulltest.o lib/libtas.so
-
 # build tests
 tests: $(TESTS)
 
@@ -71,13 +70,9 @@ run-tests: $(TESTS_AUTO)
 	tests/libtas/tas_sockets
 	tests/tas_unit/fastpath
 
-# run full tests that run full TAS
-run-tests-full: $(TESTS_AUTO_FULL) tas/tas
-	tests/full/tas_linux
-
 DEPS += $(TEST_OBJS:.o=.d)
 CLEAN += $(TEST_OBJS) $(TESTS)
 
-.PHONY: tests run-tests run-tests-full
+.PHONY: tests run-tests
 
 include mk/subdir_post.mk
