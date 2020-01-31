@@ -61,6 +61,7 @@ include mk/recipes.mk
 
 DEPS :=
 CLEAN :=
+DISTCLEAN :=
 TARGETS :=
 
 # Subdirectories
@@ -89,6 +90,9 @@ all: $(TARGETS)
 clean:
 	rm -rf $(CLEAN) $(DEPS)
 
+distclean:
+	rm -rf $(DISTCLEAN) $(CLEAN) $(DEPS)
+
 install: tas/tas lib/libtas_sockets.so lib/libtas_interpose.so \
   lib/libtas.so tools/statetool
 	mkdir -p $(DESTDIR)$(SBINDIR)
@@ -108,7 +112,7 @@ uninstall:
 
 
 .DEFAULT_GOAL := all
-.PHONY: all clean
+.PHONY: all distclean clean install uninstall
 
 # Include dependencies
 -include $(DEPS)
