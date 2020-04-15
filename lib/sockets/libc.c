@@ -37,6 +37,7 @@ static int (*libc_epoll_ctl)(int epfd, int op, int fd,
     struct epoll_event *event) = NULL;
 static int (*libc_epoll_wait)(int epfd, struct epoll_event *events,
     int maxevents, int timeout) = NULL;
+static int (*libc_poll)(struct pollfd *fds, nfds_t nfds, int timeout);
 static int (*libc_close)(int fd);
 static int (*libc_dup)(int oldfd);
 static int (*libc_dup2)(int oldfd, int newfd);
@@ -63,6 +64,12 @@ int tas_libc_epoll_wait(int epfd, struct epoll_event *events,
 {
   ensure_init();
   return libc_epoll_wait(epfd, events, maxevents, timeout);
+}
+
+int tas_libc_poll(struct pollfd *fds, nfds_t nfds, int timeout)
+{
+  ensure_init();
+  return libc_poll(fds, nfds, timeout);
 }
 
 int tas_libc_close(int fd)
@@ -116,6 +123,7 @@ static void init(void)
   libc_epoll_create1 = bind_symbol(handle, "epoll_create1");
   libc_epoll_ctl = bind_symbol(handle, "epoll_ctl");
   libc_epoll_wait = bind_symbol(handle, "epoll_wait");
+  libc_poll = bind_symbol(handle, "poll");
   libc_dup = bind_symbol(handle, "dup");
   libc_dup2 = bind_symbol(handle, "dup2");
   libc_dup3 = bind_symbol(handle, "dup3");

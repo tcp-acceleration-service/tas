@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
+#include <poll.h>
 #include <netinet/in.h>
 
 #include <tas_ll.h>
@@ -176,6 +177,7 @@ int tas_libc_epoll_ctl(int epfd, int op, int fd,
     struct epoll_event *event);
 int tas_libc_epoll_wait(int epfd, struct epoll_event *events,
     int maxevents, int timeout);
+int tas_libc_poll(struct pollfd *fds, nfds_t nfds, int timeout);
 int tas_libc_close(int fd);
 int tas_libc_dup(int oldfd);
 int tas_libc_dup2(int oldfd, int newfd);
