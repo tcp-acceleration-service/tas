@@ -61,10 +61,13 @@ int tas_socket(int domain, int type, int protocol)
 {
   struct socket *s;
   int fd;
-  int nonblock = 0;
+  int nonblock = 0, cloexec = 0;
 
   if ((type & SOCK_NONBLOCK) == SOCK_NONBLOCK) {
     nonblock = 1;
+  }
+  if ((type & SOCK_CLOEXEC) == SOCK_CLOEXEC) {
+    cloexec = 1;
   }
 
   type &= ~(SOCK_NONBLOCK | SOCK_CLOEXEC);
@@ -84,6 +87,9 @@ int tas_socket(int domain, int type, int protocol)
   if (nonblock) {
     fprintf(stderr, "socket set to nonblock\n");
     s->flags |= SOF_NONBLOCK;
+  }
+  if (cloexec) {
+    s->flags |= SOF_CLOEXEC;
   }
 
   flextcp_fd_srelease(fd, s);
@@ -608,6 +614,32 @@ int tas_fcntl(int sockfd, int cmd, ...)
       } else {
         s->flags |= SOF_NONBLOCK;
       }
+      break;
+
+    case F_GETFD:
+      if ((s->flags & SOF_CLOEXEC) == SOF_CLOEXEC) {
+        ret |= FD_CLOEXEC;
+      }
+      break;
+
+    case F_SETFD:
+      /* set/clear cloexec flag */
+      va_start(arg, cmd);
+      iarg = va_arg(arg, int);
+      va_end(arg);
+
+      if ((iarg & ~FD_CLOEXEC) != 0) {
+        fprintf(stderr, "flextcp fcntl: setfd unsupported flag (%x)\n",
+            iarg);
+        errno = EINVAL;
+        ret = -1;
+        goto out;
+      }
+
+      if ((iarg & FD_CLOEXEC) == FD_CLOEXEC)
+        s->flags |= SOF_CLOEXEC;
+      else
+        s->flags &= ~SOF_CLOEXEC;
       break;
 
     default:

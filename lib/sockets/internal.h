@@ -45,6 +45,7 @@ enum socket_flags {
   SOF_NONBLOCK = 1,
   SOF_BOUND = 2,
   SOF_REUSEPORT = 4,
+  SOF_CLOEXEC = 8,
 };
 
 enum conn_status {
