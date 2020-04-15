@@ -142,6 +142,8 @@ int tas_sock_close(struct socket *s)
   ctx = flextcp_sockctx_get();
   if (s->type == SOCK_CONNECTION) {
     conn_close(ctx, s);
+  } else if (s->type == SOCK_SOCKET) {
+    free(s);
   } else {
     fprintf(stderr, "TODO: close for non-connections. (leak)\n");
   }
