@@ -72,7 +72,7 @@ int flextcp_kernel_connect(void)
   saun.sun_family = AF_UNIX;
   memcpy(saun.sun_path, KERNEL_SOCKET_PATH, sizeof(KERNEL_SOCKET_PATH));
 
-  if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+  if ((fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) == -1) {
     perror("flextcp_kernel_connect: socket failed");
     return -1;
   }
