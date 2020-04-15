@@ -113,6 +113,7 @@ int tcp_init(void)
   nbqueue_init(&conn_async_q);
   utils_rng_init(&rng, util_timeout_time_us());
 
+  port_eph_hint = utils_rng_gen32(&rng) % ((1 << 16) - 1 - PORT_FIRST_EPH);
   if ((tcp_hashtable = calloc(TCP_HTSIZE, sizeof(*tcp_hashtable))) == NULL) {
     return -1;
   }
