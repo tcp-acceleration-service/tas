@@ -151,6 +151,7 @@ int tas_sock_close(struct socket *s)
   return 0;
 }
 
+/* called with lock on s held, takes over ownership of s struct */
 static void conn_close(struct flextcp_context *ctx, struct socket *s)
 {
   s->data.connection.status = SOC_CLOSED;
@@ -173,6 +174,7 @@ static void conn_close(struct flextcp_context *ctx, struct socket *s)
      *
      * TODO: send reset if data arrives after this */
   }
+  socket_unlock(s);
 }
 
 void flextcp_sockclose_finish(struct flextcp_context *ctx, struct socket *s)
