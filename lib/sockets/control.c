@@ -794,6 +794,8 @@ int tas_setsockopt(int sockfd, int level, int optname, const void *optval,
     /* ignore silently */
   } else if (level == SOL_SOCKET && optname == SO_KEEPALIVE) {
     /* ignore silently */
+  } else if (level == SOL_SOCKET && optname == SO_PRIORITY) {
+    /* ignore silently */
   } else if (level == IPPROTO_TCP && (optname == TCP_KEEPIDLE ||
        optname == TCP_KEEPINTVL || optname == TCP_KEEPCNT)) {
     /* ignore silently */
