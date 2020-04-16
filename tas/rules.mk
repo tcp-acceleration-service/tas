@@ -1,6 +1,6 @@
 include mk/subdir_pre.mk
 
-objs_top := tas.o config.o shm.o
+objs_top := tas.o config.o shm.o blocking.o
 objs_sp := kernel.o packetmem.o appif.o appif_ctx.o nicif.o cc.o tcp.o arp.o \
   routing.o kni.o
 objs_fp := fastemu.o network.o qman.o trace.o fast_kernel.o fast_appctx.o \

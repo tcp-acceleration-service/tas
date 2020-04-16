@@ -27,9 +27,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <arpa/inet.h>
-#include <utils_timeout.h>
 #include <utils.h>
-#include <tas_memif.h>
 #include <assert.h>
 #include <unistd.h>
 
@@ -80,18 +78,4 @@ void util_dump_mem(const void *mem, size_t len)
     fprintf(stderr, "%02x ", b[i]);
   }
   fprintf(stderr, "\n");
-}
-
-void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
-{
-  if(ts_us - ctx->last_ts > POLL_CYCLE) {
-    // Kick kernel
-    //fprintf(stderr, "kicking app/flexnic on %d in %p, &evfd: %p\n", ctx->evfd, ctx, &(ctx->evfd)); 
-    uint64_t val = 1;
-    int r = write(ctx->evfd, &val, sizeof(uint64_t));
-    
-	assert(r == sizeof(uint64_t));
-  }
-
-  ctx->last_ts = ts_us;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 University of Washington, Max Planck Institute for
+ * Copyright 2020 University of Washington, Max Planck Institute for
  * Software Systems, and The University of Texas at Austin
  *
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -22,47 +22,20 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef TAS_H_
-#define TAS_H_
+#include <assert.h>
+#include <unistd.h>
 
-#include <tas_memif.h>
-#include <config.h>
-#include <packet_defs.h>
+#include <tas.h>
 
-/** @addtogroup tas
- *  @brief TAS.
- */
+void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
+{
+  if(ts_us - ctx->last_ts > POLL_CYCLE) {
+    // Kick kernel
+    //fprintf(stderr, "kicking app/flexnic on %d in %p, &evfd: %p\n", ctx->evfd, ctx, &(ctx->evfd));
+    uint64_t val = 1;
+    int r = write(ctx->evfd, &val, sizeof(uint64_t));
+    assert(r == sizeof(uint64_t));
+  }
 
-extern struct configuration config;
-
-extern void *tas_shm;
-extern struct flextcp_pl_mem *fp_state;
-extern struct flexnic_info *tas_info;
-#if RTE_VER_YEAR < 19
-  extern struct ether_addr eth_addr;
-#else
-  extern struct rte_ether_addr eth_addr;
-#endif
-extern unsigned fp_cores_max;
-
-
-int slowpath_main(void);
-
-int shm_preinit(void);
-int shm_init(unsigned num);
-void shm_cleanup(void);
-void shm_set_ready(void);
-
-int network_init(unsigned num_threads);
-void network_cleanup(void);
-
-/* used by trace and shm */
-void *util_create_shmsiszed(const char *name, size_t size, void *addr);
-
-void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us);
-
-/* should become config options */
-#define FLEXNIC_INTERNAL_MEM_SIZE (1024 * 1024 * 32)
-#define FLEXNIC_NUM_QMQUEUES (128 * 1024)
-
-#endif /* ndef TAS_H_ */
+  ctx->last_ts = ts_us;
+}

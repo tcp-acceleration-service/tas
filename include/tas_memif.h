@@ -345,9 +345,6 @@ struct flextcp_pl_mem {
   uint8_t flow_group_steering[FLEXNIC_PL_MAX_FLOWGROUPS];
 } __attribute__((packed));
 
-
-void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us);
-
 /** @} */
 
 #endif /* ndef FLEXTCP_PLIF_H_ */
