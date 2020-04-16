@@ -116,14 +116,4 @@ static inline void arx_cache_add(struct dataplane_context *ctx, uint16_t ctx_id,
   ctx->arx_cache[id].msg.connupdate.flags = type_flags >> 8;
 }
 
-static inline void actx_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
-{
-  if(UNLIKELY(ts_us - ctx->last_ts > POLL_CYCLE)) {
-    notify_appctx(ctx, ts_us);
-    return;
-  }
-
-  ctx->last_ts = ts_us;
-}
-
 #endif /* ndef FASTEMU_H_ */

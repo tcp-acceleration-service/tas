@@ -614,7 +614,7 @@ static void arx_cache_flush(struct dataplane_context *ctx, uint32_t ts)
 
   for (i = 0; i < ctx->arx_num; i++) {
     actx = &fp_state->appctx[ctx->id][ctx->arx_ctx[i]];
-    actx_kick(actx, ts);
+    notify_appctx(actx, ts);
   }
 
   ctx->arx_num = 0;
