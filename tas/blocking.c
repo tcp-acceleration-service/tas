@@ -49,3 +49,30 @@ void notify_appctx(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
 {
   util_flexnic_kick(ctx, ts_us);
 }
+
+int notify_canblock(struct notify_blockstate *nbs, int had_data, uint32_t ts)
+{
+  if (had_data) {
+    /* not idle this round, reset everything */
+    nbs->can_block = nbs->second_bar = 0;
+    nbs->last_active_ts = ts;
+  } else if (nbs->second_bar) {
+    /* we can block now, reset afterwards */
+    nbs->can_block = nbs->second_bar = 0;
+    nbs->last_active_ts = ts;
+    return 1;
+  } else if (nbs->can_block && ts - nbs->last_active_ts > POLL_CYCLE) {
+    /* we've reached the poll cycle interval, so just poll once more */
+    nbs->second_bar = 1;
+  } else {
+    /* waiting for poll cycle interval */
+    nbs->can_block = 1;
+  }
+
+  return 0;
+}
+
+void notify_canblock_reset(struct notify_blockstate *nbs)
+{
+  nbs->can_block = nbs->second_bar = 0;
+}

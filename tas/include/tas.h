@@ -59,8 +59,16 @@ void network_cleanup(void);
 /* used by trace and shm */
 void *util_create_shmsiszed(const char *name, size_t size, void *addr);
 
+struct notify_blockstate {
+  uint32_t last_active_ts;
+  int can_block;
+  int second_bar;
+};
+
 void notify_fastpath_core(unsigned core, uint32_t ts);
 void notify_appctx(struct flextcp_pl_appctx *ctx, uint32_t ts_us);
+int notify_canblock(struct notify_blockstate *nbs, int had_data, uint32_t ts);
+void notify_canblock_reset(struct notify_blockstate *nbs);
 
 /* should become config options */
 #define FLEXNIC_INTERNAL_MEM_SIZE (1024 * 1024 * 32)
