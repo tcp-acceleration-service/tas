@@ -133,7 +133,7 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t queue,
       abort();
     }
 
-    notify_fastpath_core(new_core, ts);
+    notify_fastpath_core(new_core);
 
     ret = -1;
     goto unlock;

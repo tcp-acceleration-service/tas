@@ -48,15 +48,15 @@ static void notify_core(int cfd, uint32_t *last_ts, uint32_t ts_us,
   *last_ts = ts_us;
 }
 
-void notify_fastpath_core(unsigned core, uint32_t ts)
+void notify_fastpath_core(unsigned core)
 {
-  notify_core(fp_state->kctx[core].evfd, &fp_state->kctx[core].last_ts, ts,
-      tas_info->poll_cycle_tas);
+  notify_core(fp_state->kctx[core].evfd, &fp_state->kctx[core].last_ts,
+      util_timeout_time_us(), tas_info->poll_cycle_tas);
 }
 
-void notify_app_core(int appfd, uint32_t *last_ts, uint32_t ts_us)
+void notify_app_core(int appfd, uint32_t *last_ts)
 {
-  notify_core(appfd, last_ts, ts_us, tas_info->poll_cycle_app);
+  notify_core(appfd, last_ts, util_timeout_time_us(), tas_info->poll_cycle_app);
 }
 
 void notify_appctx(struct flextcp_pl_appctx *ctx, uint32_t ts_us)

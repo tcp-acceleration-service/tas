@@ -51,7 +51,7 @@ static int kin_req_scale(struct application *app, struct app_context *ctx,
 static void appif_ctx_kick(struct app_context *ctx)
 {
   assert(ctx->evfd != 0);
-  notify_app_core(ctx->evfd, &ctx->last_ts, util_timeout_time_us());
+  notify_app_core(ctx->evfd, &ctx->last_ts);
 }
 
 void appif_conn_opened(struct connection *c, int status)

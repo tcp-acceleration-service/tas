@@ -343,7 +343,7 @@ int nicif_connection_retransmit(uint32_t f_id, uint16_t flow_group)
   MEM_BARRIER();
   ktx->type = FLEXTCP_PL_KTX_CONNRETRAN;
 
-  notify_fastpath_core(core, util_timeout_time_us());
+  notify_fastpath_core(core);
 
   return 0;
 }
@@ -374,7 +374,7 @@ void nicif_tx_send(uint32_t opaque, int no_ts)
   ktx->type = (!no_ts ? FLEXTCP_PL_KTX_PACKET : FLEXTCP_PL_KTX_PACKET_NOTS);
   txq_tail[0] = opaque;
   
-  notify_fastpath_core(0, util_timeout_time_us());
+  notify_fastpath_core(0);
 }
 
 static int adminq_init(void)
