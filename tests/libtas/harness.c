@@ -41,7 +41,6 @@ struct harness {
 struct harness_params harness_param;
 struct harness harness;
 
-
 void harness_prepare(struct harness_params *hp)
 {
   size_t i, j;
@@ -294,7 +293,10 @@ int flexnic_driver_internal(void **int_mem_start)
 
 int flexnic_driver_connect(struct flexnic_info **p_info, void **p_mem_start)
 {
-  *p_info = NULL;
+  static struct flexnic_info info;
+  memset(&info, 0, sizeof(info));
+
+  *p_info = &info;
   /* hack: set mem start to 0 so we can just use pointers as offsets */
   *p_mem_start = (void *) 0;
   return 0;
