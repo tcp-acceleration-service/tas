@@ -119,7 +119,7 @@ static inline void arx_cache_add(struct dataplane_context *ctx, uint16_t ctx_id,
 static inline void actx_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
 {
   if(UNLIKELY(ts_us - ctx->last_ts > POLL_CYCLE)) {
-    util_flexnic_kick(ctx, ts_us);
+    notify_appctx(ctx, ts_us);
     return;
   }
 

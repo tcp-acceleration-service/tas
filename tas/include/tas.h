@@ -59,7 +59,8 @@ void network_cleanup(void);
 /* used by trace and shm */
 void *util_create_shmsiszed(const char *name, size_t size, void *addr);
 
-void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us);
+void notify_fastpath_core(unsigned core, uint32_t ts);
+void notify_appctx(struct flextcp_pl_appctx *ctx, uint32_t ts_us);
 
 /* should become config options */
 #define FLEXNIC_INTERNAL_MEM_SIZE (1024 * 1024 * 32)

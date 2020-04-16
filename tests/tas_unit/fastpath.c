@@ -59,9 +59,9 @@ int qman_set(struct qman_thread *t, uint32_t id, uint32_t rate, uint32_t avail,
   return 0;
 }
 
-void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
+void notify_fastpath_core(unsigned core, uint32_t ts_us)
 {
-  printf("util_flexnic_kick\n");
+  printf("notify_fastpath_core(%u)\n", core);
 }
 
 /* initialize basic flow state */

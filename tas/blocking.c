@@ -27,7 +27,7 @@
 
 #include <tas.h>
 
-void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
+static void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
 {
   if(ts_us - ctx->last_ts > POLL_CYCLE) {
     // Kick kernel
@@ -38,4 +38,14 @@ void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
   }
 
   ctx->last_ts = ts_us;
+}
+
+void notify_fastpath_core(unsigned core, uint32_t ts)
+{
+  util_flexnic_kick(&fp_state->kctx[core], ts);
+}
+
+void notify_appctx(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
+{
+  util_flexnic_kick(ctx, ts_us);
 }
