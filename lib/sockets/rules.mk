@@ -1,7 +1,7 @@
 include mk/subdir_pre.mk
 
 LIB_SOCKETS_OBJS = $(addprefix $(d)/, \
-  control.o transfer.o context.o manage_fd.o epoll.o libc.o)
+  control.o transfer.o context.o manage_fd.o epoll.o poll.o libc.o)
 LIB_SOCKETS_SOBJS := $(LIB_SOCKETS_OBJS:.o=.shared.o)
 
 LIB_SINT_OBJS = $(addprefix $(d)/,interpose.o)
