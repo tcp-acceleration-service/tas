@@ -276,17 +276,8 @@ static void *uxsocket_thread(void *arg)
       }
     }
 
-    // Send signal to self
-    static uint32_t __thread last_ts = 0;
-    uint32_t now = util_timeout_time_us();
-
-    if(now - last_ts > POLL_CYCLE) {
-      uint64_t val = 1;
-      int r = write(kernel_notifyfd, &val, sizeof(uint64_t));
-      assert(r == sizeof(uint64_t));
-    }
-
-    last_ts = now;
+    /* signal main slowpath thread */
+    notify_slowpath_core();
   }
 
   return NULL;
