@@ -69,7 +69,7 @@ static void conns_bump(struct flextcp_context *ctx) __attribute__((noinline));
 static void txq_probe(struct flextcp_context *ctx, unsigned n) __attribute__((noinline));
 
 void *flexnic_mem = NULL;
-static struct flexnic_info *flexnic_info = NULL;
+struct flexnic_info *flexnic_info = NULL;
 int flexnic_evfd[FLEXTCP_MAX_FTCPCORES];
 
 int flextcp_init(void)
@@ -497,7 +497,7 @@ static void flextcp_flexnic_kick(struct flextcp_context *ctx, int core)
 {
   uint32_t now = util_timeout_time_us();
 
-  if(now - ctx->queues[core].last_ts > POLL_CYCLE) {
+  if(now - ctx->queues[core].last_ts > flexnic_info->poll_cycle_tas) {
     // Kick
     uint64_t val = 1;
     int r = write(flexnic_evfd[core], &val, sizeof(uint64_t));
@@ -941,7 +941,9 @@ int flextcp_context_canwait(struct flextcp_context *ctx)
 
   if ((ctx->flags & CTX_FLAG_WANTWAIT) != 0) {
     /* in want wait state: just wait for grace period to be over */
-    if ((util_timeout_time_us() - ctx->last_inev_ts) > POLL_CYCLE) {
+    if ((util_timeout_time_us() - ctx->last_inev_ts) >
+        flexnic_info->poll_cycle_app)
+    {
       /* past grace period, move on to lastwait. clear polled flag, to make sure
        * it gets polled again before we clear lastwait. */
       ctx->flags &= ~(CTX_FLAG_POLL_CALLED | CTX_FLAG_WANTWAIT);

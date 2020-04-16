@@ -46,7 +46,7 @@ void flextcp_kernel_kick(void)
 
   /* fprintf(stderr, "kicking kernel?\n"); */
 
-  if(now - last_ts > POLL_CYCLE) {
+  if(now - last_ts > flexnic_info->poll_cycle_tas) {
     // Kick kernel
     /* fprintf(stderr, "kicking kernel\n"); */
     assert(kernel_evfd != 0);

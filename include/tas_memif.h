@@ -62,6 +62,10 @@ struct flexnic_info {
   uint64_t internal_mem_size;
   /** export mac address */
   uint64_t mac_address;
+  /** Cycles to poll before blocking for application */
+  uint32_t poll_cycle_app;
+  /** Cycles to poll before blocking for TAS */
+  uint32_t poll_cycle_tas;
   /** Number of queues in queue manager */
   uint32_t qmq_num;
   /** Number of cores in flexnic emulator */

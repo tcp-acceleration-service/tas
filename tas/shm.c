@@ -104,6 +104,8 @@ int shm_init(unsigned num)
   tas_info->qmq_num = FLEXNIC_NUM_QMQUEUES;
   tas_info->cores_num = num;
   tas_info->mac_address = 0;
+  tas_info->poll_cycle_app = config.fp_poll_interval_app;
+  tas_info->poll_cycle_tas = config.fp_poll_interval_tas;
 
   if (config.fp_hugepages)
     tas_info->flags |= FLEXNIC_FLAG_HUGEPAGES;

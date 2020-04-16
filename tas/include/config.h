@@ -123,6 +123,10 @@ struct configuration {
   uint32_t fp_hugepages;
   /** FP: enable vlan stripping */
   uint32_t fp_vlan_strip;
+  /** FP: polling interval for TAS */
+  uint32_t fp_poll_interval_tas;
+  /** FP: polling interval for app */
+  uint32_t fp_poll_interval_app;
   /** SP: kni interface name */
   char *kni_name;
   /** Ready signal fd */

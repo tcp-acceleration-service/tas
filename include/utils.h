@@ -35,8 +35,6 @@
 #define LIKELY(x) __builtin_expect((x),1)
 #define UNLIKELY(x) __builtin_expect((x),0)
 
-#define POLL_CYCLE	10000		// 10ms
-
 int util_parse_ipv4(const char *s, uint32_t *ip);
 int util_parse_mac(const char *s, uint64_t *mac);
 

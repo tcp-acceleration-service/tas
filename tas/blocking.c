@@ -32,11 +32,12 @@
 
 extern int kernel_notifyfd;
 
-static void notify_core(int cfd, uint32_t *last_ts, uint32_t ts_us)
+static void notify_core(int cfd, uint32_t *last_ts, uint32_t ts_us,
+    uint32_t delta)
 {
   uint64_t val;
 
-  if(ts_us - *last_ts > POLL_CYCLE) {
+  if(ts_us - *last_ts > delta) {
     val = 1;
     if (write(cfd, &val, sizeof(uint64_t)) != sizeof(uint64_t)) {
       perror("notify_core: write failed");
@@ -49,23 +50,25 @@ static void notify_core(int cfd, uint32_t *last_ts, uint32_t ts_us)
 
 void notify_fastpath_core(unsigned core, uint32_t ts)
 {
-  notify_core(fp_state->kctx[core].evfd, &fp_state->kctx[core].last_ts, ts);
+  notify_core(fp_state->kctx[core].evfd, &fp_state->kctx[core].last_ts, ts,
+      tas_info->poll_cycle_tas);
 }
 
 void notify_app_core(int appfd, uint32_t *last_ts, uint32_t ts_us)
 {
-  notify_core(appfd, last_ts, ts_us);
+  notify_core(appfd, last_ts, ts_us, tas_info->poll_cycle_app);
 }
 
 void notify_appctx(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
 {
-  notify_core(ctx->evfd, &ctx->last_ts, ts_us);
+  notify_core(ctx->evfd, &ctx->last_ts, ts_us, tas_info->poll_cycle_app);
 }
 
 void notify_slowpath_core(void)
 {
   static uint32_t __thread last_ts = 0;
-  notify_core(kernel_notifyfd, &last_ts, util_timeout_time_us());
+  notify_core(kernel_notifyfd, &last_ts, util_timeout_time_us(),
+      tas_info->poll_cycle_tas);
 }
 
 int notify_canblock(struct notify_blockstate *nbs, int had_data, uint32_t ts)
@@ -79,7 +82,9 @@ int notify_canblock(struct notify_blockstate *nbs, int had_data, uint32_t ts)
     nbs->can_block = nbs->second_bar = 0;
     nbs->last_active_ts = ts;
     return 1;
-  } else if (nbs->can_block && ts - nbs->last_active_ts > POLL_CYCLE) {
+  } else if (nbs->can_block &&
+      ts - nbs->last_active_ts > tas_info->poll_cycle_tas)
+  {
     /* we've reached the poll cycle interval, so just poll once more */
     nbs->second_bar = 1;
   } else {

@@ -57,6 +57,7 @@ enum conn_state {
 };
 
 extern void *flexnic_mem;
+extern struct flexnic_info *flexnic_info;
 extern int flexnic_evfd[FLEXTCP_MAX_FTCPCORES];
 
 int flextcp_kernel_connect(void);
