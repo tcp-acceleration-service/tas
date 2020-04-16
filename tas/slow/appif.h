@@ -52,7 +52,7 @@ struct app_context {
   struct app_doorbell *doorbell;
 
   int ready, evfd;
-  uint32_t last_ts;
+  uint64_t last_ts;
   struct app_context *next;
 
   struct {

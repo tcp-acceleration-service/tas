@@ -59,7 +59,7 @@ int qman_set(struct qman_thread *t, uint32_t id, uint32_t rate, uint32_t avail,
   return 0;
 }
 
-void notify_fastpath_core(unsigned core, uint32_t ts_us)
+void notify_fastpath_core(unsigned core)
 {
   printf("notify_fastpath_core(%u)\n", core);
 }

@@ -132,7 +132,7 @@ int slowpath_main(void)
       loadmon_ts = cur_ts;
     }
 
-    if (notify_canblock(&nbs, n != 0, cur_ts)) {
+    if (notify_canblock(&nbs, n != 0, util_rdtsc())) {
       slowpath_block(cur_ts);
       notify_canblock_reset(&nbs);
     }

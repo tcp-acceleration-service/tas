@@ -55,7 +55,8 @@
 
 
 static void dataplane_block(struct dataplane_context *ctx, uint32_t ts);
-static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
+static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
+    uint64_t tsc) __attribute__((noinline));
 static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)  __attribute__((noinline));
 static unsigned poll_kernel(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
 static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
@@ -72,7 +73,7 @@ static inline void tx_flush(struct dataplane_context *ctx);
 static inline void tx_send(struct dataplane_context *ctx,
     struct network_buf_handle *nbh, uint16_t off, uint16_t len);
 
-static void arx_cache_flush(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
+static void arx_cache_flush(struct dataplane_context *ctx, uint64_t tsc) __attribute__((noinline));
 
 int dataplane_init(void)
 {
@@ -159,7 +160,7 @@ void dataplane_loop(struct dataplane_context *ctx)
     ts = qman_timestamp(cyc);
 
     STATS_TS(start);
-    n += poll_rx(ctx, ts);
+    n += poll_rx(ctx, ts, cyc);
     STATS_TS(rx);
     tx_flush(ctx);
 
@@ -181,7 +182,7 @@ void dataplane_loop(struct dataplane_context *ctx)
       poll_scale(ctx);
 
     was_idle = (n == 0);
-    if (config.fp_interrupts && notify_canblock(&nbs, !was_idle, ts)) {
+    if (config.fp_interrupts && notify_canblock(&nbs, !was_idle, cyc)) {
       dataplane_block(ctx, ts);
       notify_canblock_reset(&nbs);
     }
@@ -252,7 +253,8 @@ void dataplane_dump_stats(void)
 }
 #endif
 
-static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts)
+static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
+    uint64_t tsc)
 {
   int ret;
   unsigned i, n;
@@ -307,7 +309,7 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts)
     }
   }
 
-  arx_cache_flush(ctx, ts);
+  arx_cache_flush(ctx, tsc);
 
   /* free received buffers */
   for (i = 0; i < n; i++) {
@@ -589,7 +591,7 @@ static void poll_scale(struct dataplane_context *ctx)
   fp_scale_to = 0;
 }
 
-static void arx_cache_flush(struct dataplane_context *ctx, uint32_t ts)
+static void arx_cache_flush(struct dataplane_context *ctx, uint64_t tsc)
 {
   uint16_t i;
   struct flextcp_pl_appctx *actx;
@@ -614,7 +616,7 @@ static void arx_cache_flush(struct dataplane_context *ctx, uint32_t ts)
 
   for (i = 0; i < ctx->arx_num; i++) {
     actx = &fp_state->appctx[ctx->id][ctx->arx_ctx[i]];
-    notify_appctx(actx, ts);
+    notify_appctx(actx, tsc);
   }
 
   ctx->arx_num = 0;

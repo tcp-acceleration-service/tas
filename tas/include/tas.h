@@ -60,16 +60,16 @@ void network_cleanup(void);
 void *util_create_shmsiszed(const char *name, size_t size, void *addr);
 
 struct notify_blockstate {
-  uint32_t last_active_ts;
+  uint64_t last_active_ts;
   int can_block;
   int second_bar;
 };
 
 void notify_fastpath_core(unsigned core);
-void notify_appctx(struct flextcp_pl_appctx *ctx, uint32_t ts_us);
-void notify_app_core(int appfd, uint32_t *last_ts);
+void notify_appctx(struct flextcp_pl_appctx *ctx, uint64_t tsc);
+void notify_app_core(int appfd, uint64_t *last_tsc);
 void notify_slowpath_core(void);
-int notify_canblock(struct notify_blockstate *nbs, int had_data, uint32_t ts);
+int notify_canblock(struct notify_blockstate *nbs, int had_data, uint64_t tsc);
 void notify_canblock_reset(struct notify_blockstate *nbs);
 
 /* should become config options */

@@ -495,7 +495,7 @@ int flextcp_context_tx_alloc(struct flextcp_context *ctx,
 
 static void flextcp_flexnic_kick(struct flextcp_context *ctx, int core)
 {
-  uint32_t now = util_timeout_time_us();
+  uint64_t now = util_rdtsc();
 
   if(now - ctx->queues[core].last_ts > flexnic_info->poll_cycle_tas) {
     // Kick
@@ -941,9 +941,7 @@ int flextcp_context_canwait(struct flextcp_context *ctx)
 
   if ((ctx->flags & CTX_FLAG_WANTWAIT) != 0) {
     /* in want wait state: just wait for grace period to be over */
-    if ((util_timeout_time_us() - ctx->last_inev_ts) >
-        flexnic_info->poll_cycle_app)
-    {
+    if ((util_rdtsc() - ctx->last_inev_ts) > flexnic_info->poll_cycle_app) {
       /* past grace period, move on to lastwait. clear polled flag, to make sure
        * it gets polled again before we clear lastwait. */
       ctx->flags &= ~(CTX_FLAG_POLL_CALLED | CTX_FLAG_WANTWAIT);
@@ -958,7 +956,7 @@ int flextcp_context_canwait(struct flextcp_context *ctx)
     }
   } else {
     /* not currently getting ready to wait, so start */
-    ctx->last_inev_ts = util_timeout_time_us();
+    ctx->last_inev_ts = util_rdtsc();
     ctx->flags |= CTX_FLAG_WANTWAIT;
   }
 

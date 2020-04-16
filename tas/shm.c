@@ -37,6 +37,7 @@
 #include <utils.h>
 #include <rte_config.h>
 #include <rte_malloc.h>
+#include <rte_cycles.h>
 
 #include <tas.h>
 #include <tas_memif.h>
@@ -53,6 +54,8 @@ static void *util_create_shmsiszed_huge(const char *name, size_t size,
 /* destroy shared huge page memory region */
 static void destroy_shm_huge(const char *name, size_t size, void *addr)
     __attribute__((used));
+/* convert microseconds to cycles */
+static uint64_t us_to_cycles(uint32_t us);
 
 /* Allocate DMA memory before DPDK grabs all huge pages */
 int shm_preinit(void)
@@ -104,8 +107,8 @@ int shm_init(unsigned num)
   tas_info->qmq_num = FLEXNIC_NUM_QMQUEUES;
   tas_info->cores_num = num;
   tas_info->mac_address = 0;
-  tas_info->poll_cycle_app = config.fp_poll_interval_app;
-  tas_info->poll_cycle_tas = config.fp_poll_interval_tas;
+  tas_info->poll_cycle_app = us_to_cycles(config.fp_poll_interval_app);
+  tas_info->poll_cycle_tas = us_to_cycles(config.fp_poll_interval_tas);
 
   if (config.fp_hugepages)
     tas_info->flags |= FLEXNIC_FLAG_HUGEPAGES;
@@ -237,3 +240,9 @@ static void destroy_shm_huge(const char *name, size_t size, void *addr)
   }
   unlink(path);
 }
+
+static uint64_t us_to_cycles(uint32_t us)
+{
+  return (rte_get_tsc_hz() * us) / 1000000;
+}
+

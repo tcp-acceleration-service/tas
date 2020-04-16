@@ -41,8 +41,8 @@ static int kernel_evfd = 0;
 
 void flextcp_kernel_kick(void)
 {
-  static uint32_t __thread last_ts = 0;
-  uint32_t now = util_timeout_time_us();
+  static uint64_t __thread last_ts = 0;
+  uint64_t now = util_rdtsc();
 
   /* fprintf(stderr, "kicking kernel?\n"); */
 

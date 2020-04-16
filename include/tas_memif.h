@@ -63,9 +63,9 @@ struct flexnic_info {
   /** export mac address */
   uint64_t mac_address;
   /** Cycles to poll before blocking for application */
-  uint32_t poll_cycle_app;
+  uint64_t poll_cycle_app;
   /** Cycles to poll before blocking for TAS */
-  uint32_t poll_cycle_tas;
+  uint64_t poll_cycle_tas;
   /** Number of queues in queue manager */
   uint32_t qmq_num;
   /** Number of cores in flexnic emulator */
@@ -212,9 +212,9 @@ struct flextcp_pl_appctx {
 
   /********************************************************/
   /* read-write fields */
+  uint64_t last_ts;
   uint32_t rx_head;
   uint32_t tx_head;
-  uint32_t last_ts;
   uint32_t rx_avail;
 } __attribute__((packed));
 

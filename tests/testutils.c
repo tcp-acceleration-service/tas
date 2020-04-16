@@ -64,7 +64,7 @@ int test_subcase(const char *name, void (*run)(void *), void *param)
         printf("  [passed]\n");
         return 0;
       } else {
-        printf("  [failed]\n");
+        printf("  [failed] %d %d\n", WIFEXITED(status), WEXITSTATUS(status));
         return -1;
       }
     } else {

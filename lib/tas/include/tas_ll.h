@@ -64,7 +64,8 @@ struct flextcp_context {
     uint32_t rxq_head;
     uint32_t txq_tail;
     uint32_t txq_avail;
-    uint32_t last_ts;
+    uint32_t _pad;
+    uint64_t last_ts;
   } queues[FLEXTCP_MAX_FTCPCORES];
 
   /* list of connections with pending updates for NIC */
@@ -80,7 +81,7 @@ struct flextcp_context {
   uint16_t next_queue;
 
   /* waiting */
-  uint32_t last_inev_ts;
+  uint64_t last_inev_ts;
   int evfd;
 };
 
