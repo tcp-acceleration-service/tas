@@ -51,18 +51,7 @@ static int kin_req_scale(struct application *app, struct app_context *ctx,
 static void appif_ctx_kick(struct app_context *ctx)
 {
   assert(ctx->evfd != 0);
-  uint32_t now = util_timeout_time_us();
-
-  /* fprintf(stderr, "kicking app context?\n"); */
-
-  if(now - ctx->last_ts > POLL_CYCLE) {
-    uint64_t val = 1;
-    /* fprintf(stderr, "kicking app context!\n"); */
-    int r = write(ctx->evfd, &val, sizeof(uint64_t));
-    assert(r == sizeof(uint64_t));
-  }
-
-  ctx->last_ts = now;
+  notify_app_core(ctx->evfd, &ctx->last_ts, util_timeout_time_us());
 }
 
 void appif_conn_opened(struct connection *c, int status)

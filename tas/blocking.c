@@ -52,6 +52,11 @@ void notify_fastpath_core(unsigned core, uint32_t ts)
   notify_core(fp_state->kctx[core].evfd, &fp_state->kctx[core].last_ts, ts);
 }
 
+void notify_app_core(int appfd, uint32_t *last_ts, uint32_t ts_us)
+{
+  notify_core(appfd, last_ts, ts_us);
+}
+
 void notify_appctx(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
 {
   notify_core(ctx->evfd, &ctx->last_ts, ts_us);
