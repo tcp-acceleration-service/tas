@@ -26,6 +26,9 @@
 #include <unistd.h>
 
 #include <tas.h>
+#include <utils_timeout.h>
+
+extern int kernel_notifyfd;
 
 static void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
 {
@@ -48,6 +51,23 @@ void notify_fastpath_core(unsigned core, uint32_t ts)
 void notify_appctx(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
 {
   util_flexnic_kick(ctx, ts_us);
+}
+
+void notify_slowpath_core(void)
+{
+  static uint32_t __thread last_ts = 0;
+  uint32_t now = util_timeout_time_us();
+
+  if(now - last_ts > POLL_CYCLE) {
+    // Kick kernel
+    /* fprintf(stderr, "kicking kernel\n"); */
+    assert(kernel_notifyfd != 0);
+    uint64_t val = 1;
+    int r = write(kernel_notifyfd, &val, sizeof(uint64_t));
+    assert(r == sizeof(uint64_t));
+  }
+
+  last_ts = now;
 }
 
 int notify_canblock(struct notify_blockstate *nbs, int had_data, uint32_t ts)

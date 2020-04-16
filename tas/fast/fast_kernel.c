@@ -27,13 +27,11 @@
 #include <rte_config.h>
 
 #include <tas_memif.h>
-#include <utils_timeout.h>
 
 #include "internal.h"
 #include "fastemu.h"
 #include "tcp_common.h"
 
-extern int kernel_notifyfd;
 
 static inline void inject_tcp_ts(void *buf, uint16_t len, uint32_t ts,
     struct network_buf_handle *nbh);
@@ -97,25 +95,6 @@ int fast_kernel_poll(struct dataplane_context *ctx,
   return ret;
 }
 
-static void fast_kernel_kick(void)
-{
-  static uint32_t __thread last_ts = 0;
-  uint32_t now = util_timeout_time_us();
-
-  /* fprintf(stderr, "kicking kernel?\n"); */
-
-  if(now - last_ts > POLL_CYCLE) {
-    // Kick kernel
-    /* fprintf(stderr, "kicking kernel\n"); */
-    assert(kernel_notifyfd != 0);
-    uint64_t val = 1;
-    int r = write(kernel_notifyfd, &val, sizeof(uint64_t));
-    assert(r == sizeof(uint64_t));
-  }
-
-  last_ts = now;
-}
-
 void fast_kernel_packet(struct dataplane_context *ctx,
     struct network_buf_handle *nbh)
 {
@@ -155,7 +134,7 @@ void fast_kernel_packet(struct dataplane_context *ctx,
 
   /* krx queue header */
   krx->type = FLEXTCP_PL_KRX_PACKET;
-  fast_kernel_kick();
+  notify_slowpath_core();
 }
 
 static inline void inject_tcp_ts(void *buf, uint16_t len, uint32_t ts,
