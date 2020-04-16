@@ -72,13 +72,16 @@ struct flextcp_context {
   struct flextcp_connection *bump_pending_last;
 
   /* other */
+  uint32_t flags;
   uint16_t db_id;
   uint16_t ctx_id;
 
   uint16_t num_queues;
   uint16_t next_queue;
 
-  int epfd, evfd;
+  /* waiting */
+  uint32_t last_inev_ts;
+  int evfd;
 };
 
 /** TCP listening "socket". (opaque) */
@@ -236,7 +239,39 @@ int flextcp_context_create(struct flextcp_context *ctx);
 int flextcp_context_poll(struct flextcp_context *ctx, int num,
     struct flextcp_event *events);
 
-void flextcp_block(struct flextcp_context *ctx, int timeout_ms);
+/**
+ * Get file descriptor for waiting on events in this context. Note that blocking
+ * is only allowed after `flextcp_context_canwait` indicates this. After waking
+ * up, canwait has to be called again before blocking again.
+ *
+ * @return file descriptor for waiting on. Remains constant during lifetime of
+ * context. <0 on error.
+ */
+int flextcp_context_waitfd(struct flextcp_context *ctx);
+
+/**
+ * Indicates whether the caller is allowed to block on the wait file descriptor
+ * on this context after this call returns.
+ *
+ * @return 0 if wait is allowed, -1 otherwise.
+ */
+int flextcp_context_canwait(struct flextcp_context *ctx);
+
+/**
+ * Clear events off of waitfd after waking up. Does not process any events any
+ * events, just reads the count off the internal eventfd.
+ *
+ * @return 0 on success, -1 otherwise
+ */
+void flextcp_context_waitclear(struct flextcp_context *ctx);
+
+/**
+ * Waits for events for up to timeout_ms milliseconds. Is not guaranteed to
+ * block, but only does so when flextcp_context_canwait returns 0.
+ *
+ * @return 0 if we waited, -1 otherwise.
+ */
+int flextcp_context_wait(struct flextcp_context *ctx, int timeout_ms);
 
 /*****************************************************************************/
 /* Regular TCP connection management */

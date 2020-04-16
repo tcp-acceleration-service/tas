@@ -26,7 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/epoll.h>
+#include <poll.h>
 #include <sys/eventfd.h>
 #include <unistd.h>
 #include <signal.h>
@@ -72,33 +72,6 @@ void *flexnic_mem = NULL;
 static struct flexnic_info *flexnic_info = NULL;
 int flexnic_evfd[FLEXTCP_MAX_FTCPCORES];
 
-void flextcp_block(struct flextcp_context *ctx, int timeout_ms)
-{
-  assert(ctx->evfd != 0);
-  /* fprintf(stderr, "[%d] idle - timeout %d ms\n", ctx->ctx_id, timeout_ms); */
-  struct epoll_event event[1];
-  int n;
-again:
-  n = epoll_wait(ctx->epfd, event, 1, timeout_ms);
-  if(n == -1) {
-    if(errno == EINTR) {
-      // XXX: To support attaching GDB
-      goto again;
-    }
-    fprintf(stderr, "[%d] errno = %d\n", ctx->ctx_id, errno);
-  }
-  assert(n != -1);
-  /* fprintf(stderr, "[%d] busy - %u events, kout head = %u\n", ctx->ctx_id, n, ctx->kout_head); */
-  for(int i = 0; i < n; i++) {
-    assert(event[i].data.fd == ctx->evfd);
-
-    uint64_t val;
-    /* fprintf(stderr, "[%d] - woken up by event FD = %d\n", ctx->ctx_id, event[i].data.fd); */
-    int r = read(ctx->evfd, &val, sizeof(uint64_t));
-    assert(r == sizeof(uint64_t));
-  }
-}
-
 int flextcp_init(void)
 {
   if (flextcp_kernel_connect() != 0) {
@@ -127,19 +100,11 @@ int flextcp_context_create(struct flextcp_context *ctx)
     return -1;
   }
 
-  ctx->evfd = eventfd(0, 0);
-  assert(ctx->evfd != -1);
-
-  struct epoll_event ev = {
-    .events = EPOLLIN,
-    .data.fd = ctx->evfd,
-  };
-
-  ctx->epfd = epoll_create1(0);
-  assert(ctx->epfd != -1);
-
-  int r = epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->evfd, &ev);
-  assert(r == 0);
+  ctx->evfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+  if (ctx->evfd < 0) {
+    perror("flextcp_context_create: eventfd for waiting fd failed");
+    return -1;
+  }
 
   return flextcp_kernel_newctx(ctx);
 }
@@ -186,6 +151,7 @@ static int kernel_poll(struct flextcp_context *ctx, int num,
           type, pos, ctx->kout_len);
       abort();
     }
+    ctx->flags |= CTX_FLAG_POLL_EVENTS;
 
     if (j == -1) {
       break;
@@ -231,6 +197,7 @@ static int fastpath_poll(struct flextcp_context *ctx, int num,
       } else {
         fprintf(stderr, "flextcp_context_poll: kout type=%u head=%x\n", arx->type, head);
       }
+      ctx->flags |= CTX_FLAG_POLL_EVENTS;
 
       if (j == -1) {
         ran_out = 1;
@@ -472,6 +439,8 @@ static int fastpath_poll_vec(struct flextcp_context *ctx, int num,
       util_prefetch0(arx);
       q = (q + 1 < ctx->num_queues ? q + 1 : 0);
     }
+
+    ctx->flags |= CTX_FLAG_POLL_EVENTS;
   }
 
   *used = i;
@@ -485,6 +454,8 @@ int flextcp_context_poll(struct flextcp_context *ctx, int num,
   int i, j;
 
   i = 0;
+
+  ctx->flags |= CTX_FLAG_POLL_CALLED;
 
   /* prefetch queues */
   uint32_t k, q;
@@ -941,4 +912,91 @@ static void conns_bump(struct flextcp_context *ctx)
     }
     ctx->bump_pending_first = c->bump_next;
   }
+}
+
+int flextcp_context_waitfd(struct flextcp_context *ctx)
+{
+  return ctx->evfd;
+}
+
+int flextcp_context_canwait(struct flextcp_context *ctx)
+{
+  /* At a high level this code implements a state machine that ensures that at
+   * least POLL_CYCLE time has elapsed between two unsuccessfull poll calls.
+   * This is a bit messier because we don't want to move any of the timestamp
+   * code into the poll call and make it more expensive for apps that don't
+   * block. Instead we use the timing of calls to canwait along with flags that
+   * the poll call sets when it's called and when it finds events.
+   */
+
+  /* if there were events found in the last poll, it's back to square one. */
+  if ((ctx->flags & CTX_FLAG_POLL_EVENTS) != 0) {
+    ctx->flags &= ~(CTX_FLAG_POLL_EVENTS | CTX_FLAG_WANTWAIT |
+        CTX_FLAG_LASTWAIT);
+
+    return -1;
+  }
+
+  /* from here on we know that there are no events */
+
+  if ((ctx->flags & CTX_FLAG_WANTWAIT) != 0) {
+    /* in want wait state: just wait for grace period to be over */
+    if ((util_timeout_time_us() - ctx->last_inev_ts) > POLL_CYCLE) {
+      /* past grace period, move on to lastwait. clear polled flag, to make sure
+       * it gets polled again before we clear lastwait. */
+      ctx->flags &= ~(CTX_FLAG_POLL_CALLED | CTX_FLAG_WANTWAIT);
+      ctx->flags |= CTX_FLAG_LASTWAIT;
+    }
+  } else if ((ctx->flags & CTX_FLAG_LASTWAIT) != 0) {
+    /* in last wait state */
+    if ((ctx->flags & CTX_FLAG_POLL_CALLED) != 0) {
+      /* if we have polled once more after the grace period, we're good to go to
+       * sleep */
+      return 0;
+    }
+  } else {
+    /* not currently getting ready to wait, so start */
+    ctx->last_inev_ts = util_timeout_time_us();
+    ctx->flags |= CTX_FLAG_WANTWAIT;
+  }
+
+  return -1;
+}
+
+void flextcp_context_waitclear(struct flextcp_context *ctx)
+{
+  ssize_t ret;
+  uint64_t val;
+
+  ret = read(ctx->evfd, &val, sizeof(uint64_t));
+  if ((ret >= 0 && ret != sizeof(uint64_t)) ||
+      (ret < 0 && errno != EAGAIN && errno != EWOULDBLOCK))
+  {
+    perror("flextcp_context_waitclear: read failed");
+    abort();
+  }
+
+  ctx->flags &= ~(CTX_FLAG_WANTWAIT | CTX_FLAG_LASTWAIT | CTX_FLAG_POLL_CALLED);
+}
+
+int flextcp_context_wait(struct flextcp_context *ctx, int timeout_ms)
+{
+  struct pollfd pfd;
+  int ret;
+
+  if (flextcp_context_canwait(ctx) != 0) {
+    return -1;
+  }
+
+  pfd.fd = ctx->evfd;
+  pfd.events = POLLIN;
+  pfd.revents = 0;
+  ret = poll(&pfd, 1, timeout_ms);
+  if (ret < 0) {
+    perror("flextcp_context_wait: poll returned error");
+    return -1;
+  }
+
+  flextcp_context_waitclear(ctx);
+  return 0;
 }

@@ -31,7 +31,6 @@
 #include <sys/epoll.h>
 #include <dlfcn.h>
 #include <utils.h>
-#include <utils_timeout.h>
 
 #include <tas_sockets.h>
 #include "internal.h"
@@ -240,10 +239,6 @@ again:
     nevents = flextcp_sockctx_poll_n(ctx, maxevents);
     epoll_lock(ep);
 
-    static uint32_t __thread startwait = 0;
-    if (LIKELY(nevents != 0))
-        startwait = 0;
-
     num_active = ep->num_active;
     for (i = 0; i < num_active && n < maxevents; i++) {
       es = ep->active_first;
@@ -271,20 +266,13 @@ again:
     // Block thread if nothing received for a while
     if (nevents == 0 && n == 0 && timeout != 0) {
       uint64_t cur_ms = get_msecs();
-      if (timeout == -1 || mtimeout < cur_ms) {
-        uint32_t cur_ts = util_timeout_time_us();
-
-        if(startwait == 0) {
-          startwait = cur_ts;
-        } else if(cur_ts - startwait >= POLL_CYCLE) {
-          // Idle -- wait for data from apps/flexnic
-          epoll_unlock(ep);
-          flextcp_block(ctx, cur_ms - mtimeout);
-          epoll_lock(ep);
-          // Gotta check again now that we woke up
-          startwait = 0;
-          goto again;
-        }
+      if ((timeout == -1 || mtimeout < cur_ms) &&
+          flextcp_context_canwait(ctx) == 0)
+      {
+        epoll_unlock(ep);
+        flextcp_context_wait(ctx, (timeout == -1 ? -1 : cur_ms - mtimeout));
+        epoll_lock(ep);
+        goto again;
       }
     }
   } while (n == 0 && timeout != 0 && (timeout == -1 || mtimeout < get_msecs()));
