@@ -30,7 +30,6 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <poll.h>
-#include <time.h>
 #include <dlfcn.h>
 #include <utils.h>
 #include <utils_timeout.h>
@@ -49,7 +48,6 @@ static inline void es_deactivate(struct epoll_socket *es);
 static inline void es_active_pushback(struct epoll_socket *es);
 static inline void es_remove_ep(struct epoll_socket *es);
 static inline void es_remove_sock(struct epoll_socket *es);
-static inline uint64_t get_msecs(void);
 static inline uint32_t events_epoll2poll(uint32_t epoll_event);
 
 
@@ -677,20 +675,6 @@ static inline void es_remove_sock(struct epoll_socket *es)
   if (es->so_next != NULL) {
     es->so_next->so_prev = es->so_prev;
   }
-}
-
-static inline uint64_t get_msecs(void)
-{
-  int ret;
-  struct timespec ts;
-
-  ret = clock_gettime(CLOCK_MONOTONIC, &ts);
-  if (ret != 0) {
-    perror("flextcp get_msecs: clock_gettime failed\n");
-    abort();
-  }
-
-  return ts.tv_sec * 1000ULL + (ts.tv_nsec / 1000000ULL);
 }
 
 static inline uint32_t events_epoll2poll(uint32_t epoll_event)

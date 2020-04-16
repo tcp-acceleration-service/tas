@@ -26,8 +26,11 @@
 #define INTERNAL_H_
 
 #include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
+#include <time.h>
 #include <poll.h>
 #include <netinet/in.h>
 
@@ -203,5 +206,20 @@ static inline void epoll_unlock(struct epoll *ep)
 {
   util_spin_unlock(&ep->sp_lock);
 }
+
+static inline uint64_t get_msecs(void)
+{
+  int ret;
+  struct timespec ts;
+
+  ret = clock_gettime(CLOCK_MONOTONIC, &ts);
+  if (ret != 0) {
+    perror("flextcp get_msecs: clock_gettime failed\n");
+    abort();
+  }
+
+  return ts.tv_sec * 1000ULL + (ts.tv_nsec / 1000000ULL);
+}
+
 
 #endif /* ndef INTERNAL_H_ */
