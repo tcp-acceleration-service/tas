@@ -22,6 +22,8 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <unistd.h>
 
@@ -30,44 +32,35 @@
 
 extern int kernel_notifyfd;
 
-static void util_flexnic_kick(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
+static void notify_core(int cfd, uint32_t *last_ts, uint32_t ts_us)
 {
-  if(ts_us - ctx->last_ts > POLL_CYCLE) {
-    // Kick kernel
-    //fprintf(stderr, "kicking app/flexnic on %d in %p, &evfd: %p\n", ctx->evfd, ctx, &(ctx->evfd));
-    uint64_t val = 1;
-    int r = write(ctx->evfd, &val, sizeof(uint64_t));
-    assert(r == sizeof(uint64_t));
+  uint64_t val;
+
+  if(ts_us - *last_ts > POLL_CYCLE) {
+    val = 1;
+    if (write(cfd, &val, sizeof(uint64_t)) != sizeof(uint64_t)) {
+      perror("notify_core: write failed");
+      abort();
+    }
   }
 
-  ctx->last_ts = ts_us;
+  *last_ts = ts_us;
 }
 
 void notify_fastpath_core(unsigned core, uint32_t ts)
 {
-  util_flexnic_kick(&fp_state->kctx[core], ts);
+  notify_core(fp_state->kctx[core].evfd, &fp_state->kctx[core].last_ts, ts);
 }
 
 void notify_appctx(struct flextcp_pl_appctx *ctx, uint32_t ts_us)
 {
-  util_flexnic_kick(ctx, ts_us);
+  notify_core(ctx->evfd, &ctx->last_ts, ts_us);
 }
 
 void notify_slowpath_core(void)
 {
   static uint32_t __thread last_ts = 0;
-  uint32_t now = util_timeout_time_us();
-
-  if(now - last_ts > POLL_CYCLE) {
-    // Kick kernel
-    /* fprintf(stderr, "kicking kernel\n"); */
-    assert(kernel_notifyfd != 0);
-    uint64_t val = 1;
-    int r = write(kernel_notifyfd, &val, sizeof(uint64_t));
-    assert(r == sizeof(uint64_t));
-  }
-
-  last_ts = now;
+  notify_core(kernel_notifyfd, &last_ts, util_timeout_time_us());
 }
 
 int notify_canblock(struct notify_blockstate *nbs, int had_data, uint32_t ts)
