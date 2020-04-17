@@ -90,7 +90,8 @@ int socket(int domain, int type, int protocol)
   ensure_init();
 
   /* if not a TCP socket, pass call to libc */
-  if (domain != AF_INET || type != SOCK_STREAM) {
+  if (domain != AF_INET ||
+      (type & ~(SOCK_NONBLOCK | SOCK_CLOEXEC)) != SOCK_STREAM) {
     return libc_socket(domain, type, protocol);
   }
 
