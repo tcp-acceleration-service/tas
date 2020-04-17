@@ -55,7 +55,7 @@ static inline void event_kappin_st_conn_closed(
     struct kernel_appin_status *inev, struct flextcp_event *outev);
 
 static inline int event_arx_connupdate(struct flextcp_context *ctx,
-    struct flextcp_pl_arx_connupdate *inev,
+    volatile struct flextcp_pl_arx_connupdate *inev,
     struct flextcp_event *outevs, int outn, uint16_t fn_core);
 
 static int kernel_poll(struct flextcp_context *ctx, int num,
@@ -177,7 +177,7 @@ static int fastpath_poll(struct flextcp_context *ctx, int num,
     struct flextcp_event *events, int *used)
 {
   int i, j, ran_out;
-  struct flextcp_pl_arx *arx_q, *arx;
+  volatile struct flextcp_pl_arx *arx_q, *arx;
   uint32_t head;
   uint16_t k;
 
@@ -185,7 +185,8 @@ static int fastpath_poll(struct flextcp_context *ctx, int num,
   for (k = 0; k < ctx->num_queues && i < num; k++) {
     ran_out = 0;
 
-    arx_q = (struct flextcp_pl_arx *) ctx->queues[ctx->next_queue].rxq_base;
+    arx_q = (volatile struct flextcp_pl_arx *)
+      ctx->queues[ctx->next_queue].rxq_base;
     head = ctx->queues[ctx->next_queue].rxq_head;
     for (; i < num;) {
       j = 0;
@@ -321,14 +322,14 @@ static int fastpath_poll_vec(struct flextcp_context *ctx, int num,
     struct flextcp_event *events, int *used)
 {
   int i, j, ran_out, found, found_inner;
-  struct flextcp_pl_arx *arx;
+  volatile struct flextcp_pl_arx *arx;
   uint32_t head;
   uint16_t l, k, q;
   uint8_t t;
   uint8_t types[ctx->num_queues];
   uint32_t qheads[ctx->num_queues];
 
-  struct flextcp_pl_arx *arxs[num];
+  volatile struct flextcp_pl_arx *arxs[num];
   uint8_t arx_qs[num];
 
   for (q = 0; q < ctx->num_queues; q++) {
@@ -362,7 +363,8 @@ static int fastpath_poll_vec(struct flextcp_context *ctx, int num,
         qs -= 4;
       }
       while (qs > 0) {
-        arx = (struct flextcp_pl_arx *) (ctx->queues[q].rxq_base + qheads[q]);
+        arx = (volatile struct flextcp_pl_arx *)
+          (ctx->queues[q].rxq_base + qheads[q]);
         q = (q + 1 < ctx->num_queues ? q + 1 : 0);
         types[k] = arx->type;
         k++;
@@ -372,8 +374,8 @@ static int fastpath_poll_vec(struct flextcp_context *ctx, int num,
       /* prefetch connection state for all entries */
       for (k = 0, q = ctx->next_queue; k < ctx->num_queues && i + l < num; k++) {
         if (types[k] == FLEXTCP_PL_ARX_CONNUPDATE) {
-          arx = (struct flextcp_pl_arx *) (ctx->queues[q].rxq_base +
-              qheads[q]);
+          arx = (volatile struct flextcp_pl_arx *)
+            (ctx->queues[q].rxq_base + qheads[q]);
           util_prefetch0(OPAQUE_PTR(arx->msg.connupdate.opaque) + 64);
           util_prefetch0(OPAQUE_PTR(arx->msg.connupdate.opaque));
 
@@ -691,8 +693,8 @@ static inline void event_kappin_st_conn_closed(
 }
 
 static inline int event_arx_connupdate(struct flextcp_context *ctx,
-    struct flextcp_pl_arx_connupdate *inev, struct flextcp_event *outevs,
-    int outn, uint16_t fn_core)
+    volatile struct flextcp_pl_arx_connupdate *inev,
+    struct flextcp_event *outevs, int outn, uint16_t fn_core)
 {
   struct flextcp_connection *conn;
   uint32_t rx_bump, rx_len, tx_bump, tx_sent;
