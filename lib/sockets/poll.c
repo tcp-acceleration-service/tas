@@ -92,8 +92,8 @@ again:
       flextcp_fd_srelease(p->fd, s);
 
       if ((p->events & ~(POLLIN | POLLPRI | POLLOUT | POLLRDHUP | POLLERR |
-              POLLHUP | POLLRDNORM | POLLWRNORM | POLLNVAL)) != 0)
-      {
+              POLLHUP | POLLRDNORM | POLLWRNORM | POLLNVAL | POLLRDBAND |
+              POLLWRBAND | POLLERR)) != 0) {
         errno = EINVAL;
         fprintf(stderr, "tas_pselect: unsupported fd flags (%x)\n", p->events);
         return -1;
