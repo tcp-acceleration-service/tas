@@ -955,7 +955,7 @@ int flextcp_context_canwait(struct flextcp_context *ctx)
        * sleep */
       return 0;
     }
-  } else {
+  } else if ((ctx->flags & CTX_FLAG_POLL_CALLED) != 0) {
     /* not currently getting ready to wait, so start */
     ctx->last_inev_ts = util_rdtsc();
     ctx->flags |= CTX_FLAG_WANTWAIT;
