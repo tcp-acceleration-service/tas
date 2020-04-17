@@ -269,7 +269,7 @@ out:
 int tas_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
   struct socket *s;
-  int ret = 0;
+  int ret = 0, block;
   struct sockaddr_in *sin = (struct sockaddr_in *) addr;
   struct flextcp_context *ctx;
 
@@ -328,8 +328,12 @@ int tas_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     goto out;
   } else {
     /* if this is blocking, wait for connection to complete */
+    block = 0;
     do {
       socket_unlock(s);
+      if (block)
+        flextcp_context_wait(ctx, -1);
+      block = 1;
       flextcp_sockctx_poll(ctx);
       socket_lock(s);
     } while (s->data.connection.status == SOC_CONNECTING);
@@ -351,7 +355,7 @@ int tas_listen(int sockfd, int backlog)
 {
   struct socket *s;
   struct flextcp_context *ctx;
-  int ret = 0;
+  int ret = 0, block;
   uint32_t flags = 0;
 
   if (flextcp_fd_slookup(sockfd, &s) != 0) {
@@ -401,8 +405,12 @@ int tas_listen(int sockfd, int backlog)
   s->data.listener.pending = NULL;
 
   /* wait for listen to complete */
+  block = 0;
   do {
     socket_unlock(s);
+    if (block)
+      flextcp_context_wait(ctx, -1);
+    block = 1;
     flextcp_sockctx_poll(ctx);
     socket_lock(s);
   } while (s->data.listener.status == SOL_OPENING);
@@ -426,7 +434,7 @@ int tas_accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
   struct socket *s, *ns;
   struct flextcp_context *ctx;
   struct socket_pending *sp, *spp;
-  int ret = 0, nonblock = 0, newfd;
+  int ret = 0, nonblock = 0, newfd, block;
 
   if (flextcp_fd_slookup(sockfd, &s) != 0) {
     errno = EBADF;
@@ -528,10 +536,14 @@ int tas_accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
       goto out;
     } else {
       /* if this is blocking, wait for connection to complete */
+      block = 0;
       do {
         socket_unlock(ns);
         socket_unlock(s);
+        if (block)
+          flextcp_context_wait(ctx, -1);
         flextcp_sockctx_poll(ctx);
+        block = 1;
         socket_lock(s);
         socket_lock(ns);
       } while (ns->data.connection.status == SOC_CONNECTING);
@@ -913,7 +925,7 @@ int tas_move_conn(int sockfd)
 
 int tas_sock_move(struct socket *s)
 {
-  int ret;
+  int ret, block;
   struct flextcp_context *ctx;
 
   /* if not connection or not currently connected then there is no peername */
@@ -937,8 +949,12 @@ int tas_sock_move(struct socket *s)
     return -1;
   }
 
+  block = 0;
   do {
     socket_unlock(s);
+    if (block)
+      flextcp_context_wait(ctx, -1);
+    block = 1;
     flextcp_sockctx_poll(ctx);
     socket_lock(s);
   } while (s->data.connection.move_status == INT_MIN);
