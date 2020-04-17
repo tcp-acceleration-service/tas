@@ -154,6 +154,9 @@ struct epoll_socket {
 
 struct sockets_context {
   struct flextcp_context ctx;
+
+  struct pollfd *pollfds_cache;
+  size_t pollfds_cache_size;
 };
 
 int flextcp_fd_init(void);
