@@ -433,7 +433,7 @@ int tas_accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
   struct socket *s, *ns;
   struct flextcp_context *ctx;
   struct socket_pending *sp, *spp;
-  int ret = 0, nonblock = 0, newfd, block;
+  int ret = 0, nonblock = 0, cloexec = 0, newfd, block;
 
   if (flextcp_fd_slookup(sockfd, &s) != 0) {
     errno = EBADF;
@@ -443,6 +443,9 @@ int tas_accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
   /* validate flags */
   if ((flags & SOCK_NONBLOCK) == SOCK_NONBLOCK) {
     nonblock = 1;
+  }
+  if ((flags & SOCK_CLOEXEC) == SOCK_CLOEXEC) {
+    cloexec = 1;
   }
 
   flags &= ~(SOCK_NONBLOCK | SOCK_CLOEXEC);
@@ -484,7 +487,7 @@ int tas_accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
     }
 
     ns->type = SOCK_CONNECTION;
-    ns->flags = (nonblock ? SOF_NONBLOCK : 0);
+    ns->flags = (nonblock ? SOF_NONBLOCK : 0) | (cloexec ? SOF_CLOEXEC : 0);
     ns->data.connection.status = SOC_CONNECTING;
     ns->data.connection.listener = s;
     ns->data.connection.rx_len_1 = 0;
