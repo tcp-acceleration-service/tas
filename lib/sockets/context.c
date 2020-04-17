@@ -57,12 +57,12 @@ static inline void ev_conn_txclosed(struct flextcp_context *ctx,
 static inline void ev_conn_closed(struct flextcp_context *ctx,
     struct flextcp_event *ev);
 
-static __thread struct flextcp_context *local_context;
+static __thread struct sockets_context *local_context;
 static pthread_mutex_t context_init_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-struct flextcp_context *flextcp_sockctx_get(void)
+struct sockets_context *flextcp_sockctx_getfull(void)
 {
-  struct flextcp_context *ctx = local_context;
+  struct sockets_context *ctx = local_context;
   int ret;
 
   if (ctx == NULL) {
@@ -72,7 +72,7 @@ struct flextcp_context *flextcp_sockctx_get(void)
     }
 
     pthread_mutex_lock(&context_init_mutex);
-    ret = flextcp_context_create(ctx);
+    ret = flextcp_context_create(&ctx->ctx);
     pthread_mutex_unlock(&context_init_mutex);
     if (ret != 0) {
       fprintf(stderr, "flextcp socket flextcp_sockctx_get: flextcp_context_create "
@@ -84,6 +84,12 @@ struct flextcp_context *flextcp_sockctx_get(void)
   }
 
   return ctx;
+
+}
+
+struct flextcp_context *flextcp_sockctx_get(void)
+{
+  return &flextcp_sockctx_getfull()->ctx;
 }
 
 int flextcp_sockctx_poll(struct flextcp_context *ctx)

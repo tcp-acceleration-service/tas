@@ -152,6 +152,10 @@ struct epoll_socket {
   uint8_t active;
 };
 
+struct sockets_context {
+  struct flextcp_context ctx;
+};
+
 int flextcp_fd_init(void);
 int flextcp_fd_salloc(struct socket **ps);
 int flextcp_fd_ealloc(struct epoll **pe, int fd);
@@ -161,6 +165,7 @@ void flextcp_fd_srelease(int fd, struct socket *s);
 void flextcp_fd_erelease(int fd, struct epoll *ep);
 void flextcp_fd_close(int fd);
 
+struct sockets_context *flextcp_sockctx_getfull(void);
 struct flextcp_context *flextcp_sockctx_get(void);
 int flextcp_sockctx_poll(struct flextcp_context *ctx);
 int flextcp_sockctx_poll_n(struct flextcp_context *ctx, unsigned n);
