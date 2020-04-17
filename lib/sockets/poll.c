@@ -82,6 +82,7 @@ again:
 
       if (flextcp_fd_slookup(p->fd, &s) != 0) {
         /* this is a linux fd */
+        p->revents = 0;
         nfds_linux++;
         continue;
       }
