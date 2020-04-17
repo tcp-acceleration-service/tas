@@ -32,18 +32,84 @@
 #include <tas_sockets.h>
 #include "internal.h"
 
+#define SELECT_POLLIN_SET (POLLRDNORM | POLLRDBAND | POLLIN | POLLHUP | POLLERR)
+#define SELECT_POLLOUT_SET (POLLWRBAND | POLLWRNORM | POLLOUT | POLLERR)
+#define SELECT_POLLEX_SET (POLLPRI)
+
 static inline uint32_t events_epoll2poll(uint32_t epoll_event);
 static int pollfd_cache_alloc(struct sockets_context *ctx, size_t n);
 static int pollfd_cache_prepare(struct sockets_context *ctx, struct pollfd *fds,
     nfds_t nfds, nfds_t num_linuxfds);
+static int selectfd_cache_alloc(struct sockets_context *ctx, size_t n);
 
 
 int tas_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     struct timeval *timeout)
 {
-  assert(!"NYI");
-  errno = ENOTSUP;
-  return -1;
+  struct sockets_context *ctx;
+  struct pollfd *p;
+  int fd, fd_r, fd_w, fd_e, ret, t;
+  nfds_t i, n = 0;
+
+  ctx = flextcp_sockctx_getfull();
+
+  if (selectfd_cache_alloc(ctx, nfds) != 0) {
+    errno = ENOMEM;
+    return -1;
+  }
+
+  for (fd = 0; fd < nfds; fd++) {
+    p = &ctx->selectfds_cache[n];
+
+    fd_r = readfds != NULL && FD_ISSET(fd, readfds);
+    fd_w = writefds != NULL && FD_ISSET(fd, writefds);
+    fd_e = exceptfds != NULL && FD_ISSET(fd, exceptfds);
+
+    if (fd_r || fd_w || fd_e) {
+      p->fd = fd;
+      p->revents = 0;
+      p->events = 0;
+      n++;
+    }
+
+    if (fd_r)
+      p->events |= SELECT_POLLIN_SET;
+    if (fd_w)
+      p->events |= SELECT_POLLOUT_SET;
+    if (fd_e)
+      p->events |= SELECT_POLLEX_SET;
+  }
+
+  if (timeout == NULL) {
+    t = -1;
+  } else {
+    t = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
+  }
+
+  ret = tas_poll(ctx->selectfds_cache, n, t);
+
+  if (ret < 0)
+    return ret;
+
+  if (readfds != NULL)
+    FD_ZERO(readfds);
+  if (writefds != NULL)
+    FD_ZERO(writefds);
+  if (exceptfds != NULL)
+    FD_ZERO(exceptfds);
+
+  for (i = 0; i < n; i++) {
+    p = &ctx->selectfds_cache[i];
+
+    if ((p->revents & SELECT_POLLIN_SET) != 0 && readfds != NULL)
+      FD_SET(p->fd, readfds);
+    if ((p->revents & SELECT_POLLOUT_SET) != 0 && writefds != NULL)
+      FD_SET(p->fd, writefds);
+    if ((p->revents & SELECT_POLLEX_SET) != 0 && exceptfds != NULL)
+      FD_SET(p->fd, exceptfds);
+  }
+
+  return ret;
 }
 
 int tas_pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
@@ -290,5 +356,34 @@ static int pollfd_cache_prepare(struct sockets_context *ctx, struct pollfd *fds,
   ctx->pollfds_cache[num_linux].events = POLLIN;
   ctx->pollfds_cache[num_linux].revents= 0;
 
+  return 0;
+}
+
+/* make sure that ctx->selectfds_cache can hold at least n entries */
+static int selectfd_cache_alloc(struct sockets_context *ctx, size_t n)
+{
+  void *ptr;
+  size_t size, cnt = ctx->selectfds_cache_size;
+
+  if (cnt >= n) {
+    return 0;
+  }
+
+  /* set initial size to 16 */
+  if (cnt == 0)
+    cnt = 16;
+
+  /* double size till we have enough to keep it a power of 2 */
+  while (cnt < n)
+    cnt *= 2;
+
+  size = cnt * sizeof(struct pollfd);
+  if ((ptr = realloc(ctx->selectfds_cache, size)) == NULL) {
+    perror("selectfd_cache_alloc: alloc failed");
+    return -1;
+  }
+
+  ctx->selectfds_cache = ptr;
+  ctx->selectfds_cache_size = cnt;
   return 0;
 }

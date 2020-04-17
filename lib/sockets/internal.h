@@ -157,6 +157,9 @@ struct sockets_context {
 
   struct pollfd *pollfds_cache;
   size_t pollfds_cache_size;
+
+  struct pollfd *selectfds_cache;
+  size_t selectfds_cache_size;
 };
 
 int flextcp_fd_init(void);
