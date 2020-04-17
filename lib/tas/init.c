@@ -320,7 +320,7 @@ static inline void fetch_4ts(struct flextcp_context *ctx, uint32_t *heads,
 static int fastpath_poll_vec(struct flextcp_context *ctx, int num,
     struct flextcp_event *events, int *used)
 {
-  int i, j, ran_out, found;
+  int i, j, ran_out, found, found_inner;
   struct flextcp_pl_arx *arx;
   uint32_t head;
   uint16_t l, k, q;
@@ -340,8 +340,8 @@ static int fastpath_poll_vec(struct flextcp_context *ctx, int num,
   q = ctx->next_queue;
   while (i < num && !ran_out) {
     l = 0;
-    for (found = 1; found && i + l < num; ) {
-      found = 0;
+    for (found_inner = 1; found_inner && i + l < num; ) {
+      found_inner = 0;
 
       /* fetch types from all n queues */
       uint16_t qs = ctx->num_queues;
@@ -380,7 +380,7 @@ static int fastpath_poll_vec(struct flextcp_context *ctx, int num,
           arxs[l] = arx;
           arx_qs[l] = q;
           l++;
-          found = 1;
+          found_inner = 1;
 
           qheads[q] = qheads[q] + sizeof(*arx);
           if (qheads[q] >= ctx->rxq_len) {
@@ -411,6 +411,8 @@ static int fastpath_poll_vec(struct flextcp_context *ctx, int num,
             arx->type, head);
       }
 
+      found = 1;
+
       if (j == -1) {
         ran_out = 1;
         break;
@@ -425,7 +427,6 @@ static int fastpath_poll_vec(struct flextcp_context *ctx, int num,
         head -= ctx->rxq_len;
       }
       ctx->queues[q].rxq_head = head;
-      found = 1;
     }
     q = (q + 1 < ctx->num_queues ? q + 1 : 0);
   }
