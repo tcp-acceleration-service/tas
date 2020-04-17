@@ -33,7 +33,9 @@
  * @brief Application library for TAS lowlevel interface.
  * @{ */
 
+#include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h>
 
 #define FLEXTCP_MAX_CONTEXTS 32
 #define FLEXTCP_MAX_FTCPCORES 16
