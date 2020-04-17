@@ -85,7 +85,6 @@ int tas_socket(int domain, int type, int protocol)
   flextcp_epoll_sockinit(s);
 
   if (nonblock) {
-    fprintf(stderr, "socket set to nonblock\n");
     s->flags |= SOF_NONBLOCK;
   }
   if (cloexec) {
