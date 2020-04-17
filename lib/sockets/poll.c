@@ -61,8 +61,8 @@ int tas_poll(struct pollfd *fds, nfds_t nfds, int timeout)
   struct pollfd *p;
   nfds_t nfds_linux, nfds_tas, i;
   uint32_t s_events;
-  int ret, active_fds = 0, mixed_events = 0, j;
-  uint64_t mtimeout = 0;
+  int ret, active_fds, mixed_events = 0, j, block_ms;
+  uint64_t mtimeout = 0, cur_ts;
   int first = 1;
 
   ctx = flextcp_sockctx_getfull();
@@ -71,9 +71,11 @@ int tas_poll(struct pollfd *fds, nfds_t nfds, int timeout)
     mtimeout = get_msecs() + timeout;
 
   do {
+again:
     flextcp_sockctx_poll_n(&ctx->ctx, nfds);
 
     nfds_linux = nfds_tas = 0;
+    active_fds = 0;
     /* first process any tas fds */
     for (i = 0; i < nfds; i++) {
       p = &fds[i];
@@ -101,11 +103,24 @@ int tas_poll(struct pollfd *fds, nfds_t nfds, int timeout)
         active_fds++;
     }
 
+    /* if we have TAS fds, calculate how long we can block for */
+    block_ms = 0;
+    if (nfds_tas > 0 && active_fds == 0 && mixed_events == 0 && timeout != 0) {
+      if (timeout == -1) {
+        block_ms = -1;
+      } else {
+        cur_ts = get_msecs();
+        if (cur_ts < mtimeout) {
+          block_ms = mtimeout - cur_ts;
+        }
+      }
+    }
+
     /* now look at linux fds */
     if (nfds_linux > 0 && nfds_tas == 0) {
       /* only linux, this is the easy case -> just call into linux */
       return tas_libc_poll(fds, nfds, timeout);
-    } else if (nfds_linux > 0) {
+    } else if (nfds_linux > 0 && mixed_events == 0) {
       /* mixed tas and linux, this is annoying as we need to separate out linux
        * fds */
 
@@ -119,13 +134,39 @@ int tas_poll(struct pollfd *fds, nfds_t nfds, int timeout)
         first = 0;
       }
 
-      ret = tas_libc_poll(ctx->pollfds_cache, nfds_linux, 0);
-      if (ret < 0) {
-        perror("tas_poll: mixed poll, linux poll failed");
-        return -1;
-      }
+      if (block_ms == 0 || flextcp_context_canwait(&ctx->ctx) != 0) {
+        /* we're not blocking */
+        ret = tas_libc_poll(ctx->pollfds_cache, nfds_linux, 0);
+        if (ret < 0) {
+          perror("tas_poll: mixed poll, linux poll failed");
+          return -1;
+        }
 
-      mixed_events += ret;
+        mixed_events = ret;
+      } else {
+        /* we're blocking */
+        ret = tas_libc_poll(ctx->pollfds_cache, nfds_linux + 1, block_ms);
+        if (ret < 0) {
+          perror("tas_poll: mixed poll, linux poll failed");
+          return -1;
+        }
+
+        /* check if the TAS ctx fd is active */
+        if (ret > 0 && ctx->pollfds_cache[nfds_linux].revents != 0) {
+          /* ctx fd is active */
+          flextcp_context_waitclear(&ctx->ctx);
+          mixed_events = ret - 1;
+
+          /* and here we go poll the TAS fds again, regardless of whether we
+           * have linux events or not */
+          goto again;
+        } else {
+          mixed_events = ret;
+        }
+      }
+    } else if (nfds_tas > 0 && nfds_linux == 0 && block_ms != 0) {
+      /* just tas fds, can block if needed */
+      flextcp_context_wait(&ctx->ctx, block_ms);
     }
   } while (active_fds == 0 && mixed_events == 0 && timeout != 0 &&
       (timeout == -1 || get_msecs() < mtimeout));
@@ -214,7 +255,7 @@ static int pollfd_cache_alloc(struct sockets_context *ctx, size_t n)
 }
 
 /* copy subset of linux fds from fds to pollfd cache. check that number matches
- * num_linuxfds_confirm */
+ * num_linuxfds_confirm. also adds TAS wait fd as last entry. */
 static int pollfd_cache_prepare(struct sockets_context *ctx, struct pollfd *fds,
     nfds_t nfds, nfds_t num_linuxfds_confirm)
 {
@@ -222,7 +263,7 @@ static int pollfd_cache_prepare(struct sockets_context *ctx, struct pollfd *fds,
   struct pollfd *p;
   nfds_t i, num_linux = 0;
 
-  if (pollfd_cache_alloc(ctx, num_linuxfds_confirm) != 0)
+  if (pollfd_cache_alloc(ctx, num_linuxfds_confirm + 1) != 0)
     return -1;
 
   /* copy linux fds to pollfds_cache */
@@ -243,6 +284,10 @@ static int pollfd_cache_prepare(struct sockets_context *ctx, struct pollfd *fds,
     ctx->pollfds_cache[num_linux] = *p;
     num_linux++;
   }
+
+  ctx->pollfds_cache[num_linux].fd = flextcp_context_waitfd(&ctx->ctx);
+  ctx->pollfds_cache[num_linux].events = POLLIN;
+  ctx->pollfds_cache[num_linux].revents= 0;
 
   return 0;
 }
