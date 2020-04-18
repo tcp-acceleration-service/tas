@@ -91,22 +91,30 @@ int tas_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
   if (ret < 0)
     return ret;
 
-  if (readfds != NULL)
-    FD_ZERO(readfds);
-  if (writefds != NULL)
-    FD_ZERO(writefds);
-  if (exceptfds != NULL)
-    FD_ZERO(exceptfds);
-
   for (i = 0; i < n; i++) {
     p = &ctx->selectfds_cache[i];
+    fd = p->fd;
 
-    if ((p->revents & SELECT_POLLIN_SET) != 0 && readfds != NULL)
-      FD_SET(p->fd, readfds);
-    if ((p->revents & SELECT_POLLOUT_SET) != 0 && writefds != NULL)
-      FD_SET(p->fd, writefds);
-    if ((p->revents & SELECT_POLLEX_SET) != 0 && exceptfds != NULL)
-      FD_SET(p->fd, exceptfds);
+    if (readfds != NULL && FD_ISSET(fd, readfds)) {
+      if ((p->revents & SELECT_POLLIN_SET) != 0)
+        FD_SET(fd, readfds);
+      else
+        FD_CLR(fd, readfds);
+    }
+
+    if (writefds != NULL && FD_ISSET(fd, writefds)) {
+      if ((p->revents & SELECT_POLLOUT_SET) != 0)
+        FD_SET(fd, writefds);
+      else
+        FD_CLR(fd, writefds);
+    }
+
+    if (exceptfds != NULL && FD_ISSET(fd, exceptfds)) {
+      if ((p->revents & SELECT_POLLEX_SET) != 0)
+        FD_SET(fd, exceptfds);
+      else
+        FD_CLR(fd, exceptfds);
+    }
   }
 
   return ret;
