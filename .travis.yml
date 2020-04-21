@@ -10,6 +10,7 @@ env:
 cache:
   directories:
     - $HOME/dpdk/
+    - tests/distfiles/
 install:
 - /bin/bash .travis-install.sh
 script:
