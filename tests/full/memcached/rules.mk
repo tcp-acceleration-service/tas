@@ -85,14 +85,14 @@ $(ft_memcached_bin): $(ft_memcached_build) $(ft_memcached_lev_dep)
 tests-full: $(ft_memcached_bin) $(ft_memcached_lm_bin)
 
 # Here memcached runs in TAS and the client on Linux
-run-tests-full-memcached-server: $(ft_memcached_bin) $(ft_memcached_lm_bin) $(FTWRAP) lib/libtas_interpose.so
+run-tests-full-memcached-server: $(ft_memcached_bin) $(ft_memcached_lm_bin) test-full-wrapdeps
 	$(FTWRAP) -d 1000 \
 		-P '$(ft_memcached_bin) -U 0 -u root' \
 		-c '$(ft_memcached_lm_bin) -s $$TAS_IP -t 10s \
 		      -F $(ft_memcached_dir)/memaslap.cnf'
 
 # Here the client runs in Linux
-run-tests-full-memcached-client: $(ft_memcached_bin) $(ft_memcached_lm_bin) $(FTWRAP) lib/libtas_interpose.so
+run-tests-full-memcached-client: $(ft_memcached_bin) $(ft_memcached_lm_bin) test-full-wrapdeps
 	$(FTWRAP) -d 1000 \
 		-C '$(ft_memcached_bin) -U 0 -u root' \
 		-p '$(ft_memcached_lm_bin) -s $$LINUX_IP -t 10s \
