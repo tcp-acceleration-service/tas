@@ -278,6 +278,11 @@ static inline void ev_conn_received(struct flextcp_context *ctx,
 
   socket_lock(s);
 
+  if (s->data.connection.status == SOC_CLOSED) {
+    /* ignore data on socket we have already closed */
+    goto out;
+  }
+
   assert(s->type == SOCK_CONNECTION);
   assert(s->data.connection.status == SOC_CONNECTED);
 
@@ -314,6 +319,7 @@ static inline void ev_conn_received(struct flextcp_context *ctx,
 
   flextcp_epoll_set(s, EPOLLIN);
 
+out:
   socket_unlock(s);
 }
 
