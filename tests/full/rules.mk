@@ -13,7 +13,7 @@ FULLTESTS := \
 tests/full/%.o: CPPFLAGS+=-Ilib/tas/include
 tests/full/tas_linux: tests/full/tas_linux.o tests/full/fulltest.o lib/libtas.so
 
-tests: $(FULLTESTS)
+tests-full: $(FULLTESTS) $(FTWRAP)
 
 $(FTWRAP): $(FTWRAP_OBJS)
 
@@ -33,6 +33,6 @@ include $(dir)/rules.mk
 DEPS += $(FULLTEST_OBJS:.o=.d) $(FTWRAP_OBJS:.o=.d)
 CLEAN += $(FULLTEST_OBJS) $(FTWRAP_OBJS) $(FULLTESTS) $(FTWRAP)
 
-.PHONY: run-tests-full run-tests-full-simple
+.PHONY: tests-full run-tests-full run-tests-full-simple
 
 include mk/subdir_post.mk

@@ -82,6 +82,8 @@ $(ft_memcached_bin): $(ft_memcached_build) $(ft_memcached_lev_dep)
 
 ###################################
 
+tests-full: $(ft_memcached_bin) $(ft_memcached_lm_bin)
+
 # Here memcached runs in TAS and the client on Linux
 run-tests-full-memcached-server: $(ft_memcached_bin) $(ft_memcached_lm_bin) $(FTWRAP) lib/libtas_interpose.so
 	$(FTWRAP) -d 1000 \
