@@ -30,6 +30,8 @@ TESTS := $(TESTS_NONE) $(TESTS_LIBTAS) $(TESTS_SOCKETS) $(TESTS_AUTO)
 TEST_OBJS := $(addsuffix .o, $(TESTS)) \
   tests/testutils.o tests/libtas/harness.o
 
+TEST_DISTFILES := tests/distfiles
+
 #########################
 
 dir := $(d)/full
@@ -72,6 +74,7 @@ run-tests: $(TESTS_AUTO)
 
 DEPS += $(TEST_OBJS:.o=.d)
 CLEAN += $(TEST_OBJS) $(TESTS)
+DISTCLEAN += $(TEST_DISTFILES)
 
 .PHONY: tests run-tests
 

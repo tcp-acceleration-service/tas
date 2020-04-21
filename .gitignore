@@ -19,10 +19,7 @@ tests/libtas/tas_sockets
 tests/tas_unit/fastpath
 tests/full/tas_linux
 tests/full/wrapper
-tests/full/memcached/libevent-*
-tests/full/memcached/libmemcached-*
-tests/full/memcached/memcached-*
-tests/full/memcached/prefix/
+tests/distfiles
 tracetool
 statetool
 scaletool
