@@ -284,34 +284,7 @@ static inline void ev_conn_received(struct flextcp_context *ctx,
   buf = ev->ev.conn_received.buf;
   len = ev->ev.conn_received.len;
 
-  /* static size_t all_received = 0; */
-
-  /* all_received += len; */
-
-  /* if(all_received > 1048000) { */
-  /*   fprintf(stderr, "%s: payload at %p = \n", HOSTNAME, (void *)(buf - flexnic_mem)); */
-  /*   uint8_t *payload = buf; */
-  /*   for(int i = 0; i < len; i++) { */
-  /*     if(i % 16 == 0) { */
-  /* 	printf("\n%08X  ", i); */
-  /*     } */
-  /*     if(i % 4 == 0) { */
-  /* 	printf(" "); */
-  /*     } */
-  /*     printf("%02X ", payload[i]); */
-  /*   } */
-  /*   printf("\n"); */
-  /* } */
-
-  /* if(len < 1024) { */
-  /*   fprintf(stderr, "%s ev_conn_received len = %zu\n", HOSTNAME, len); */
-  /* } */
-
   if (s->data.connection.rx_len_1 == 0) {
-    /* if(all_received > 1048000) { */
-    /*   fprintf(stderr, "%s: reset buffers\n", HOSTNAME); */
-    /* } */
-
     /* no data currently ready on socket */
     s->data.connection.rx_len_1 = len;
     s->data.connection.rx_buf_1 = buf;
@@ -319,18 +292,11 @@ static inline void ev_conn_received(struct flextcp_context *ctx,
   } else if (s->data.connection.rx_len_2 == 0 && buf ==
       (uint8_t *) s->data.connection.rx_buf_1 + s->data.connection.rx_len_1)
   {
-    /* if(all_received > 1048000) { */
-    /*   fprintf(stderr, "%s: appending to buffer 1\n", HOSTNAME); */
-    /* } */
-
     /* append to previous location 1 */
     s->data.connection.rx_len_1 += len;
   } else if (buf ==
       (uint8_t *) s->data.connection.rx_buf_2 + s->data.connection.rx_len_2)
   {
-    /* if(all_received > 1048000) { */
-    /*   fprintf(stderr, "%s: appending to buffer 2\n", HOSTNAME); */
-    /* } */
     /* append to previous location 2 */
     s->data.connection.rx_len_2 += len;
   } else {
@@ -341,10 +307,6 @@ static inline void ev_conn_received(struct flextcp_context *ctx,
           "buffer pieces, this should not happen\n");
       abort();
     }
-
-    /* if(all_received > 1048000) { */
-    /*   fprintf(stderr, "%s: resetting buffer 2\n", HOSTNAME); */
-    /* } */
 
     s->data.connection.rx_len_2 = len;
     s->data.connection.rx_buf_2 = buf;
