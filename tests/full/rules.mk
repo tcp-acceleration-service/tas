@@ -30,6 +30,9 @@ run-tests-full: run-tests-full-simple
 dir := $(d)/memcached
 include $(dir)/rules.mk
 
+dir := $(d)/redis
+include $(dir)/rules.mk
+
 #########################
 
 DEPS += $(FULLTEST_OBJS:.o=.d) $(FTWRAP_OBJS:.o=.d)
