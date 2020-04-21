@@ -23,6 +23,13 @@ run-tests-full-simple: $(FULLTESTS) tas/tas
 
 run-tests-full: run-tests-full-simple
 
+#########################
+
+dir := $(d)/memcached
+include $(dir)/rules.mk
+
+#########################
+
 DEPS += $(FULLTEST_OBJS:.o=.d) $(FTWRAP_OBJS:.o=.d)
 CLEAN += $(FULLTEST_OBJS) $(FTWRAP_OBJS) $(FULLTESTS) $(FTWRAP)
 
