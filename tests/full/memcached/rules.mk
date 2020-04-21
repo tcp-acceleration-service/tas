@@ -72,6 +72,7 @@ $(ft_memcached_tar):
 # Extract memcached tarball
 $(ft_memcached_build): $(ft_memcached_tar)
 	tar xf $< -C $(ft_memcached_parentdir)
+	touch $@
 
 # Build memcached
 $(ft_memcached_bin): $(ft_memcached_build) $(ft_memcached_lev_dep)
