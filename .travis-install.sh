@@ -1,7 +1,7 @@
 #!/bin/bash
 
 sudo apt-get update -qq
-sudo apt-get install -qq libnuma-dev libpcap-dev linux-headers-`uname -r`
+sudo apt-get install -qq libnuma-dev libpcap-dev linux-headers-`uname -r` gdb
 
 instdir=${HOME}/dpdk/${DPDK_VER}
 

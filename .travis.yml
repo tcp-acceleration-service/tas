@@ -13,6 +13,12 @@ cache:
     - tests/distfiles/
 install:
 - /bin/bash .travis-install.sh
+before_script:
+- mkdir /tmp/cores
+- sudo sysctl -w kernel.core_pattern="/tmp/cores/core.%e.%p.%t"
+- ulimit -c unlimited -S # enable core dumps
 script:
 - make all RTE_SDK=${HOME}/dpdk/${DPDK_VER}
 - make run-tests run-tests-full RTE_SDK=${HOME}/dpdk/${DPDK_VER}
+after_failure:
+- /bin/bash .travis-postmortem.sh
