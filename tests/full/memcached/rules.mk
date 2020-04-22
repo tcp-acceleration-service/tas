@@ -52,7 +52,7 @@ $(ft_memcached_lm_bin): $(ft_memcached_lm_build) $(ft_memcached_lev_dep)
 	  ./configure --enable-memaslap --disable-dtrace \
 	    --enable-static --disable-shared \
 	    --prefix=$(ft_memcached_prefix) CXXFLAGS=-fpermissive \
-	    CPPFLAGS=-I$(ft_memcached_prefix)/include \
+	    CPPFLAGS='-I$(ft_memcached_prefix)/include -DSIGSEGV_NO_AUTO_INIT'\
 	    LDFLAGS=-L$(ft_memcached_prefix)/lib
 	$(MAKE) -C $(ft_memcached_lm_build) install
 
