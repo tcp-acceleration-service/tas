@@ -525,9 +525,11 @@ int dup3(int oldfd, int newfd, int flags)
  */
 long syscall(long number, ...)
 {
-  int ret;
+  long ret;
   va_list val;
   long arg1, arg2, arg3, arg4, arg5, arg6;
+
+  ensure_init();
 
   /* pray to god that this is safe on X86-64... */
   va_start(val, number);
