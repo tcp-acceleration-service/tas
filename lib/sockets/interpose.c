@@ -171,16 +171,13 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
   return ret;
 }
 
-int fcntl(int sockfd, int cmd, ...)
+static int vfcntl(int sockfd, int cmd, va_list val)
 {
   int ret, arg_i;
   void *arg_p;
-  va_list val;
-  ensure_init();
 
   /* this is pretty ugly, but unfortunately there is no other way to interpose
    * on variadic functions and pass along all arguments. */
-  va_start(val, cmd);
   switch (cmd) {
     /* these take no argument */
     case F_GETFD:
@@ -245,6 +242,19 @@ int fcntl(int sockfd, int cmd, ...)
       ret = -1;
       break;
   }
+
+  return ret;
+
+}
+
+int fcntl(int sockfd, int cmd, ...)
+{
+  int ret;
+  va_list val;
+  ensure_init();
+
+  va_start(val, cmd);
+  ret = vfcntl(sockfd, cmd, val);
   va_end(val);
 
   return ret;
