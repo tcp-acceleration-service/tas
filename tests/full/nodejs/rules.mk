@@ -26,7 +26,8 @@ $(ft_nodejs_build): $(ft_nodejs_tar)
 $(ft_nodejs_server): $(ft_nodejs_build)
 	cd $(ft_nodejs_build) && ./configure \
 	  --prefix=$(abspath $(ft_nodejs_prefix)) \
-	  --v8-non-optimized-debug --without-ssl --without-npm
+	  --v8-non-optimized-debug --without-ssl --without-npm \
+	  --debug-node
 	$(MAKE) -C $(ft_nodejs_build) install
 
 # Generate tas-specific config file
@@ -48,6 +49,7 @@ $(ft_nodejs_wrk_build):
 	rm -rf $@
 	git clone --depth 1 https://github.com/giltene/wrk2.git $@
 	cd $@ && git checkout $(ft_nodejs_wrk_ver)
+	sed -i -s 's/CFLAGS *:=.*/\0 -g/' $(ft_nodejs_wrk_build)/Makefile
 
 $(ft_nodejs_client): $(ft_nodejs_wrk_build)
 	$(MAKE) -C $(ft_nodejs_wrk_build)

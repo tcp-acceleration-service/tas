@@ -26,7 +26,7 @@ $(ft_memcached_lev_build): $(ft_memcached_lev_tar)
 $(ft_memcached_lev_dep): $(ft_memcached_lev_build)
 	cd $(ft_memcached_lev_build) && \
 	  ./configure --disable-openssl --prefix=$(ft_memcached_prefix) \
-	    --enable-static --disable-shared
+	    --enable-static --disable-shared CFLAGS='-g' LDFLAGS='-g'
 	$(MAKE) -C $(ft_memcached_lev_build) install
 
 ###################################
@@ -51,8 +51,9 @@ $(ft_memcached_lm_bin): $(ft_memcached_lm_build) $(ft_memcached_lev_dep)
 	cd $(ft_memcached_lm_build) && \
 	  ./configure --enable-memaslap --disable-dtrace \
 	    --enable-static --disable-shared \
-	    --prefix=$(ft_memcached_prefix) CXXFLAGS=-fpermissive \
-	    CPPFLAGS='-I$(ft_memcached_prefix)/include -DSIGSEGV_NO_AUTO_INIT'\
+	    --prefix=$(ft_memcached_prefix) CXXFLAGS='-g -fpermissive' \
+	    CFLAGS='-g -fpermissive' \
+	    CPPFLAGS='-g -I$(ft_memcached_prefix)/include -DSIGSEGV_NO_AUTO_INIT'\
 	    LDFLAGS=-L$(ft_memcached_prefix)/lib
 	$(MAKE) -C $(ft_memcached_lm_build) install
 
@@ -78,7 +79,8 @@ $(ft_memcached_build): $(ft_memcached_tar)
 $(ft_memcached_bin): $(ft_memcached_build) $(ft_memcached_lev_dep)
 	cd $(ft_memcached_build) && \
 	  ./configure --disable-docs --prefix=$(ft_memcached_prefix) \
-	      --with-libevent=$(ft_memcached_prefix)
+	      --with-libevent=$(ft_memcached_prefix) \
+	      CFLAGS='-g' LDFLAGS='-g'
 	$(MAKE) -C $(ft_memcached_build) install
 
 ###################################
