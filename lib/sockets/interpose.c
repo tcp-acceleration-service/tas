@@ -710,6 +710,7 @@ static void init(void)
   libc_sendmsg = bind_symbol("sendmsg");
   libc_writev = bind_symbol("writev");
   libc_pwrite = bind_symbol("pwrite");
+  libc_sendfile = bind_symbol("sendfile");
   libc_syscall = bind_symbol("syscall");
 
   if (tas_init() != 0) {
