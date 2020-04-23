@@ -215,6 +215,12 @@ static int run_child(int (*tas_entry)(void *), int (*linux_entry)(void *),
   pid = fork();
   if (pid == 0) {
     /* in child */
+
+    if (mount("tmpfs", "/dev/shm", "tmpfs", 0, "") != 0) {
+      perror("mounting /dev/shm failed");
+      return 1;
+    }
+
     umask(0022);
 
     /* start tas */
