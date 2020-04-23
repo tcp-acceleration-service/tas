@@ -30,6 +30,7 @@
 #include <dlfcn.h>
 #include <pthread.h>
 #include <sys/select.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -84,6 +85,7 @@ static ssize_t (*libc_pwrite)(int sockfd, const void *buf, size_t count,
     off_t offset) = NULL;
 static ssize_t (*libc_sendfile)(int sockfd, int in_fd, off_t *offset,
     size_t len) = NULL;
+static long (*libc_syscall)(long num, ...) = NULL;
 
 int socket(int domain, int type, int protocol)
 {
@@ -516,6 +518,155 @@ int dup3(int oldfd, int newfd, int flags)
   return tas_dup3(oldfd, newfd, flags);
 }
 
+/* I really apologize to anyone reading this particular piece of code.
+ * So apparently there is code out there that calls some socket calls directly
+ * with syscall (nodejs being one example). In this case these get past our
+ * interposition layer and break things.
+ */
+long syscall(long number, ...)
+{
+  int ret;
+  va_list val;
+  long arg1, arg2, arg3, arg4, arg5, arg6;
+
+  /* pray to god that this is safe on X86-64... */
+  va_start(val, number);
+  arg1 = va_arg(val, long);
+  arg2 = va_arg(val, long);
+  arg3 = va_arg(val, long);
+  arg4 = va_arg(val, long);
+  arg5 = va_arg(val, long);
+  arg6 = va_arg(val, long);
+  va_end(val);
+
+  switch (number) {
+    case SYS_socket:
+      return socket((int) arg1, (int) arg2, (int) arg3);
+    case SYS_close:
+      return close((int) arg1);
+    case SYS_shutdown:
+      return shutdown((int) arg1, (int) arg2);
+    case SYS_bind:
+      return bind((int) arg1, (const struct sockaddr *) (uintptr_t) arg2,
+          (socklen_t) arg3);
+    case SYS_connect:
+      return connect((int) arg1, (const struct sockaddr *) (uintptr_t) arg2,
+          (socklen_t) arg3);
+    case SYS_listen:
+      return listen((int) arg1, (int) arg2);
+    case SYS_accept4:
+      return accept4((int) arg1, (struct sockaddr *) (uintptr_t) arg2,
+          (socklen_t *) (uintptr_t) arg3, (int) arg4);
+    case SYS_accept:
+      return accept((int) arg1, (struct sockaddr *) (uintptr_t) arg2,
+          (socklen_t *) (uintptr_t) arg3);
+    case SYS_fcntl:
+      va_start(val, number);
+      (void) va_arg(val, long);
+      (void) va_arg(val, long);
+      ret = vfcntl((int) arg1, (int) arg2, val);
+      va_end(val);
+      return ret;
+    case SYS_getsockopt:
+      return getsockopt((int) arg1, (int) arg2, (int) arg3,
+          (void *) (uintptr_t) arg4, (socklen_t *) (uintptr_t) arg5);
+    case SYS_setsockopt:
+      return setsockopt((int) arg1, (int) arg2, (int) arg3,
+          (const void *) (uintptr_t) arg4, (socklen_t) arg5);
+    case SYS_getsockname:
+      return getsockname((int) arg1, (struct sockaddr *) (uintptr_t) arg2,
+          (socklen_t *) (uintptr_t) arg3);
+    case SYS_getpeername:
+      return getpeername((int) arg1, (struct sockaddr *) (uintptr_t) arg2,
+          (socklen_t *) (uintptr_t) arg3);
+
+    case SYS_read:
+      return read((int) arg1, (void *) (uintptr_t) arg2, (size_t) arg3);
+#ifdef SYS_recv
+    case SYS_recv:
+      return recv((int) arg1, (void *) (uintptr_t) arg2, (size_t) arg3,
+          (int) arg4);
+#endif
+    case SYS_recvfrom:
+      return recvfrom((int) arg1, (void *) (uintptr_t) arg2, (size_t) arg3,
+          (int) arg4, (struct sockaddr *) (uintptr_t) arg5,
+          (socklen_t *) (uintptr_t) arg6);
+    case SYS_recvmsg:
+      return recvmsg((int) arg1, (struct msghdr *) (uintptr_t) arg2,
+          (int) arg3);
+    case SYS_readv:
+      return readv((int) arg1, (struct iovec *) (uintptr_t) arg2,
+          (int) arg3);
+    case SYS_pread64:
+      return pread((int) arg1, (void *) (uintptr_t) arg2, (size_t) arg3,
+          (off_t) arg4);
+
+    case SYS_write:
+      return write((int) arg1, (const void *) (uintptr_t) arg2, (size_t) arg3);
+#ifdef SYS_send
+    case SYS_send:
+      return send((int) arg1, (const void *) (uintptr_t) arg2, (size_t) arg3,
+          (int) arg4);
+#endif
+    case SYS_sendto:
+      return sendto((int) arg1,(const void *) (uintptr_t) arg2, (size_t) arg3,
+          (int) arg4, (const struct sockaddr *) (uintptr_t) arg5,
+          (socklen_t) arg6);
+    case SYS_sendmsg:
+      return sendmsg((int) arg1, (const struct msghdr *) (uintptr_t) arg2,
+          (int) arg3);
+    case SYS_writev:
+      return writev((int) arg1, (const struct iovec *) (uintptr_t) arg2,
+          (int) arg3);
+    case SYS_pwrite64:
+      return pwrite((int) arg1, (const void *) (uintptr_t) arg2, (size_t) arg3,
+          (off_t) arg4);
+    case SYS_sendfile:
+      return sendfile((int) arg1, (int) arg2, (off_t *) (uintptr_t) arg3,
+          (size_t) arg4);
+
+    case SYS_select:
+      return select((int) arg1, (fd_set *) (uintptr_t) arg2,
+          (fd_set *) (uintptr_t) arg3, (fd_set *) (uintptr_t) arg4,
+          (struct timeval *) (uintptr_t) arg5);
+    case SYS_pselect6:
+      fprintf(stderr, "tas syscall(): warning our pselect6 does not update "
+          "timeout value\n");
+      return pselect((int) arg1, (fd_set *) (uintptr_t) arg2,
+          (fd_set *) (uintptr_t) arg3, (fd_set *) (uintptr_t) arg4,
+          (struct timespec *) (uintptr_t) arg5,
+          (const sigset_t *) (uintptr_t) arg6);
+    case SYS_epoll_create:
+      return epoll_create((int) arg1);
+    case SYS_epoll_create1:
+      return epoll_create1((int) arg1);
+    case SYS_epoll_ctl:
+      return epoll_ctl((int) arg1, (int) arg2, (int) arg3,
+          (struct epoll_event *) (uintptr_t) arg4);
+    case SYS_epoll_wait:
+      return epoll_wait((int) arg1, (struct epoll_event *) (uintptr_t) arg2,
+          (int) arg3, (int) arg4);
+    case SYS_epoll_pwait:
+      return epoll_pwait((int) arg1, (struct epoll_event *) (uintptr_t) arg2,
+          (int) arg3, (int) arg4, (const sigset_t *) (uintptr_t) arg5);
+    case SYS_poll:
+      return poll((struct pollfd *) (uintptr_t) arg1, (nfds_t) arg2,
+          (int) arg3);
+    case SYS_ppoll:
+      return ppoll((struct pollfd *) (uintptr_t) arg1, (nfds_t) arg2,
+          (const struct timespec *) (uintptr_t) arg3,
+          (const sigset_t *) (uintptr_t) arg4);
+
+    case SYS_dup:
+      return dup((int) arg1);
+    case SYS_dup2:
+      return dup2((int) arg1, (int) arg2);
+    case SYS_dup3:
+      return dup3((int) arg1, (int) arg2, (int) arg3);
+  }
+
+  return libc_syscall(number, arg1, arg2, arg3, arg4, arg5, arg6);
+}
 
 /******************************************************************************/
 /* Helper functions */
@@ -557,6 +708,7 @@ static void init(void)
   libc_sendmsg = bind_symbol("sendmsg");
   libc_writev = bind_symbol("writev");
   libc_pwrite = bind_symbol("pwrite");
+  libc_syscall = bind_symbol("syscall");
 
   if (tas_init() != 0) {
     abort();
