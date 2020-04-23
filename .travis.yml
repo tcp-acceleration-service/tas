@@ -20,6 +20,6 @@ before_script:
 script:
 - make all -j2 RTE_SDK=${HOME}/dpdk/${DPDK_VER}
 - make tests tests-full -j2 RTE_SDK=${HOME}/dpdk/${DPDK_VER}
-- make run-tests run-tests-full RTE_SDK=${HOME}/dpdk/${DPDK_VER}
+- make run-tests run-tests-full RTE_SDK=${HOME}/dpdk/${DPDK_VER} NODE_SYSTEM=y
 after_failure:
 - /bin/bash .travis-postmortem.sh
