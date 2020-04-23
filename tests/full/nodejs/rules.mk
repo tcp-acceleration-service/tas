@@ -62,7 +62,7 @@ tests-full-nodejs: $(ft_nodejs_server)
 endif
 
 tests-full-nodejs: $(ft_nodejs_client)
-tests-full: tests-full-nodejs
+#tests-full: tests-full-nodejs
 
 # Here nodejs runs in TAS and the client on Linux
 run-tests-full-nodejs-server: tests-full-nodejs test-full-wrapdeps
@@ -77,7 +77,7 @@ run-tests-full-nodejs-client: tests-full-nodejs test-full-wrapdeps
 		-p '$(ft_nodejs_client) -t2 -c100 -d10s -R2000 http://$$LINUX_IP:3000'
 
 run-tests-full-nodejs: run-tests-full-nodejs-server run-tests-full-nodejs-client
-run-tests-full: run-tests-full-nodejs
+#run-tests-full: run-tests-full-nodejs
 
 .PHONY: tests-full-nodejs run-tests-full-nodejs run-tests-full-nodejs-server run-tests-full-nodejs-client
 
