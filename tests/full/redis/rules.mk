@@ -23,10 +23,14 @@ $(ft_redis_build): $(ft_redis_tar)
 	touch $(@)
 
 # Build redis
-$(ft_redis_server) $(ft_redis_client) $(ft_redis_build)/redis.conf: $(ft_redis_build)
+$(ft_redis_build)/build_success: $(ft_redis_build)
 	$(MAKE) -C $(ft_redis_build) clean
 	$(MAKE) -C $(ft_redis_build) CFLAGS=-g CXXFLAGS=-g
 	touch $(ft_redis_build)/redis.conf
+	touch $@
+
+$(ft_redis_server) $(ft_redis_client) $(ft_redis_build)/redis.conf: $(ft_redis_build)/build_success
+	true
 
 # Generate tas-specific config file
 $(ft_redis_config): $(ft_redis_build)/redis.conf
