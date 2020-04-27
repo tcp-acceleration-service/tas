@@ -35,7 +35,7 @@ $(ft_memcached_lev_dep): $(ft_memcached_lev_build)
 ft_memcached_lm_ver := 1.0.18
 ft_memcached_lm_tar := $(ft_memcached_parentdir)/libmemcached-$(ft_memcached_lm_ver).tar.gz
 ft_memcached_lm_build := $(ft_memcached_parentdir)/libmemcached-$(ft_memcached_lm_ver)
-ft_memcached_lm_bin := $(ft_memcached_prefix_rel)/bin/memaslap
+ft_memcached_lm_bin := $(ft_memcached_prefix_rel)/bin/memslap
 
 # Download libmemcached tarball
 $(ft_memcached_lm_tar):
@@ -91,15 +91,15 @@ tests-full: $(ft_memcached_bin) $(ft_memcached_lm_bin)
 run-tests-full-memcached-server: $(ft_memcached_bin) $(ft_memcached_lm_bin) test-full-wrapdeps
 	$(FTWRAP) -d 1000 \
 		-P '$(ft_memcached_bin) -U 0 -u root' \
-		-c '$(ft_memcached_lm_bin) -s $$TAS_IP -t 10s \
-		      -F $(ft_memcached_dir)/memaslap.cnf'
+		-c '$(ft_memcached_lm_bin) --servers=$$TAS_IP --tcp-nodelay \
+		--execute-number=500'
 
 # Here the client runs in Linux
 run-tests-full-memcached-client: $(ft_memcached_bin) $(ft_memcached_lm_bin) test-full-wrapdeps
 	$(FTWRAP) -d 1000 \
 		-C '$(ft_memcached_bin) -U 0 -u root' \
-		-p '$(ft_memcached_lm_bin) -s $$LINUX_IP -t 10s \
-		      -F $(ft_memcached_dir)/memaslap.cnf'
+		-p '$(ft_memcached_lm_bin) --servers=$$LINUX_IP --tcp-nodelay \
+		--execute-number=500'
 
 run-tests-full-memcached: run-tests-full-memcached-server run-tests-full-memcached-client
 run-tests-full: run-tests-full-memcached
