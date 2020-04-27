@@ -101,7 +101,15 @@ run-tests-full-memcached-client: $(ft_memcached_bin) $(ft_memcached_lm_bin) test
 		-p '$(ft_memcached_lm_bin) --servers=$$LINUX_IP --tcp-nodelay \
 		--execute-number=500'
 
-run-tests-full-memcached: run-tests-full-memcached-server run-tests-full-memcached-client
+# Here the client runs in TAS
+run-tests-full-memcached-clientnb: $(ft_memcached_bin) $(ft_memcached_lm_bin) test-full-wrapdeps
+	$(FTWRAP) -d 1000 \
+		-C '$(ft_memcached_bin) -U 0 -u root' \
+		-p '$(ft_memcached_lm_bin) --servers=$$LINUX_IP --tcp-nodelay \
+		--execute-number=500 --non-blocking'
+
+
+run-tests-full-memcached: run-tests-full-memcached-server run-tests-full-memcached-client run-tests-full-memcached-clientnb
 run-tests-full: run-tests-full-memcached
 
 
