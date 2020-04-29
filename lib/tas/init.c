@@ -500,6 +500,11 @@ static void flextcp_flexnic_kick(struct flextcp_context *ctx, int core)
 {
   uint64_t now = util_rdtsc();
 
+  if (flexnic_info->poll_cycle_tas == UINT64_MAX) {
+    /* blocking for TAS disabled */
+    return;
+  }
+
   if(now - ctx->queues[core].last_ts > flexnic_info->poll_cycle_tas) {
     // Kick
     uint64_t val = 1;
@@ -931,6 +936,11 @@ int flextcp_context_canwait(struct flextcp_context *ctx)
    * block. Instead we use the timing of calls to canwait along with flags that
    * the poll call sets when it's called and when it finds events.
    */
+
+  /* if blocking is disabled, we can never wait */
+  if (flexnic_info->poll_cycle_app == UINT64_MAX) {
+    return -1;
+  }
 
   /* if there were events found in the last poll, it's back to square one. */
   if ((ctx->flags & CTX_FLAG_POLL_EVENTS) != 0) {

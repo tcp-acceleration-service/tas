@@ -243,6 +243,10 @@ static void destroy_shm_huge(const char *name, size_t size, void *addr)
 
 static uint64_t us_to_cycles(uint32_t us)
 {
+  if (us == UINT32_MAX) {
+    return UINT64_MAX;
+  }
+
   return (rte_get_tsc_hz() * us) / 1000000;
 }
 

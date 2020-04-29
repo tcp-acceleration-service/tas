@@ -26,6 +26,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -472,6 +473,7 @@ int config_parse(struct configuration *c, int argc, char *argv[])
         break;
       case CP_FP_NO_INTS:
         c->fp_interrupts = 0;
+        c->fp_poll_interval_tas = UINT32_MAX;
         break;
       case CP_FP_NO_XSUMOFFLOAD:
         c->fp_xsumoffload = 0;

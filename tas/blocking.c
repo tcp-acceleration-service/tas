@@ -36,6 +36,11 @@ static void notify_core(int cfd, uint64_t *last_ts, uint64_t tsc,
 {
   uint64_t val;
 
+  /* blocking is disabled */
+  if (delta == UINT64_MAX) {
+    return;
+  }
+
   if(tsc - *last_ts > delta) {
     val = 1;
     if (write(cfd, &val, sizeof(uint64_t)) != sizeof(uint64_t)) {
@@ -72,6 +77,10 @@ void notify_slowpath_core(void)
 
 int notify_canblock(struct notify_blockstate *nbs, int had_data, uint64_t tsc)
 {
+  if (tas_info->poll_cycle_tas == UINT64_MAX) {
+    return 0;
+  }
+
   if (had_data) {
     /* not idle this round, reset everything */
     nbs->can_block = nbs->second_bar = 0;
