@@ -419,6 +419,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
   /* check if we should drop this segment */
   if (UNLIKELY(tcp_trim_rxbuf(fs, seq, payload_bytes, &trim_start, &trim_end) != 0)) {
     /* packet is completely outside of unused receive buffer */
+    trigger_ack = 1;
     goto unlock;
   }
 
@@ -468,6 +469,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
 #else
   /* check if we should drop this segment */
   if (tcp_valid_rxseq(fs, seq, payload_bytes, &trim_start, &trim_end) != 0) {
+    trigger_ack = 1;
 #if 0
     fprintf(stderr, "dma_krx_pkt_fastpath: packet with bad seq "
         "(got %u, expect %u, avail %u, payload %u)\n", seq, fs->rx_next_seq,
