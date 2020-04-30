@@ -125,7 +125,7 @@ int dataplane_context_init(struct dataplane_context *ctx)
 
   ctx->poll_next_ctx = ctx->id;
 
-  ctx->evfd = eventfd(0, 0);
+  ctx->evfd = eventfd(0, EFD_NONBLOCK);
   assert(ctx->evfd != -1);
   ctx->ev.epdata.event = EPOLLIN;
   int r = rte_epoll_ctl(RTE_EPOLL_PER_THREAD, EPOLL_CTL_ADD, ctx->evfd, &ctx->ev);

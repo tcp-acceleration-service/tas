@@ -52,7 +52,7 @@ int slowpath_main(void)
   uint32_t last_print = 0;
   uint32_t loadmon_ts = 0;
 
-  kernel_notifyfd = eventfd(0, 0);
+  kernel_notifyfd = eventfd(0, EFD_NONBLOCK);
   assert(kernel_notifyfd != -1);
 
   struct epoll_event ev = {
