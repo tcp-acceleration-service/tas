@@ -19,6 +19,11 @@ passed explicitly):
 
    make RTE_SDK=~/dpdk-inst
 
+Note: For Mellanox cards, you need to add the following lines to a Makefile.local file or provide them as command line parameters
+
+.. code-block:: bash
+   DPDK_PMDS= mlx5
+   EXTRA_LIBS_DPDK= -libverbs -lmlx5
 
 This will build the TAS service (binary ``tas/tas``), client libraries (in
 ``lib/``), and a few debugging tools (in ``tools/``).
@@ -35,7 +40,9 @@ Before running TAS the following steps are necessary:
 
    * Binding the NIC to the dpdk driver, as with any other dpdk application (for
      Intel NICs use ``vfio`` because ``uio`` does not support multiple
-     interrupts).
+     interrupts).Binding is not required for Mellanox cards because as they 
+     provide kernel bypass through the in-kernel MLX driver. It's required 
+     for Intel and virtio cards
 
 .. code-block:: bash
 
