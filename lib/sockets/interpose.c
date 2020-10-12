@@ -53,6 +53,7 @@ static int (*libc_accept4)(int sockfd, struct sockaddr *addr,
 static int (*libc_accept)(int sockfd, struct sockaddr *addr,
     socklen_t *addrlen) = NULL;
 static int (*libc_fcntl)(int sockfd, int cmd, ...) = NULL;
+static int (*libc_fcntl64)(int sockfd, int cmd, ...) = NULL;
 static int (*libc_getsockopt)(int sockfd, int level, int optname, void *optval,
     socklen_t *optlen) = NULL;
 static int (*libc_setsockopt)(int sockfd, int level, int optname,
@@ -173,7 +174,7 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
   return ret;
 }
 
-static int vfcntl(int sockfd, int cmd, va_list val)
+static int vfcntl(int sockfd, int cmd, va_list val, int is_64)
 {
   int ret, arg_i;
   void *arg_p;
@@ -191,8 +192,12 @@ static int vfcntl(int sockfd, int cmd, va_list val)
 #ifdef F_GET_SEALS
     case F_GET_SEALS:
 #endif
-      if ((ret = tas_fcntl(sockfd, cmd)) == -1 && errno == EBADF)
-        ret = libc_fcntl(sockfd, cmd);
+      if ((ret = tas_fcntl(sockfd, cmd)) == -1 && errno == EBADF) {
+        if (is_64)
+          ret = libc_fcntl64(sockfd, cmd);
+        else
+          ret = libc_fcntl(sockfd, cmd);
+      }
       break;
 
 
@@ -210,8 +215,12 @@ static int vfcntl(int sockfd, int cmd, va_list val)
     case F_ADD_SEALS:
 #endif
       arg_i = va_arg(val, int);
-      if ((ret = tas_fcntl(sockfd, cmd, arg_i)) == -1 && errno == EBADF)
-        ret = libc_fcntl(sockfd, cmd, arg_i);
+      if ((ret = tas_fcntl(sockfd, cmd, arg_i)) == -1 && errno == EBADF) {
+        if (is_64)
+          ret = libc_fcntl64(sockfd, cmd, arg_i);
+        else
+          ret = libc_fcntl(sockfd, cmd, arg_i);
+      }
       break;
 
 
@@ -233,8 +242,12 @@ static int vfcntl(int sockfd, int cmd, va_list val)
     case F_SET_FILE_RW_HINT:
 #endif
       arg_p = va_arg(val, void *);
-      if ((ret = tas_fcntl(sockfd, cmd, arg_p)) == -1 && errno == EBADF)
-        ret = libc_fcntl(sockfd, cmd, arg_p);
+      if ((ret = tas_fcntl(sockfd, cmd, arg_p)) == -1 && errno == EBADF) {
+        if (is_64)
+          ret = libc_fcntl64(sockfd, cmd, arg_p);
+        else
+          ret = libc_fcntl(sockfd, cmd, arg_p);
+      }
       break;
 
     /* unsupported */
@@ -256,7 +269,20 @@ int fcntl(int sockfd, int cmd, ...)
   ensure_init();
 
   va_start(val, cmd);
-  ret = vfcntl(sockfd, cmd, val);
+  ret = vfcntl(sockfd, cmd, val, 0);
+  va_end(val);
+
+  return ret;
+}
+
+int fcntl64(int sockfd, int cmd, ...)
+{
+  int ret;
+  va_list val;
+  ensure_init();
+
+  va_start(val, cmd);
+  ret = vfcntl(sockfd, cmd, val, 1);
   va_end(val);
 
   return ret;
@@ -566,9 +592,18 @@ long syscall(long number, ...)
       va_start(val, number);
       (void) va_arg(val, long);
       (void) va_arg(val, long);
-      ret = vfcntl((int) arg1, (int) arg2, val);
+      ret = vfcntl((int) arg1, (int) arg2, val, 0);
       va_end(val);
       return ret;
+#ifdef SYS_fcntl64
+    case SYS_fcntl64:
+      va_start(val, number);
+      (void) va_arg(val, long);
+      (void) va_arg(val, long);
+      ret = vfcntl((int) arg1, (int) arg2, val, 1);
+      va_end(val);
+      return ret;
+#endif
     case SYS_getsockopt:
       return getsockopt((int) arg1, (int) arg2, (int) arg3,
           (void *) (uintptr_t) arg4, (socklen_t *) (uintptr_t) arg5);
@@ -694,6 +729,7 @@ static void init(void)
   libc_accept4 = bind_symbol("accept4");
   libc_accept = bind_symbol("accept");
   libc_fcntl = bind_symbol("fcntl");
+  libc_fcntl64 = bind_symbol("fcntl64");
   libc_getsockopt = bind_symbol("getsockopt");
   libc_setsockopt = bind_symbol("setsockopt");
   libc_getsockname = bind_symbol("getsockname");
