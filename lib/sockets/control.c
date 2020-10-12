@@ -617,7 +617,7 @@ int tas_fcntl(int sockfd, int cmd, ...)
       va_end(arg);
 
       /* make sure only supported flags are set */
-      if ((iarg & ~O_NONBLOCK) != 0) {
+      if ((iarg & ~(O_NONBLOCK | O_ACCMODE)) != 0) {
         fprintf(stderr, "flextcp fcntl: unsupported flags set (%x)\n",
             iarg);
         /* not sure if that's the right error code */
