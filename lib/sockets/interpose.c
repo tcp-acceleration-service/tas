@@ -729,7 +729,11 @@ static void init(void)
   libc_accept4 = bind_symbol("accept4");
   libc_accept = bind_symbol("accept");
   libc_fcntl = bind_symbol("fcntl");
-  libc_fcntl64 = bind_symbol("fcntl64");
+
+  libc_fcntl64 = dlsym(RTLD_NEXT, "fcntl64");
+  if (libc_fcntl64 == NULL)
+      libc_fcntl64 = libc_fcntl;
+
   libc_getsockopt = bind_symbol("getsockopt");
   libc_setsockopt = bind_symbol("setsockopt");
   libc_getsockname = bind_symbol("getsockname");
