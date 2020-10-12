@@ -36,6 +36,9 @@ include $(dir)/rules.mk
 dir := $(d)/nodejs
 include $(dir)/rules.mk
 
+dir := $(d)/lighttpd
+include $(dir)/rules.mk
+
 #########################
 
 DEPS += $(FULLTEST_OBJS:.o=.d) $(FTWRAP_OBJS:.o=.d)
