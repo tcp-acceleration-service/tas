@@ -81,6 +81,9 @@ int main(int argc, char *argv[])
     goto error_exit;
   }
   fp_cores_max = config.fp_cores_max;
+  if (!config.fp_autoscale) {
+    fp_cores_cur = fp_cores_max;
+  }
 
   /* allocate shared memory before dpdk grabs all huge pages */
   if (shm_preinit() != 0) {
