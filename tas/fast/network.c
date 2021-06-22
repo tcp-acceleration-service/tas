@@ -270,6 +270,7 @@ int network_thread_init(struct dataplane_context *ctx)
       }
     }
 
+    /* setting up RETA failed */
     if (reta_setup() != 0) {
       fprintf(stderr, "RETA setup failed\n");
       goto error_tx_queue;
