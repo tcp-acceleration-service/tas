@@ -298,6 +298,7 @@ int tcp_listen(struct app_context *ctx, uint64_t opaque, uint16_t local_port,
   lst->opaque = opaque;
   lst->port = local_port;
   lst->wait_conns = NULL;
+  lst->wait_conns_last = NULL;
   lst->backlog_len = backlog;
   lst->backlog_pos = 0;
   lst->backlog_used = 0;
@@ -339,8 +340,14 @@ int tcp_accept(struct app_context *ctx, uint64_t opaque,
   conn->flags = listen->flags;
   conn->cnt_tx_pending = 0;
 
-  conn->ht_next = listen->wait_conns;
-  listen->wait_conns = conn;
+  conn->ht_next = NULL;
+  if (listen->wait_conns == NULL) {
+    listen->wait_conns = conn;
+    listen->wait_conns_last = conn;
+  } else {
+    listen->wait_conns_last->ht_next = conn;
+    listen->wait_conns_last = conn;
+  }
 
   if (listen->backlog_used > 0) {
     listener_accept(listen);
@@ -960,6 +967,9 @@ static void listener_accept(struct listener *l)
   }
 
   l->wait_conns = c->ht_next;
+  if (l->wait_conns == NULL) {
+    l->wait_conns_last = NULL;
+  }
   conn_register(c);
   nbqueue_enq(&conn_async_q, &c->comp.el);
 

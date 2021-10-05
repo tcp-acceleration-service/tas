@@ -589,8 +589,11 @@ struct listener {
     uint16_t *backlog_fgs;
   /**@}*/
 
-  /** List of waiting connections from accept calls */
+  /** List of waiting connections from accept calls (head) */
   struct connection *wait_conns;
+  /** List of waiting connections from accept calls (tail) */
+  struct connection *wait_conns_last;
+
   /** Listener port */
   uint16_t port;
   /** Flags: see #nicif_connection_flags */
