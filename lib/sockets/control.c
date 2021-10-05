@@ -851,7 +851,8 @@ int tas_setsockopt(int sockfd, int level, int optname, const void *optval,
   } else if (level == SOL_SOCKET && optname == SO_PRIORITY) {
     /* ignore silently */
   } else if (level == IPPROTO_TCP && (optname == TCP_KEEPIDLE ||
-       optname == TCP_KEEPINTVL || optname == TCP_KEEPCNT)) {
+       optname == TCP_KEEPINTVL || optname == TCP_KEEPCNT ||
+       optname == TCP_DEFER_ACCEPT)) {
     /* ignore silently */
   } else if (level == SOL_SOCKET && optname == SO_LINGER) {
     fprintf(stderr, "flextcp setsockopt: SO_LINGER not implemented\n");
