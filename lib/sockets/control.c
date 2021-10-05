@@ -855,10 +855,7 @@ int tas_setsockopt(int sockfd, int level, int optname, const void *optval,
        optname == TCP_DEFER_ACCEPT)) {
     /* ignore silently */
   } else if (level == SOL_SOCKET && optname == SO_LINGER) {
-    fprintf(stderr, "flextcp setsockopt: SO_LINGER not implemented\n");
-    errno = ENOPROTOOPT;
-    ret = -1;
-    goto out;
+    fprintf(stderr, "flextcp setsockopt: warning SO_LINGER not implemented\n");
   } else {
     /* unknown option */
     fprintf(stderr, "flextcp setsockopt: unknown level optname combination "
