@@ -364,11 +364,60 @@ out:
   return ret;
 }
 
+/** Enqueue accept requests for backlog. Lock on s has to be held. */
+static int enqueue_accept(struct flextcp_context *ctx, struct socket *s)
+{
+  int newfd;
+  struct socket *ns;
+  struct socket_listen *l = &s->data.listener;
+  struct socket_backlog *bl;
+
+  /* try to fill backlog */
+  while (l->backlog_num != l->backlog_len) {
+    /* allocate socket structure */
+    if ((newfd = flextcp_fd_salloc(&ns)) < 0) {
+      break;
+    }
+
+    ns->type = SOCK_CONNECTION;
+    ns->flags = 0;
+    ns->data.connection.status = SOC_CONNECTING;
+    ns->data.connection.listener = s;
+    ns->data.connection.rx_len_1 = 0;
+    ns->data.connection.rx_len_2 = 0;
+    ns->data.connection.ctx = ctx;
+
+    bl = l->backlog + ((l->backlog_next + l->backlog_num) % l->backlog_len);
+    bl->s = ns;
+    bl->fd = newfd;
+
+    /* send accept request to kernel */
+    if (flextcp_listen_accept(ctx, &l->l, &ns->data.connection.c) != 0)
+    {
+      /* TODO: check error code... */
+      flextcp_fd_close(newfd);
+      break;
+    }
+
+    socket_unlock(ns);
+    l->backlog_num = l->backlog_num + 1;
+  }
+
+  if (l->backlog_num == 0) {
+    errno = ENOBUFS;
+    return -1;
+  }
+
+  return 0;
+}
+
 int tas_listen(int sockfd, int backlog)
 {
   struct socket *s;
+  struct socket_backlog *bl;
+  struct socket_listen *l;
   struct flextcp_context *ctx;
-  int ret = 0, block;
+  int block;
   uint32_t flags = 0;
 
   if (flextcp_fd_slookup(sockfd, &s) != 0) {
@@ -379,16 +428,14 @@ int tas_listen(int sockfd, int backlog)
   /* socket already used */
   if (s->type != SOCK_SOCKET) {
     errno = EOPNOTSUPP;
-    ret = -1;
-    goto out;
+    goto err;
   }
 
   /* socket not bound */
   /* TODO: technically sohuld probably bind to an ephemeral port */
   if ((s->flags & SOF_BOUND) != SOF_BOUND) {
     errno = EADDRINUSE;
-    ret = -1;
-    goto out;
+    goto err;
   }
 
   /* pass on reuseport flags */
@@ -401,21 +448,28 @@ int tas_listen(int sockfd, int backlog)
     backlog = 8;
   }
 
+  if ((bl = calloc(backlog, sizeof(*bl))) == NULL) {
+    errno = ENOMEM;
+    goto err;
+  }
+
   /* open flextcp listener */
   ctx = flextcp_sockctx_get();
   if (flextcp_listen_open(ctx, &s->data.listener.l, ntohs(s->addr.sin_port),
         backlog, flags))
   {
-    /* TODO */
+    free (bl);
     errno = ECONNREFUSED;
-    ret = -1;
-    goto out;
+    goto err_bl;
   }
 
   s->type = SOCK_LISTENER;
-  s->data.listener.backlog = backlog;
-  s->data.listener.status = SOL_OPENING;
-  s->data.listener.pending = NULL;
+  l = &s->data.listener;
+  l->backlog = bl;
+  l->backlog_len = backlog;
+  l->backlog_next = 0;
+  l->backlog_num = 0;
+  l->status = SOL_OPENING;
 
   /* wait for listen to complete */
   block = 0;
@@ -430,29 +484,41 @@ int tas_listen(int sockfd, int backlog)
 
   /* check whether listen failed */
   if (s->data.listener.status == SOL_FAILED) {
-    /* TODO */
     errno = ENOBUFS;
-    ret = -1;
-    goto out;
+    goto err_bl;
   }
 
-out:
+  /* enqueue accepts */
+  if (enqueue_accept(ctx, s)) {
+    goto err_close;
+  }
+
   flextcp_fd_srelease(sockfd, s);
-  return ret;
+  return 0;
+
+err_close:
+  /* TODO: close listener */
+err_bl:
+  free(bl);
+err:
+  flextcp_fd_srelease(sockfd, s);
+  return -1;
 }
 
 int tas_accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
     int flags)
 {
   struct socket *s, *ns;
+  struct socket_listen *sl;
   struct flextcp_context *ctx;
-  struct socket_pending *sp, *spp;
+  struct socket_backlog *bl;
   int ret = 0, nonblock = 0, cloexec = 0, newfd, block;
 
   if (flextcp_fd_slookup(sockfd, &s) != 0) {
     errno = EBADF;
     return -1;
   }
+  sl = &s->data.listener;
 
   /* validate flags */
   if ((flags & SOCK_NONBLOCK) == SOCK_NONBLOCK) {
@@ -477,112 +543,72 @@ int tas_accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
   }
 
   ctx = flextcp_sockctx_get();
-
-  /* lookup pending connection for this context/thread */
-  for (sp = s->data.listener.pending; sp != NULL; sp = sp->next) {
-    if (sp->ctx == ctx) {
-      break;
-    }
-  }
-
-  /* if there is no pending request, send out a request */
-  if (sp == NULL) {
-    if ((sp = malloc(sizeof(*sp))) == NULL) {
-      errno = ENOMEM;
-      ret = -1;
-      goto out;
-    }
-
-    /* allocate socket structure */
-    if ((newfd = flextcp_fd_salloc(&ns)) < 0) {
-      free(sp);
-      ret = -1;
-      goto out;
-    }
-
-    ns->type = SOCK_CONNECTION;
-    ns->flags = (nonblock ? SOF_NONBLOCK : 0) | (cloexec ? SOF_CLOEXEC : 0);
-    ns->data.connection.status = SOC_CONNECTING;
-    ns->data.connection.listener = s;
-    ns->data.connection.rx_len_1 = 0;
-    ns->data.connection.rx_len_2 = 0;
-    ns->data.connection.ctx = ctx;
-
-    sp->fd = newfd;
-    sp->s = ns;
-    sp->ctx = ctx;
-    sp->next = NULL;
-
-    /* send accept request to kernel */
-    if (flextcp_listen_accept(ctx, &s->data.listener.l,
-          &ns->data.connection.c) != 0)
-    {
-      /* TODO */
+  block = 0;
+  while (1) {
+    /* grab next pending accept */
+    if (sl->backlog_num == 0 && enqueue_accept(ctx, s)) {
       errno = ENOBUFS;
       ret = -1;
-      free(sp);
-      flextcp_fd_close(newfd);
-      free(s);
       goto out;
     }
+    bl = sl->backlog + sl->backlog_next;
+    ns = bl->s;
+    newfd = bl->fd;
 
-    /* append entry to pending list */
-    spp = s->data.listener.pending;
-    if (spp == NULL) {
-      s->data.listener.pending = sp;
+    socket_lock(ns);
+    if (ns->data.connection.status != SOC_CONNECTING) {
+      /* connection is ready */
+      break;
     } else {
-      while (spp->next != NULL) {
-        spp = spp->next;
-      }
-      spp->next = sp;
-    }
-  } else {
-    ns = sp->s;
-    newfd = sp->fd;
-  }
+      /* connection is still pending */
+      socket_unlock(ns);
 
-  /* check if connection is still pending */
-  if (ns->data.connection.status == SOC_CONNECTING) {
-    flextcp_epoll_clear(s, EPOLLIN);
-    if ((s->flags & SOF_NONBLOCK) == SOF_NONBLOCK) {
-      /* if non-blocking, just return */
-      errno = EAGAIN;
-      ret = -1;
-      flextcp_fd_srelease(newfd, ns);
-      goto out;
-    } else {
-      /* if this is blocking, wait for connection to complete */
-      block = 0;
-      do {
-        socket_unlock(ns);
+      if ((s->flags & SOF_NONBLOCK) == SOF_NONBLOCK) {
+        /* if non-blocking, just return */
+        errno = EAGAIN;
+        ret = -1;
+        goto out;
+      } else {
+        /* if this is blocking, wait for a connection to complete */
         socket_unlock(s);
+
         if (block)
           flextcp_context_wait(ctx, -1);
         flextcp_sockctx_poll(ctx);
         block = 1;
+
         socket_lock(s);
-        socket_lock(ns);
-      } while (ns->data.connection.status == SOC_CONNECTING);
+      }
     }
   }
 
   /* connection is opened now */
   assert(ns->data.connection.status == SOC_CONNECTED);
 
-  /* remove entry from pending list */
-  if (s->data.listener.pending == sp) {
-    s->data.listener.pending = sp->next;
-  } else {
-    spp = s->data.listener.pending;
-    assert(spp != NULL);
-    while (spp->next != sp) {
-      assert(spp->next != NULL);
-      spp = spp->next;
-    }
-    spp->next = sp->next;
-  }
-  free(sp);
+  if (cloexec)
+    ns->flags |= SOF_CLOEXEC;
+  if (nonblock)
+    ns->flags |= SOF_NONBLOCK;
+
+  /* remove this connection from backlog now */
+  sl->backlog_next = (sl->backlog_next + 1) % sl->backlog_len;
+  --sl->backlog_num;
+
   flextcp_fd_srelease(newfd, ns);
+
+  /* refill backlog */
+  enqueue_accept(ctx, s);
+
+  /* clear epollin on listening socket if no more connections */
+  if (!sl->backlog_num) {
+    flextcp_epoll_clear(s, EPOLLIN);
+  } else {
+    struct socket *next = sl->backlog[sl->backlog_next].s;
+    socket_lock(next);
+    if (next->data.connection.status == SOC_CONNECTING)
+      flextcp_epoll_clear(s, EPOLLIN);
+    socket_unlock(next);
+  }
 
   // fill in addr if given
   if(addr != NULL) {

@@ -192,20 +192,6 @@ static inline void ev_listen_open(struct flextcp_context *ctx,
 static inline void ev_listen_newconn(struct flextcp_context *ctx,
     struct flextcp_event *ev)
 {
-  struct flextcp_listener *l;
-  struct socket *s;
-
-  l = ev->ev.listen_newconn.listener;
-  s = (struct socket *)
-    ((uint8_t *) l - offsetof(struct socket, data.listener.l));
-
-  socket_lock(s);
-
-  assert(s->type == SOCK_LISTENER);
-
-  flextcp_epoll_set(s, EPOLLIN);
-
-  socket_unlock(s);
 }
 
 static inline void ev_listen_accept(struct flextcp_context *ctx,
@@ -218,13 +204,13 @@ static inline void ev_listen_accept(struct flextcp_context *ctx,
   s = (struct socket *)
     ((uint8_t *) c - offsetof(struct socket, data.connection.c));
 
-  socket_lock(s);
-
   assert(s->type == SOCK_CONNECTION);
-  assert(s->data.connection.status == SOC_CONNECTING);
   sl = s->data.connection.listener;
   assert(sl != NULL);
 
+  socket_lock(sl);
+  socket_lock(s);
+  assert(s->data.connection.status == SOC_CONNECTING);
   flextcp_epoll_set(sl, EPOLLIN);
 
   if (ev->ev.listen_accept.status == 0) {
@@ -236,6 +222,7 @@ static inline void ev_listen_accept(struct flextcp_context *ctx,
   }
 
   socket_unlock(s);
+  socket_unlock(sl);
 }
 
 static inline void ev_conn_open(struct flextcp_context *ctx,

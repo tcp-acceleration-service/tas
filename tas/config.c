@@ -505,6 +505,7 @@ int config_parse(struct configuration *c, int argc, char *argv[])
       case CP_FP_NO_INTS:
         c->fp_interrupts = 0;
         c->fp_poll_interval_tas = UINT32_MAX;
+        c->fp_poll_interval_app = UINT32_MAX;
         break;
       case CP_FP_NO_XSUMOFFLOAD:
         c->fp_xsumoffload = 0;

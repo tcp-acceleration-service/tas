@@ -70,13 +70,6 @@ enum conn_stflags {
   CSTF_TXCLOSED_ACK = 4,
 };
 
-struct socket_pending {
-  struct socket *s;
-  struct flextcp_context *ctx;
-  struct socket_pending *next;
-  int fd;
-};
-
 struct socket_conn {
   struct flextcp_connection c;
   uint8_t status;
@@ -91,10 +84,17 @@ struct socket_conn {
   int move_status;
 };
 
+struct socket_backlog {
+  struct socket *s;
+  int fd;
+};
+
 struct socket_listen {
   struct flextcp_listener l;
-  struct socket_pending *pending;
-  int backlog;
+  struct socket_backlog *backlog;
+  int backlog_len;
+  int backlog_next;
+  int backlog_num;
   uint8_t status;
 };
 
