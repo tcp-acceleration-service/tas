@@ -160,7 +160,6 @@ int network_init(unsigned n_threads)
     goto error_exit;
   }
 
-
   /* workaround for mlx5. */
   if (config.fp_autoscale) {
     if (reta_mlx5_resize() != 0) {
@@ -270,11 +269,9 @@ int network_thread_init(struct dataplane_context *ctx)
     }
 
     /* setting up RETA failed */
-    if (config.fp_autoscale) {
-      if (reta_setup() != 0) {
-        fprintf(stderr, "RETA setup failed\n");
-        goto error_tx_queue;
-      }
+    if (reta_setup() != 0) {
+      fprintf(stderr, "RETA setup failed\n");
+      goto error_tx_queue;
     }
     start_done = 1;
   }
@@ -438,6 +435,20 @@ static int reta_setup()
 
   /* allocate RSS redirection table and core-bucket count table */
   rss_reta_size = eth_devinfo.reta_size;
+  if (rss_reta_size == 0) {
+    fprintf(stderr, "Warning: NIC does not expose reta size\n");
+    rss_reta_size = rte_align32pow2(fp_cores_cur); /* map groups to fp cores in this case */
+  }
+  if (rss_reta_size > FLEXNIC_PL_MAX_FLOWGROUPS) {
+    fprintf(stderr, "reta_setup: reta size (%u) greater than maximum supported"
+        " (%u)\n", rss_reta_size, FLEXNIC_PL_MAX_FLOWGROUPS);
+    abort();
+  }
+  if (!rte_is_power_of_2(rss_reta_size)) {
+    fprintf(stderr, "reta_setup: reta size (%u) is not a power of 2\n", rss_reta_size);
+    abort();
+  }
+
   rss_reta = rte_calloc("rss reta", ((rss_reta_size + RTE_RETA_GROUP_SIZE - 1) /
         RTE_RETA_GROUP_SIZE), sizeof(*rss_reta), 0);
   rss_core_buckets = rte_calloc("rss core buckets", fp_cores_max,
@@ -446,12 +457,6 @@ static int reta_setup()
   if (rss_reta == NULL || rss_core_buckets == NULL) {
     fprintf(stderr, "reta_setup: rss_reta alloc failed\n");
     goto error_exit;
-  }
-
-  if (rss_reta_size > FLEXNIC_PL_MAX_FLOWGROUPS) {
-    fprintf(stderr, "reta_setup: reta size (%u) greater than maximum supported"
-        " (%u)\n", rss_reta_size, FLEXNIC_PL_MAX_FLOWGROUPS);
-    abort();
   }
 
   /* initialize reta */
@@ -463,9 +468,9 @@ static int reta_setup()
     c = (c + 1) % fp_cores_cur;
   }
 
-  if (rte_eth_dev_rss_reta_update(net_port_id, rss_reta, rss_reta_size) != 0) {
+  if (rte_eth_dev_rss_reta_update(net_port_id, rss_reta, rss_reta_size) != 0 && config.fp_autoscale) {
     fprintf(stderr, "reta_setup: rte_eth_dev_rss_reta_update failed\n");
-    return -1;
+    goto error_exit;
   }
 
   return 0;

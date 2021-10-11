@@ -123,7 +123,7 @@ void fast_kernel_packet(struct dataplane_context *ctx,
   len = network_buf_len(nbh);
   dma_write(krx->addr, len, network_buf_bufoff(nbh));
 
-  if (network_buf_flowgroup(nbh, &krx->msg.packet.flow_group)) {
+  if (network_buf_flowgroup(nbh, &krx->msg.packet.flow_group, ctx->id)) {
     fprintf(stderr, "fast_kernel_packet: network_buf_flowgroup failed\n");
     abort();
   }
