@@ -107,7 +107,7 @@ int dataplane_context_init(struct dataplane_context *ctx)
   if ((ctx->qman_fwd_ring = rte_ring_create(name, 32 * 1024, rte_socket_id(),
           RING_F_SC_DEQ)) == NULL)
   {
-    fprintf(stderr, "initializing rte_ring_create");
+    fprintf(stderr, "initializing rte_ring_create\n");
     return -1;
   }
 
