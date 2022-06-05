@@ -77,6 +77,7 @@ enum cfg_params {
   CP_FP_VLAN_STRIP,
   CP_FP_POLL_INTERVAL_TAS,
   CP_FP_POLL_INTERVAL_APP,
+  CP_PS,
   CP_KNI_NAME,
   CP_READY_FD,
   CP_DPDK_EXTRA,
@@ -210,6 +211,9 @@ static struct option opts[] = {
     { .name = "fp-poll-interval-app",
       .has_arg = required_argument,
       .val = CP_FP_POLL_INTERVAL_APP },
+    { .name = "ps",
+      .has_arg = required_argument,
+      .val = CP_PS},
     { .name = "kni-name",
       .has_arg = required_argument,
       .val = CP_KNI_NAME },
@@ -499,7 +503,16 @@ int config_parse(struct configuration *c, int argc, char *argv[])
         }
         break;
        break;
-
+      case CP_PS:
+        if (!strcmp(optarg, "default")) {
+          c->ps_algorithm = CONFIG_PS_DEFAULT;
+        } else if (!strcmp(optarg, "hierarchical")) {
+          c->ps_algorithm = CONFIG_PS_HIERARCHICAL;
+        } else {
+          fprintf(stderr, "ps algorithm parsing failed\n");
+          goto failed;
+        }
+        break;
       case CP_KNI_NAME:
         if (!(c->kni_name = strdup(optarg))) {
           fprintf(stderr, "strdup kni name failed\n");
@@ -592,6 +605,7 @@ static int config_defaults(struct configuration *c, char *progname)
   c->fp_vlan_strip = 0;
   c->fp_poll_interval_tas = 10000;
   c->fp_poll_interval_app = 10000;
+  c->ps_algorithm = CONFIG_PS_DEFAULT;
   c->kni_name = NULL;
   c->ready_fd = -1;
   c->quiet = 0;
@@ -697,6 +711,11 @@ static void print_usage(struct configuration *c, char *progname)
       "  --fp-poll-interval-app      App polling interval before blocking "
           "in us [default: %"PRIu32"]\n"
       "  --dpdk-extra=ARG            Add extra DPDK argument\n"
+      "\n"
+      "Packet scheduling:\n"
+      "   --ps=ALGORITHM             Packet scheduling algorithm "
+           "[default: default]\n"
+      "      Options: default, hierarchical\n"
       "\n"
       "Host kernel interface:\n"
       "  --kni-name=NAME             Network interface name to expose "
