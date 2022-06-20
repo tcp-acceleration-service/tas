@@ -74,6 +74,10 @@ void notify_canblock_reset(struct notify_blockstate *nbs);
 
 /* should become config options */
 #define FLEXNIC_INTERNAL_MEM_SIZE (1024 * 1024 * 32)
-#define FLEXNIC_NUM_QMQUEUES (128 * 1024)
+
+
+#define FLEXNIC_NUM_QMFLOWQUEUES (128 * 1024)
+#define FLEXNIC_NUM_QMAPPQUEUES (30)
+#define FLEXNIC_NUM_QMQUEUES (FLEXNIC_NUM_QMAPPQUEUES * FLEXNIC_NUM_QMFLOWQUEUES)
 
 #endif /* ndef TAS_H_ */

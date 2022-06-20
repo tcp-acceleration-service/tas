@@ -47,21 +47,13 @@ struct network_thread {
 #define QMAN_SKIPLIST_LEVELS 4
 
 struct qman_thread {
-  /************************************/
-  /* read-only */
-  struct queue *queues;
-
-  /************************************/
   /* modified by owner thread */
-  uint32_t head_idx[QMAN_SKIPLIST_LEVELS];
-  uint32_t nolimit_head_idx;
-  uint32_t nolimit_tail_idx;
+  /************************************/
+  struct app_cont *a_cont;
   uint32_t ts_real;
   uint32_t ts_virtual;
   struct utils_rng rng;
-  bool nolimit_first;
 };
-
 
 struct dataplane_context {
   struct network_thread net;

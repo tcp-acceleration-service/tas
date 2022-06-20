@@ -410,6 +410,7 @@ static unsigned poll_kernel(struct dataplane_context *ctx, uint32_t ts)
 static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
 {
   unsigned q_ids[BATCH_SIZE];
+  unsigned aq_id;
   uint16_t q_bytes[BATCH_SIZE];
   struct network_buf_handle **handles;
   uint16_t off = 0, max;
@@ -425,7 +426,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   max = bufcache_prealloc(ctx, max, &handles);
 
   /* poll queue manager */
-  ret = qman_poll(&ctx->qman, max, q_ids, q_bytes);
+  ret = qman_poll(&ctx->qman, max, &aq_id, q_ids, q_bytes);
   if (ret <= 0) {
     STATS_ADD(ctx, qm_empty, 1);
     return 0;
@@ -451,7 +452,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   fast_flows_qman_pfbufs(ctx, q_ids, ret);
 
   for (i = 0; i < ret; i++) {
-    use = fast_flows_qman(ctx, q_ids[i], handles[off], ts);
+    use = fast_flows_qman(ctx, aq_id, q_ids[i], handles[off], ts);
 
     if (use == 0)
      off++;
