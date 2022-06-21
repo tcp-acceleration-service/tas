@@ -103,6 +103,10 @@ struct app_queue {
   uint32_t next_idx;
   /** Pointer to container with flows for this app */
   struct flow_cont *f_cont;
+  /** Number of entries in queue */
+  uint32_t avail;
+  /** Flags: FLAG_INNOLIMITL */
+  uint16_t flags;
 };
 
 /** Queue state for flow */

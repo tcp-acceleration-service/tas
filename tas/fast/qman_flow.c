@@ -180,7 +180,8 @@ static inline void flow_queue_activate_nolimit(struct flow_cont *fc,
 
   q->flags |= FLAG_INNOLIMITL;
   q->next_idxs[0] = IDXLIST_INVAL;
-  if (fc->nolimit_tail_idx == IDXLIST_INVAL) {
+  if (fc->nolimit_tail_idx == IDXLIST_INVAL) 
+  {
     fc->nolimit_head_idx = fc->nolimit_tail_idx = idx;
     return;
   }

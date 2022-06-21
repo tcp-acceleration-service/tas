@@ -280,7 +280,6 @@ int fast_flows_packet(struct dataplane_context *ctx,
     struct network_buf_handle *nbh, void *fsp, struct tcp_opts *opts,
     uint32_t ts)
 {
-  printf("received packet\n");
   struct pkt_tcp *p = network_buf_bufoff(nbh);
   struct flextcp_pl_flowst *fs = fsp;
   uint32_t payload_bytes, payload_off, seq, ack, old_avail, new_avail,
