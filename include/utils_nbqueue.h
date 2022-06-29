@@ -30,6 +30,7 @@
 
 struct nbqueue_el {
   struct nbqueue_el *next;
+  struct nbqueue_el *prev;
 };
 
 struct nbqueue {
@@ -46,8 +47,14 @@ static inline void nbqueue_init(struct nbqueue *nbq)
 static inline void nbqueue_enq(struct nbqueue *nbq, struct nbqueue_el *el)
 {
   pthread_mutex_lock(&nbq->mutex);
+  
+  if (nbq->head != NULL)
+    nbq->head->prev = el;
+  
   el->next = nbq->head;
+  el->prev = NULL;
   nbq->head = el;
+  
   pthread_mutex_unlock(&nbq->mutex);
 }
 
@@ -78,6 +85,31 @@ static inline void *nbqueue_deq(struct nbqueue *nbq)
   pthread_mutex_unlock(&nbq->mutex);
 
   return el;
+}
+
+static inline void nbqueue_remove(struct nbqueue *nbq, struct nbqueue_el *el)
+{
+    struct nbqueue_el *prev_el, *next_el;
+    pthread_mutex_lock(&nbq->mutex);
+
+    if (el->next == NULL) 
+    {
+      nbq->head = NULL;
+      return;
+    } 
+    else if (el->prev == NULL) 
+    {
+      nbq->head = el->next;
+      nbq->head->prev = NULL;
+      return;
+    }
+
+    prev_el = el->prev;
+    next_el = el->next;
+    prev_el->next = next_el;
+    next_el->prev = prev_el;
+
+    pthread_mutex_unlock(&nbq->mutex);
 }
 
 #endif /* ndef UTILS_NBQUEUE_H_ */

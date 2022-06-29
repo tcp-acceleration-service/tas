@@ -425,8 +425,24 @@ static void uxsocket_notify(void)
 
 static void uxsocket_error(struct application *app)
 {
+  struct app_context *ctx, *prev_ctx;
+  epoll_ctl(epfd, EPOLL_CTL_DEL, app->fd, NULL);
   close(app->fd);
+  // nbqueue_remove(&ux_to_poll, &app->nqe);
+  free(app->resp);
   app->closed = true;
+
+  ctx = app->contexts;
+  while (ctx != NULL)
+  {
+    prev_ctx = ctx;
+    ctx = ctx->next;
+    free(prev_ctx);
+  }
+
+  // free(app);
+
+  // TODO: Figure out why I can't free app memory of the nqe for the app.
 }
 
 static void uxsocket_receive(struct application *app)
