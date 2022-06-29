@@ -4,16 +4,39 @@
 
 #include "internal.h"
 
-// TODO: Remove apps that have no more packets to send from list
-// TODO: Retrieve packets from more than one app with each call to qman_poll
-// TODO: Add rate to app containers
-// TODO: Make sure flow_id makes sense when distributed among different apps.
-// find way to translate absolute flow_id to an id in the application queue.
+/* TODO: Retrieve packets from more than one app with each call to qman_poll */
+/* TODO: Add rate to app containers */
+/* TODO: Make sure flow_id makes sense when distributed among different apps.
+   find way to translate absolute flow_id to an id in the application queue.
+   Right now, we are using more memory than necessary to keep track of all
+   the queues. */
+ 
 
+static inline void app_queue_fire(struct app_cont *ac, struct app_queue *q,
+    uint32_t idx, uint16_t *q_bytes, unsigned start, unsigned end);
 static inline void app_set_impl(struct app_cont *ac, uint32_t a_idx,
     uint32_t f_idx, uint32_t avail, uint8_t flags);
 static inline void app_queue_activate(struct app_cont *ac,
-    struct app_queue *q, uint32_t idx);
+struct app_queue *q, uint32_t idx);
+    static inline uint32_t sum_bytes(uint16_t *q_bytes, unsigned start, unsigned end);
+
+int count_list_size(struct app_cont *ac)
+{
+  if (ac->head_idx == IDXLIST_INVAL)
+  {
+    return 0;
+  }
+
+  int count = 1;
+  struct app_queue *q = &ac->queues[ac->head_idx];
+  while (q->next_idx != IDXLIST_INVAL)
+  {
+    count += 1;
+    q = &ac->queues[q->next_idx];
+  }
+
+  return count;
+}
 
 int appcont_init(struct qman_thread *t)
 {
@@ -49,7 +72,7 @@ int appcont_init(struct qman_thread *t)
 int app_qman_poll(struct qman_thread *t, struct app_cont *ac, unsigned num, 
     unsigned *app_id, unsigned *q_ids, uint16_t *q_bytes)
 {
-  int ret;
+  int x;
 
   uint32_t idx = ac->head_idx;
 
@@ -69,9 +92,14 @@ int app_qman_poll(struct qman_thread *t, struct app_cont *ac, unsigned num,
   }
 
   aq->flags &= ~FLAG_INNOLIMITL;
-  ret = flow_qman_poll(t, fc, num, q_ids, q_bytes);
+  x = flow_qman_poll(t, fc, num, q_ids, q_bytes);
 
-  return ret;
+  if (aq->avail > 0)
+  {
+    app_queue_fire(ac, aq, idx, q_bytes, 0, x);
+  }
+
+  return x;
 }
 
 int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id, 
@@ -89,20 +117,25 @@ int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id,
     return -1;
   }
 
+  app_set_impl(ac, app_id, flow_id, avail, flags);
   ret = flow_qman_set(t, fc, flow_id, rate, avail, max_chunk, flags);
 
-  app_set_impl(ac, app_id, flow_id, avail, flags);
   return ret;
-  // if (ac->tail_idx == IDXLIST_INVAL)
-  // {
-  //   ac->head_idx = ac->tail_idx = app_id;
-  //   return ret;
-  // }
+}
 
-  // a_tail = &ac->queues[ac->tail_idx];
-  // a_tail->next_idx = app_id;
-  // ac->tail_idx = app_id;
-  // return ret;
+static inline void app_queue_fire(struct app_cont *ac, struct app_queue *q,
+    uint32_t idx, uint16_t *q_bytes, unsigned start, unsigned end)
+{
+  uint32_t bytes;
+  assert(q->avail > 0);
+
+  bytes = sum_bytes(q_bytes, start, end);
+  q->avail -= bytes;
+
+  if (q->avail > 0) {
+    app_queue_activate(ac, q, idx);
+  }
+
 }
 
 static inline void app_set_impl(struct app_cont *ac, uint32_t a_idx,
@@ -116,16 +149,15 @@ static inline void app_set_impl(struct app_cont *ac, uint32_t a_idx,
 
   if ((flags & QMAN_SET_AVAIL) != 0)
   {
-      new_avail = 1;
-      int prev_avail = fq->avail;
-      aq->avail -= prev_avail;
-      aq->avail += avail;
+    new_avail = 1;
+    int prev_avail = fq->avail;
+    aq->avail -= prev_avail;
+    aq->avail += avail;
   }
-
-  if ((flags & QMAN_ADD_AVAIL) != 0)
+  else if ((flags & QMAN_ADD_AVAIL) != 0)
   {
-      aq->avail += avail;
-      new_avail = 1;
+    aq->avail += avail;
+    new_avail = 1;
   }
 
   if (new_avail && aq->avail > 0 && ((aq->flags & (FLAG_INNOLIMITL)) == 0)) 
@@ -153,4 +185,16 @@ static inline void app_queue_activate(struct app_cont *ac,
   q_tail = &ac->queues[ac->tail_idx];
   q_tail->next_idx = idx;
   ac->tail_idx = idx;
+}
+
+static inline uint32_t sum_bytes(uint16_t *q_bytes, unsigned start, unsigned end)
+{
+  int i;
+  uint32_t bytes = 0;
+  for (i = start; i < end; i++)
+  {
+    bytes += q_bytes[i];
+  }
+
+  return bytes;
 }

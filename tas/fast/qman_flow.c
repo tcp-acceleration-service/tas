@@ -339,7 +339,8 @@ static inline unsigned flow_poll_skiplist(struct qman_thread *t, struct flow_con
         timestamp_lessthaneq(t, fc->queues[idx].next_ts, max_vts))
     {
       t->ts_virtual = fc->queues[idx].next_ts;
-    } else {
+    } else 
+    {
       t->ts_virtual = max_vts;
     }
   }
@@ -374,11 +375,13 @@ static inline void flow_queue_fire(struct qman_thread *t, struct flow_cont *fc,
   q->avail -= bytes;
 
   dprintf("flow_queue_fire: t=%p q=%p idx=%u gidx=%u bytes=%u avail=%u rate=%u\n", t, q, idx, idx, bytes, q->avail, q->rate);
-  if (q->rate > 0) {
+  if (q->rate > 0) 
+  {
     q->next_ts = flow_queue_new_ts(t, q, bytes);
   }
 
-  if (q->avail > 0) {
+  if (q->avail > 0) 
+  {
     flow_queue_activate(t, fc, q, idx);
   }
 
