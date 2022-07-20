@@ -39,18 +39,20 @@ struct configuration config;
 
 struct qman_set_op {
   int got_op;
-  uint32_t id;
+  uint32_t app_id;
+  uint32_t flow_id;
   uint32_t rate;
   uint32_t avail;
   uint16_t max_chunk;
   uint8_t flags;
 } qm_set_op = { .got_op = 0 };
 
-int qman_set(struct qman_thread *t, uint32_t id, uint32_t rate, uint32_t avail,
+int qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id, uint32_t rate, uint32_t avail,
     uint16_t max_chunk, uint8_t flags)
 {
   qm_set_op.got_op = 1;
-  qm_set_op.id = id;
+  qm_set_op.app_id = app_id;
+  qm_set_op.flow_id = flow_id;
   qm_set_op.rate = rate;
   qm_set_op.avail = avail;
   qm_set_op.max_chunk = max_chunk;
@@ -113,7 +115,8 @@ void test_txbump_small(void *arg)
   test_assert("unused tx buffer", ret == -1);
   test_assert("updated tx avail", fs->tx_avail == 32);
   test_assert("qman set sent", qm_set_op.got_op);
-  test_assert("qman set id correct", qm_set_op.id == 0);
+  test_assert("qman set app id correct", qm_set_op.app_id == 0);
+  test_assert("qman set id correct", qm_set_op.flow_id == 0);
   test_assert("qman set rate correct", qm_set_op.rate == fs->tx_rate);
   test_assert("qman set avail correct", qm_set_op.avail == 32);
   test_assert("qman set max chunk correct", qm_set_op.max_chunk == 1448);
@@ -136,7 +139,8 @@ void test_txbump_full(void *arg)
   test_assert("unused tx buffer", ret == -1);
   test_assert("updated tx avail", fs->tx_avail == 1024);
   test_assert("qman set sent", qm_set_op.got_op);
-  test_assert("qman set id correct", qm_set_op.id == 0);
+  test_assert("qman set app id correct", qm_set_op.app_id == 0);
+  test_assert("qman set id correct", qm_set_op.flow_id == 0);
   test_assert("qman set rate correct", qm_set_op.rate == fs->tx_rate);
   test_assert("qman set avail correct", qm_set_op.avail == 1024);
   test_assert("qman set max chunk correct", qm_set_op.max_chunk == 1448);
@@ -279,7 +283,8 @@ void test_retransmit(void *arg)
   test_assert("tx remote avail reset", fs->rx_remote_avail == 1024);
 
   test_assert("qman set sent", qm_set_op.got_op);
-  test_assert("qman set id correct", qm_set_op.id == 0);
+  test_assert("qman set app id correct", qm_set_op.app_id == 0);
+  test_assert("qman set id correct", qm_set_op.flow_id == 0);
   test_assert("qman set rate correct", qm_set_op.rate == fs->tx_rate);
   test_assert("qman set avail correct", qm_set_op.avail == 128);
   test_assert("qman set max chunk correct", qm_set_op.max_chunk == 1448);

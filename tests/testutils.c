@@ -48,7 +48,6 @@ int test_subcase(const char *name, void (*run)(void *), void *param)
   int status;
 
   printf("Subcase: %s ...\n", name);
-
   pid = fork();
   if (!pid) {
     /* in child */

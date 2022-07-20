@@ -24,7 +24,8 @@ TESTS_SOCKETS := \
 TESTS_AUTO := \
   tests/libtas/tas_ll \
   tests/libtas/tas_sockets \
-  tests/tas_unit/fastpath
+  tests/tas_unit/fastpath \
+  tests/tas_unit/qman_rr
 
 TESTS := $(TESTS_NONE) $(TESTS_LIBTAS) $(TESTS_SOCKETS) $(TESTS_AUTO)
 TEST_OBJS := $(addsuffix .o, $(TESTS)) \
@@ -63,6 +64,13 @@ tests/tas_unit/fastpath: LDLIBS+= -lrte_eal
 tests/tas_unit/fastpath: tests/tas_unit/fastpath.o tests/testutils.o \
   tas/fast/fast_flows.o
 
+tests/tas_unit/qman_rr: CPPFLAGS+= -Itas/include -Ilib/tas/include/ $(DPDK_CPPFLAGS)
+tests/tas_unit/qman_rr: CFLAGS+= $(DPDK_CFLAGS)
+tests/tas_unit/qman_rr: LDFLAGS+= $(DPDK_LDFLAGS)
+tests/tas_unit/qman_rr: LDLIBS+= $(DPDK_LDLIBS)
+tests/tas_unit/qman_rr: tests/tas_unit/qman_rr.o tests/testutils.o \
+  tas/fast/qman.o lib/utils/rng.o
+
 # build tests
 tests: $(TESTS)
 
@@ -71,6 +79,7 @@ run-tests: $(TESTS_AUTO)
 	tests/libtas/tas_ll
 	tests/libtas/tas_sockets
 	tests/tas_unit/fastpath
+	tests/tas_unit/qman_rr
 
 DEPS += $(TEST_OBJS:.o=.d)
 CLEAN += $(TEST_OBJS) $(TESTS)
