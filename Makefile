@@ -24,8 +24,7 @@ INCDIR ?= $(PREFIX)/include
 # DPDK configuration
 
 DPDK_CPPFLAGS ?= $(shell $(PKG_CONFIG) --cflags libdpdk)
-DPDK_LDFLAGS ?= $(shell $(PKG_CONFIG) --libs-only-l libdpdk)
-DPDK_LDLIBS ?= $(shell $(PKG_CONFIG) --libs-only-L --libs-only-other libdpdk)
+DPDK_LDLIBS ?= $(shell $(PKG_CONFIG) --static --libs libdpdk)
 
 ##############################################################################
 
