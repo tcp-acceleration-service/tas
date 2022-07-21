@@ -115,25 +115,28 @@ struct flow_queue {
 } __attribute__((packed));
 STATIC_ASSERT((sizeof(struct flow_queue) == 32), queue_size);
 
+/** General qman functions */
 static inline int64_t rel_time(uint32_t cur_ts, uint32_t ts_in);
 static inline uint32_t sum_bytes(uint16_t *q_bytes, unsigned start, unsigned end);
 static inline uint32_t timestamp(void);
 static inline int timestamp_lessthaneq(struct qman_thread *t, uint32_t a,
     uint32_t b);
 
+/** Qman functions for app */
 static inline int appcont_init(struct qman_thread *t);
 static inline int app_qman_poll(struct qman_thread *t, struct app_cont *ac,
     unsigned num, unsigned *app_id, unsigned *q_ids, uint16_t *q_bytes);
 int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id,
     uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags);
-/** General queue management for app queues */
 static inline void app_queue_fire(struct app_cont *ac, struct app_queue *q,
     uint32_t idx, uint16_t *q_bytes, unsigned start, unsigned end);
+/** Actually update queue state for app queue */
 static inline void app_set_impl(struct app_cont *ac, uint32_t a_idx,
     uint32_t f_idx, uint32_t avail, uint8_t flags);
 static inline void app_queue_activate(struct app_cont *ac,
     struct app_queue *q, uint32_t idx);
 
+/** Qman management functions for flows */
 static inline int flowcont_init(struct app_queue *aq);
 static inline int flow_qman_poll(struct qman_thread *t, struct flow_cont *fc,
     unsigned num, unsigned *q_ids, uint16_t *q_bytes);
@@ -154,7 +157,6 @@ static inline unsigned flow_poll_skiplist(struct qman_thread *t, struct flow_con
     uint32_t cur_ts, unsigned num, unsigned *q_ids, uint16_t *q_bytes);
 static inline uint8_t flow_queue_level(struct qman_thread *t, 
     struct flow_cont *fc);
-/** General queue management for flow queues */
 static inline void flow_queue_fire(struct qman_thread *t, struct flow_cont *fc,
     struct flow_queue *q, uint32_t idx, unsigned *q_id, uint16_t *q_bytes);
 static inline void flow_queue_activate(struct qman_thread *t, struct flow_cont *fc, 
@@ -318,27 +320,6 @@ int timestamp_lessthaneq(struct qman_thread *t, uint32_t a,
                          uint32_t b)
 {
   return rel_time(t->ts_virtual, a) <= rel_time(t->ts_virtual, b);
-}
-
-void free_app_cont(struct dataplane_context *ctx)
-{
-  int i;
-  struct app_cont *ac;
-  struct app_queue *aq;
-  struct flow_cont *fc;
-
-  ac = ctx->qman.a_cont;
-
-  for (i = 0; i < FLEXNIC_PL_APPST_NUM; i++)
-  {
-    aq = &ac->queues[i];
-    fc = aq->f_cont;
-    free(fc->queues);
-    free(fc);
-  }
-
-  free(ac->queues);
-  free(ac);
 }
 
 /*****************************************************************************/
@@ -532,6 +513,8 @@ static inline uint32_t sum_bytes(uint16_t *q_bytes, unsigned start, unsigned end
 
   return bytes;
 }
+
+/*****************************************************************************/
 
 /*****************************************************************************/
 /* Manages flow queues */
@@ -872,3 +855,40 @@ static inline void flow_queue_activate(struct qman_thread *t, struct flow_cont *
 }
 
 /*****************************************************************************/
+
+/*****************************************************************************/
+/* Helper functions for unit tests */
+
+void qman_free_app_cont(struct dataplane_context *ctx)
+{
+  int i;
+  struct app_cont *ac;
+  struct app_queue *aq;
+  struct flow_cont *fc;
+
+  ac = ctx->qman.a_cont;
+
+  for (i = 0; i < FLEXNIC_PL_APPST_NUM; i++)
+  {
+    aq = &ac->queues[i];
+    fc = aq->f_cont;
+    free(fc->queues);
+    free(fc);
+  }
+
+  free(ac->queues);
+  free(ac);
+}
+
+uint32_t qman_app_get_avail(struct dataplane_context *ctx, uint32_t app_id)
+{
+  uint32_t avail;
+  struct app_cont *ac;
+  struct app_queue *aq;
+  
+  ac = ctx->qman.a_cont;
+  aq = &ac->queues[app_id];
+  avail = aq->avail;
+  
+  return avail;
+}
