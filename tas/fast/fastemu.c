@@ -144,8 +144,7 @@ int dataplane_context_init(struct dataplane_context *ctx)
   }
 
   /* initialize queue manager */
-  if (qman_thread_init(ctx) != 0)
-  {
+  if (tas_qman_thread_init(ctx) != 0) {
     fprintf(stderr, "initializing qman thread failed\n");
     return -1;
   }
@@ -238,7 +237,7 @@ void dataplane_loop(struct dataplane_context *ctx)
     if (!was_idle)
       ctx->loadmon_cyc_busy += cyc - prev_cyc;
 
-    ts = qman_timestamp(cyc);
+    ts = tas_qman_timestamp(cyc);
 
     STATS_TS(start);
   
@@ -299,7 +298,7 @@ static void dataplane_block(struct dataplane_context *ctx, uint32_t ts)
     return;
   }
 
-  max_timeout = qman_next_ts(&ctx->qman, ts);
+  max_timeout = tas_qman_next_ts(&ctx->qman, ts);
 
   ret = rte_epoll_wait(RTE_EPOLL_PER_THREAD, event, 2,
                        max_timeout == (uint32_t)-1 ? -1 : max_timeout / 1000);
@@ -608,7 +607,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   max = bufcache_prealloc(ctx, max, &handles);
 
   /* poll queue manager */
-  ret = qman_poll(ctx, max, vq_ids, fq_ids, q_bytes);
+  ret = tas_qman_poll(ctx, max, vq_ids, fq_ids, q_bytes);
 
   if (ret <= 0)
   {
