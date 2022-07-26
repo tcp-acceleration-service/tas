@@ -172,12 +172,12 @@ int nicif_appctx_add(uint16_t appid, uint32_t db, uint64_t *rxq_base,
 }
 
 /** Register flow */
-int nicif_connection_add(uint32_t db, uint64_t mac_remote, uint32_t ip_local,
-    uint16_t port_local, uint32_t ip_remote, uint16_t port_remote,
-    uint64_t rx_base, uint32_t rx_len, uint64_t tx_base, uint32_t tx_len,
-    uint32_t remote_seq, uint32_t local_seq, uint64_t app_opaque,
-    uint32_t flags, uint32_t rate, uint32_t fn_core, uint16_t flow_group,
-    uint32_t *pf_id)
+int nicif_connection_add(uint32_t db, uint16_t app_id, uint64_t mac_remote, 
+    uint32_t ip_local, uint16_t port_local, uint32_t ip_remote, 
+    uint16_t port_remote, uint64_t rx_base, uint32_t rx_len, uint64_t tx_base,
+    uint32_t tx_len, uint32_t remote_seq, uint32_t local_seq, 
+    uint64_t app_opaque, uint32_t flags, uint32_t rate, uint32_t fn_core, 
+    uint16_t flow_group, uint32_t *pf_id)
 {
   struct flextcp_pl_flowst *fs;
   beui32_t lip = t_beui32(ip_local), rip = t_beui32(ip_remote);
@@ -213,6 +213,7 @@ int nicif_connection_add(uint32_t db, uint64_t mac_remote, uint32_t ip_local,
   fs->tx_len = tx_len;
   memcpy(&fs->remote_mac, &mac_remote, ETH_ADDR_LEN);
   fs->db_id = db;
+  fs->app_id = app_id;
 
   fs->local_ip = lip;
   fs->remote_ip = rip;

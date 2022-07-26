@@ -257,6 +257,9 @@ struct flextcp_pl_flowst {
   /** Doorbell ID (identifying the app ctx to use) */
   uint16_t db_id;
 
+  /** Id of applicatiion this flow belongs to */
+  uint16_t app_id;
+
   /** Flow group for this connection (rss bucket) */
   uint16_t flow_group;
   /** Sequence number of queue pointer bumps */

@@ -28,4 +28,5 @@ doc/html
 doc/xml
 doc/_build
 .dockerwrap
+.vscode
 Makefile.local

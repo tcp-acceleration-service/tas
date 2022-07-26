@@ -37,6 +37,7 @@
 #include <utils.h>
 #include <utils_rng.h>
 #include "internal.h"
+#include "appif.h"
 
 #define TCP_MSS 1460
 #define TCP_HTSIZE 4096
@@ -568,7 +569,7 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
   c->comp.notify_fd = -1;
   c->comp.status = 0;
 
-  if (nicif_connection_add(c->db_id, c->remote_mac, c->local_ip, c->local_port,
+  if (nicif_connection_add(c->db_id, c->ctx->app->id, c->remote_mac, c->local_ip, c->local_port,
         c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) tas_shm,
         c->rx_len, c->tx_buf - (uint8_t *) tas_shm, c->tx_len,
         c->remote_seq, c->local_seq, c->opaque, c->flags, c->cc_rate,
@@ -941,7 +942,7 @@ static void listener_accept(struct listener *l)
   c->comp.notify_fd = -1;
   c->comp.status = 0;
 
-  if (nicif_connection_add(c->db_id, c->remote_mac, c->local_ip, c->local_port,
+  if (nicif_connection_add(c->db_id, c->ctx->app->id, c->remote_mac, c->local_ip, c->local_port,
         c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) tas_shm,
         c->rx_len, c->tx_buf - (uint8_t *) tas_shm, c->tx_len,
         c->remote_seq, c->local_seq + 1, c->opaque, c->flags, c->cc_rate,

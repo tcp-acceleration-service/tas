@@ -427,7 +427,7 @@ int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id,
 
   if (app_id >= FLEXNIC_PL_APPST_NUM) 
   {
-    fprintf(stderr, "app_qman_set: invalid queue id: %u >= %u\n", app_id,
+    fprintf(stderr, "app_qman_set: invalid app id: %u >= %u\n", app_id,
         FLEXNIC_PL_APPST_NUM);
     return -1;
   }
