@@ -127,6 +127,7 @@ static struct trace *trace_connect(unsigned id)
   t->hdr = m;
   t->base = t->hdr + 1;
   t->len = sb.st_size - sizeof(*t->hdr);
+  printf("size of file = %ld\n", t->len);
   t->pos = 0;
   return t;
 }
@@ -477,8 +478,8 @@ static void qmset_dump(void *buf, size_t len)
     return;
   }
 
-  printf(" cfg={id=%u rate=%u avail=%u max_chunk=%u opaque=%x flags=%x}",
-      hdr->id, hdr->rate, hdr->avail, hdr->max_chunk, hdr->opaque, hdr->flags);
+  printf(" cfg={id=%u rate=%u avail=%u max_chunk=%u opaque=%x flags=%x counter=%lu}",
+      hdr->id, hdr->rate, hdr->avail, hdr->max_chunk, hdr->opaque, hdr->flags, hdr->counter);
 }
 
 static void qmevt_dump(void *buf, size_t len)

@@ -65,6 +65,7 @@ struct flexnic_trace_entry_qman_set {
   uint16_t max_chunk;
   uint8_t  opaque;
   uint8_t  flags;
+  uint64_t counter;
 } __attribute__((packed));
 
 struct flexnic_trace_entry_qman_event {

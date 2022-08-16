@@ -33,14 +33,14 @@
 
 #define BUFFER_SIZE 2048
 
-//#define FLEXNIC_TRACING
+// #define FLEXNIC_TRACING
 #ifdef FLEXNIC_TRACING
 #   include <tas_trace.h>
 #   define FLEXNIC_TRACE_RX
 #   define FLEXNIC_TRACE_TX
 #   define FLEXNIC_TRACE_DMA
 #   define FLEXNIC_TRACE_QMAN
-#   define FLEXNIC_TRACE_LEN (1024 * 1024 * 32)
+#   define FLEXNIC_TRACE_LEN (1024 * 256)
     int trace_thread_init(uint16_t id);
     int trace_event(uint16_t type, uint16_t length, const void *buf);
     int trace_event2(uint16_t type, uint16_t len_1, const void *buf_1,

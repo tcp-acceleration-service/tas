@@ -60,6 +60,8 @@
 #define TIMESTAMP_BITS 32
 #define TIMESTAMP_MASK 0xFFFFFFFF
 
+uint64_t *set_counter;
+
 /** Queue container for an application */
 struct app_cont {
   /** Application queue */
@@ -126,7 +128,7 @@ static inline int timestamp_lessthaneq(struct qman_thread *t, uint32_t a,
 static inline int appcont_init(struct qman_thread *t);
 static inline int app_qman_poll(struct qman_thread *t, struct app_cont *ac,
     unsigned num, unsigned *app_id, unsigned *q_ids, uint16_t *q_bytes);
-int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id,
+static inline int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id,
     uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags);
 static inline void app_queue_fire(struct app_cont *ac, struct app_queue *q,
     uint32_t idx, uint16_t *q_bytes, unsigned start, unsigned end);
@@ -181,6 +183,9 @@ int qman_thread_init(struct dataplane_context *ctx)
   utils_rng_init(&t->rng, RNG_SEED * ctx->id + ctx->id);
   t->ts_virtual = 0;
   t->ts_real = timestamp();
+
+  set_counter = calloc(3, sizeof(uint64_t));
+
   return 0;
 }
 
@@ -199,6 +204,26 @@ int qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id, uint32_t 
 {
   int ret;
   ret = app_qman_set(t, app_id, flow_id, rate, avail, max_chunk, flags);
+  
+  #ifdef FLEXNIC_TRACE_QMAN
+
+  if (ret == 0 && (flags & QMAN_ADD_AVAIL))
+  {
+    set_counter[app_id] += 1;
+  }
+
+  if (app_id == 0)
+  {
+    struct flexnic_trace_entry_qman_set evt = {
+      .id = app_id, .rate = rate, .avail = avail, .max_chunk = max_chunk,
+      .flags = flags, .counter = set_counter[app_id],
+    };
+    trace_event(FLEXNIC_TRACE_EV_QMSET, sizeof(evt), &evt);
+  }
+
+  #endif
+
+ 
   return ret;
 }
 
@@ -359,11 +384,11 @@ int appcont_init(struct qman_thread *t)
   return 0;
 }
 
-int app_qman_poll(struct qman_thread *t, struct app_cont *ac, unsigned num, 
+static inline int app_qman_poll(struct qman_thread *t, struct app_cont *ac, unsigned num, 
     unsigned *app_id, unsigned *q_ids, uint16_t *q_bytes)
 {
   int i, cnt, x;
-  // uint16_t quanta = 2;
+  uint16_t quanta = BATCH_SIZE / 2;
   uint32_t idx;
 
   for (cnt = 0; cnt < num && ac->head_idx != IDXLIST_INVAL;)
@@ -380,16 +405,16 @@ int app_qman_poll(struct qman_thread *t, struct app_cont *ac, unsigned num,
 
     aq->flags &= ~FLAG_INNOLIMITL;
 
-    // if (aq->dc < num - cnt)
-    // {
-    //   x = flow_qman_poll(t, fc, aq->dc, q_ids + cnt, q_bytes + cnt);
-    // }
-    // else
-    // {
-    x = flow_qman_poll(t, fc, num - cnt, q_ids + cnt, q_bytes + cnt);
-    // }
+    if (aq->dc < num - cnt)
+    {
+      x = flow_qman_poll(t, fc, aq->dc, q_ids + cnt, q_bytes + cnt);
+    }
+    else
+    {
+      x = flow_qman_poll(t, fc, num - cnt, q_ids + cnt, q_bytes + cnt);
+    }
 
-    // aq->dc -= x;
+    aq->dc -= x;
     cnt += x;
 
     // Update app_id list
@@ -403,13 +428,13 @@ int app_qman_poll(struct qman_thread *t, struct app_cont *ac, unsigned num,
       app_queue_fire(ac, aq, idx, q_bytes, cnt - x, cnt);
     }
   
-    // if ((aq->dc + quanta) > BATCH_SIZE)
-    // {
-    //   aq->dc = BATCH_SIZE;
-    // }
-    // else{
-    //   aq->dc += quanta;
-    // }
+    if ((aq->dc + quanta) > BATCH_SIZE)
+    {
+      aq->dc = BATCH_SIZE;
+    }
+    else{
+      aq->dc += quanta;
+    }
 
   }
 
@@ -417,7 +442,7 @@ int app_qman_poll(struct qman_thread *t, struct app_cont *ac, unsigned num,
   return cnt;
 }
 
-int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id, 
+static inline int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id, 
     uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags)
 {
   int ret;
@@ -543,7 +568,7 @@ int flowcont_init(struct app_queue *aq)
   return 0;
 }
 
-int flow_qman_poll(struct qman_thread *t, struct flow_cont *fc, unsigned num, 
+static inline int flow_qman_poll(struct qman_thread *t, struct flow_cont *fc, unsigned num, 
     unsigned *q_ids, uint16_t *q_bytes)
 {
   unsigned x, y;

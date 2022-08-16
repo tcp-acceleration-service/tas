@@ -83,6 +83,7 @@ int trace_thread_init(uint16_t id)
 
 int trace_event(uint16_t type, uint16_t len, const void *buf)
 {
+
   return trace_event2(type, len, buf, 0, NULL);
 }
 
