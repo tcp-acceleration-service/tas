@@ -160,7 +160,6 @@ int network_init(unsigned n_threads)
     goto error_exit;
   }
 
-
   /* workaround for mlx5. */
   if (config.fp_autoscale) {
     if (reta_mlx5_resize() != 0) {
@@ -222,12 +221,13 @@ int network_thread_init(struct dataplane_context *ctx)
     goto error_mpool;
   }
 
-  /* initialize tx queue */
+  /* initialize tx queue for each application */
   t->queue_id = ctx->id;
   rte_spinlock_lock(&initlock);
-  ret = rte_eth_tx_queue_setup(net_port_id, t->queue_id, TX_DESCRIPTORS,
+  ret = rte_eth_tx_queue_setup(net_port_id, t->queue_id, TX_DESCRIPTORS, 
           rte_socket_id(), &eth_devinfo.default_txconf);
   rte_spinlock_unlock(&initlock);
+ 
   if (ret != 0) {
     fprintf(stderr, "network_thread_init: rte_eth_tx_queue_setup failed\n");
     goto error_tx_queue;
@@ -237,12 +237,13 @@ int network_thread_init(struct dataplane_context *ctx)
   __sync_add_and_fetch(&tx_init_done, 1);
   while (tx_init_done < num_threads);
 
-  /* initialize rx queue */
+  /* initialize rx queue for each application */
   t->queue_id = ctx->id;
   rte_spinlock_lock(&initlock);
-  ret = rte_eth_rx_queue_setup(net_port_id, t->queue_id, RX_DESCRIPTORS,
-          rte_socket_id(), &eth_devinfo.default_rxconf, t->pool);
+    ret = rte_eth_rx_queue_setup(net_port_id, t->queue_id, RX_DESCRIPTORS, 
+            rte_socket_id(), &eth_devinfo.default_rxconf, t->pool);
   rte_spinlock_unlock(&initlock);
+  
   if (ret != 0) {
     fprintf(stderr, "network_thread_init: rte_eth_rx_queue_setup failed\n");
     goto error_rx_queue;
@@ -283,15 +284,17 @@ int network_thread_init(struct dataplane_context *ctx)
   while (!start_done);
 
   if (config.fp_interrupts) {
-    /* setup rx queue interrupt */
+    /* setup rx queue interrupt for each application */
     rte_spinlock_lock(&initlock);
     ret = rte_eth_dev_rx_intr_ctl_q(net_port_id, t->queue_id,
-        RTE_EPOLL_PER_THREAD, RTE_INTR_EVENT_ADD, NULL);
+            RTE_EPOLL_PER_THREAD, RTE_INTR_EVENT_ADD, NULL);
+    
     rte_spinlock_unlock(&initlock);
-    if (ret != 0) {
-      fprintf(stderr, "network_thread_init: rte_eth_dev_rx_intr_ctl_q failed "
-          "(%d)\n", rte_errno);
-      goto error_int_queue;
+    if (ret != 0) 
+    {
+        fprintf(stderr, "network_thread_init: rte_eth_dev_rx_intr_ctl_q failed "
+            "(%d)\n", rte_errno);
+        goto error_int_queue;
     }
   }
 

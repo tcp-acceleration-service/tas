@@ -613,7 +613,7 @@ unlock:
     trace_event(FLEXNIC_PL_TREV_ARX, sizeof(te_arx), &te_arx);
 #endif
 
-    arx_cache_add(ctx, fs->db_id, fs->opaque, rx_bump, rx_pos, tx_bump, type);
+    arx_cache_add(ctx, fs->db_id, fs->app_id, fs->opaque, rx_bump, rx_pos, tx_bump, type);
   }
 
   /* Flow control: More receiver space? -> might need to start sending */

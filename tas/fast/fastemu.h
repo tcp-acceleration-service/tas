@@ -36,9 +36,10 @@ void fast_kernel_packet(struct dataplane_context *ctx,
     struct network_buf_handle *nbh);
 
 /* fast_appctx.c */
-void fast_appctx_poll_pf(struct dataplane_context *ctx, uint32_t id);
+void fast_appctx_poll_pf(struct dataplane_context *ctx, uint32_t id, 
+        uint16_t app_id);
 int fast_appctx_poll_fetch(struct dataplane_context *ctx, uint32_t id,
-    void **pqe);
+    uint16_t app_id, void **pqe);
 int fast_appctx_poll_bump(struct dataplane_context *ctx, void *pqe,
     struct network_buf_handle *nbh, uint32_t ts);
 
@@ -46,7 +47,8 @@ int fast_appctx_poll(struct dataplane_context *ctx, uint32_t id,
     struct network_buf_handle *nbh, uint32_t ts);
 int fast_actx_rxq_alloc(struct dataplane_context *ctx,
     struct flextcp_pl_appctx *actx, struct flextcp_pl_arx **arx);
-int fast_actx_rxq_probe(struct dataplane_context *ctx, uint32_t id);
+int fast_actx_rxq_probe(struct dataplane_context *ctx, uint32_t id,
+    uint16_t app_id);
 
 /* fast_flows.c */
 void fast_flows_qman_pf(struct dataplane_context *ctx, uint32_t *queues,
@@ -102,12 +104,13 @@ static inline uint16_t tx_xsum_enable(struct network_buf_handle *nbh,
 }
 
 static inline void arx_cache_add(struct dataplane_context *ctx, uint16_t ctx_id,
-    uint64_t opaque, uint32_t rx_bump, uint32_t rx_pos, uint32_t tx_bump,
-    uint16_t type_flags)
+    uint16_t app_id, uint64_t opaque, uint32_t rx_bump, uint32_t rx_pos, 
+    uint32_t tx_bump, uint16_t type_flags)
 {
   uint16_t id = ctx->arx_num++;
 
   ctx->arx_ctx[id] = ctx_id;
+  ctx->arx_ctx_appid[id] = app_id;
   ctx->arx_cache[id].type = type_flags & 0xff;
   ctx->arx_cache[id].msg.connupdate.opaque = opaque;
   ctx->arx_cache[id].msg.connupdate.rx_bump = rx_bump;

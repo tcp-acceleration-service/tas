@@ -100,6 +100,7 @@ int dataplane_init(void)
 
 int dataplane_context_init(struct dataplane_context *ctx)
 {
+  int i;
   char name[32];
 
   /* initialize forwarding queue */
@@ -123,7 +124,11 @@ int dataplane_context_init(struct dataplane_context *ctx)
     return -1;
   }
 
-  ctx->poll_next_ctx = ctx->id;
+  for (i = 0; i < FLEXNIC_PL_APPST_NUM; i++)
+  {
+    ctx->poll_next_ctx[i] = ctx->id;
+  }
+  ctx->poll_next_app = 0;
 
   ctx->evfd = eventfd(0, EFD_NONBLOCK);
   assert(ctx->evfd != -1);
@@ -325,7 +330,7 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
   struct network_buf_handle **handles;
   void *aqes[BATCH_SIZE];
   unsigned n, i, total = 0;
-  uint16_t max, k = 0, num_bufs = 0, j;
+  uint16_t max, k = 0, num_bufs = 0, j, aid;
   int ret;
 
   STATS_ADD(ctx, qs_poll, 1);
@@ -337,23 +342,35 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
   /* allocate buffers contents */
   max = bufcache_prealloc(ctx, max, &handles);
 
-  for (n = 0; n < FLEXNIC_PL_APPCTX_NUM; n++) {
-    fast_appctx_poll_pf(ctx, (ctx->poll_next_ctx + n) % FLEXNIC_PL_APPCTX_NUM);
+  for  (aid = 0; aid < FLEXNIC_PL_APPST_NUM; aid++)
+  {
+    for (n = 0; n < FLEXNIC_PL_APPCTX_NUM; n++) 
+    {
+      fast_appctx_poll_pf(ctx, (ctx->poll_next_ctx[aid] + n) % FLEXNIC_PL_APPCTX_NUM,
+        aid);
+    }
   }
 
-  for (n = 0; n < FLEXNIC_PL_APPCTX_NUM && k < max; n++) {
-    for (i = 0; i < BATCH_SIZE && k < max; i++) {
-      ret = fast_appctx_poll_fetch(ctx, ctx->poll_next_ctx, &aqes[k]);
-      if (ret == 0)
-        k++;
-      else
-        break;
+  /* poll each app in round-robin fashion */
+  for (aid = 0; aid < FLEXNIC_PL_APPST_NUM && k < max; aid++)
+  {
+    for (n = 0; n < FLEXNIC_PL_APPCTX_NUM && k < max; n++) 
+    {
+      for (i = 0; i < BATCH_SIZE && k < max; i++) 
+      {
+        ret = fast_appctx_poll_fetch(ctx, ctx->poll_next_ctx[aid], ctx->poll_next_app, &aqes[k]);
+        if (ret == 0)
+          k++;
+        else
+          break;
 
-      total++;
+        total++;
+      }
+
+      ctx->poll_next_ctx[aid] = (ctx->poll_next_ctx[aid] + 1) %
+        FLEXNIC_PL_APPCTX_NUM;
     }
-
-    ctx->poll_next_ctx = (ctx->poll_next_ctx + 1) %
-      FLEXNIC_PL_APPCTX_NUM;
+    ctx->poll_next_app = (ctx->poll_next_app + 1) % FLEXNIC_PL_APPST_NUM;
   }
 
   for (j = 0; j < k; j++) {
@@ -365,8 +382,11 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
   /* apply buffer reservations */
   bufcache_alloc(ctx, num_bufs);
 
-  for (n = 0; n < FLEXNIC_PL_APPCTX_NUM; n++)
-    fast_actx_rxq_probe(ctx, n);
+  for (aid = 0; aid < FLEXNIC_PL_APPST_NUM; aid++)
+  {
+    for (n = 0; n < FLEXNIC_PL_APPCTX_NUM; n++)
+      fast_actx_rxq_probe(ctx, n, aid);
+  }
 
   STATS_ADD(ctx, qs_total, total);
   if (total == 0)
@@ -483,17 +503,17 @@ static inline uint8_t bufcache_prealloc(struct dataplane_context *ctx, uint16_t 
 {
   uint16_t grow, res, head, g, i;
   struct network_buf_handle *nbh;
-
   /* try refilling buffer cache */
   if (ctx->bufcache_num < num) {
     grow = BUFCACHE_SIZE - ctx->bufcache_num;
     head = (ctx->bufcache_head + ctx->bufcache_num) & (BUFCACHE_SIZE - 1);
-
+    
     if (head + grow <= BUFCACHE_SIZE) {
       res = network_buf_alloc(&ctx->net, grow, ctx->bufcache_handles + head);
     } else {
       g = BUFCACHE_SIZE - head;
       res = network_buf_alloc(&ctx->net, g, ctx->bufcache_handles + head);
+      
       if (res == g) {
         res += network_buf_alloc(&ctx->net, grow - g, ctx->bufcache_handles);
       }
@@ -510,6 +530,7 @@ static inline uint8_t bufcache_prealloc(struct dataplane_context *ctx, uint16_t 
   }
   num = MIN(num, (ctx->bufcache_head + ctx->bufcache_num <= BUFCACHE_SIZE ?
         ctx->bufcache_num : BUFCACHE_SIZE - ctx->bufcache_head));
+
 
   *handles = ctx->bufcache_handles + ctx->bufcache_head;
 
@@ -594,12 +615,13 @@ static void poll_scale(struct dataplane_context *ctx)
 
 static void arx_cache_flush(struct dataplane_context *ctx, uint64_t tsc)
 {
-  uint16_t i;
+  uint16_t i, app_id;
   struct flextcp_pl_appctx *actx;
   struct flextcp_pl_arx *parx[BATCH_SIZE];
 
   for (i = 0; i < ctx->arx_num; i++) {
-    actx = &fp_state->appctx[ctx->id][ctx->arx_ctx[i]];
+    app_id = ctx->arx_ctx_appid[i];
+    actx = &fp_state->appctx[ctx->id][app_id][ctx->arx_ctx[i]];
     if (fast_actx_rxq_alloc(ctx, actx, &parx[i]) != 0) {
       /* TODO: how do we handle this? */
       fprintf(stderr, "arx_cache_flush: no space in app rx queue\n");
@@ -616,7 +638,8 @@ static void arx_cache_flush(struct dataplane_context *ctx, uint64_t tsc)
   }
 
   for (i = 0; i < ctx->arx_num; i++) {
-    actx = &fp_state->appctx[ctx->id][ctx->arx_ctx[i]];
+    app_id = ctx->arx_ctx_appid[i];
+    actx = &fp_state->appctx[ctx->id][app_id][ctx->arx_ctx[i]];
     notify_appctx(actx, tsc);
   }
 

@@ -139,9 +139,8 @@ int slowpath_main(void)
 
     if (cur_ts - last_print >= 1000000) {
       if (!config.quiet) {
-        printf("stats: drops=%"PRIu64" k_rexmit=%"PRIu64" ecn=%"PRIu64" acks=%"
-            PRIu64"\n", kstats.drops, kstats.kernel_rexmit, kstats.ecn_marked,
-            kstats.acks);
+        printf("stats: drops=%"PRIu64" k_rexmit=%"PRIu64" ecn=%"PRIu64" acks=%"PRIu64"\n",
+            kstats.drops, kstats.kernel_rexmit, kstats.ecn_marked, kstats.acks);
         fflush(stdout);
       }
       last_print = cur_ts;

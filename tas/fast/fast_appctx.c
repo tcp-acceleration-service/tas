@@ -30,16 +30,17 @@
 #include "internal.h"
 #include "fastemu.h"
 
-void fast_appctx_poll_pf(struct dataplane_context *ctx, uint32_t id)
+void fast_appctx_poll_pf(struct dataplane_context *ctx, uint32_t id, 
+    uint16_t app_id)
 {
-  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][id];
+  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][app_id][id];
   rte_prefetch0(dma_pointer(actx->tx_base + actx->tx_head, 1));
 }
 
-int fast_appctx_poll_fetch(struct dataplane_context *ctx, uint32_t id,
-    void **pqe)
+int fast_appctx_poll_fetch(struct dataplane_context *ctx, uint32_t actx_id,
+    uint16_t app_id, void **pqe)
 {
-  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][id];
+  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][app_id][actx_id];
   struct flextcp_pl_atx *atx;
   uint8_t type;
   uint32_t flow_id  = -1;
@@ -57,7 +58,7 @@ int fast_appctx_poll_fetch(struct dataplane_context *ctx, uint32_t id,
     return -1;
   } else if (type != FLEXTCP_PL_ATX_CONNUPDATE) {
     fprintf(stderr, "fast_appctx_poll: unknown type: %u id=%u\n", type,
-        id);
+        actx_id);
     abort();
   }
 
@@ -135,9 +136,10 @@ int fast_actx_rxq_alloc(struct dataplane_context *ctx,
 }
 
 
-int fast_actx_rxq_probe(struct dataplane_context *ctx, uint32_t id)
+int fast_actx_rxq_probe(struct dataplane_context *ctx, uint32_t id,
+    uint16_t app_id)
 {
-  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][id];
+  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][app_id][id];
   struct flextcp_pl_arx *parx;
   uint32_t pos, i;
 

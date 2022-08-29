@@ -67,6 +67,7 @@ struct dataplane_context {
   /* arx cache */
   struct flextcp_pl_arx arx_cache[BATCH_SIZE];
   uint16_t arx_ctx[BATCH_SIZE];
+  uint16_t arx_ctx_appid[BATCH_SIZE];
   uint16_t arx_num;
 
   /********************************************************/
@@ -76,7 +77,8 @@ struct dataplane_context {
 
   /********************************************************/
   /* polling queues */
-  uint32_t poll_next_ctx;
+  uint16_t poll_next_app;
+  uint32_t poll_next_ctx[FLEXNIC_PL_APPST_NUM];
 
   /********************************************************/
   /* pre-allocated buffers for polling doorbells and queue manager */

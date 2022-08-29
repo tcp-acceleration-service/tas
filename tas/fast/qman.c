@@ -38,13 +38,8 @@
 #include <utils.h>
 
 #include "internal.h"
+#include "../slow/internal.h"
 
-/* TODO: Retrieve packets from more than one app with each call to qman_poll */
-/* TODO: Add rate to app containers */
-/* TODO: Make sure flow_id makes sense when distributed among different apps.
-   find way to translate absolute flow_id to an id in the application queue.
-   Right now, we are using more memory than necessary to keep track of all
-   the queues. */
 
 #define dprintf(...) do { } while (0)
 
@@ -59,8 +54,6 @@
 #define RNG_SEED 0x12345678
 #define TIMESTAMP_BITS 32
 #define TIMESTAMP_MASK 0xFFFFFFFF
-
-uint64_t *set_counter;
 
 /** Queue container for an application */
 struct app_cont {
@@ -184,8 +177,6 @@ int qman_thread_init(struct dataplane_context *ctx)
   t->ts_virtual = 0;
   t->ts_real = timestamp();
 
-  set_counter = calloc(3, sizeof(uint64_t));
-
   return 0;
 }
 
@@ -204,26 +195,7 @@ int qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id, uint32_t 
 {
   int ret;
   ret = app_qman_set(t, app_id, flow_id, rate, avail, max_chunk, flags);
-  
-  #ifdef FLEXNIC_TRACE_QMAN
 
-  if (ret == 0 && (flags & QMAN_ADD_AVAIL))
-  {
-    set_counter[app_id] += 1;
-  }
-
-  if (app_id == 0)
-  {
-    struct flexnic_trace_entry_qman_set evt = {
-      .id = app_id, .rate = rate, .avail = avail, .max_chunk = max_chunk,
-      .flags = flags, .counter = set_counter[app_id],
-    };
-    trace_event(FLEXNIC_TRACE_EV_QMSET, sizeof(evt), &evt);
-  }
-
-  #endif
-
- 
   return ret;
 }
 
@@ -388,7 +360,7 @@ static inline int app_qman_poll(struct qman_thread *t, struct app_cont *ac, unsi
     unsigned *app_id, unsigned *q_ids, uint16_t *q_bytes)
 {
   int i, cnt, x;
-  uint16_t quanta = BATCH_SIZE / 2;
+  uint16_t quanta = num / 2;
   uint32_t idx;
 
   for (cnt = 0; cnt < num && ac->head_idx != IDXLIST_INVAL;)

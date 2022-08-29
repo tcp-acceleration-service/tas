@@ -147,7 +147,7 @@ int nicif_appctx_add(uint16_t appid, uint32_t db, uint64_t *rxq_base,
   }
 
   for (i = 0; i < tas_info->cores_num; i++) {
-    actx = &fp_state->appctx[i][db];
+    actx = &fp_state->appctx[i][appid][db];
     actx->appst_id = appid;
     actx->rx_base = rxq_base[i];
     actx->tx_base = txq_base[i];
@@ -158,7 +158,7 @@ int nicif_appctx_add(uint16_t appid, uint32_t db, uint64_t *rxq_base,
   MEM_BARRIER();
 
   for (i = 0; i < tas_info->cores_num; i++) {
-    actx = &fp_state->appctx[i][db];
+    actx = &fp_state->appctx[i][appid][db];
     actx->tx_len = txq_len;
     actx->rx_len = rxq_len;
   }

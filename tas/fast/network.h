@@ -45,7 +45,6 @@ int network_rx_interrupt_ctl(struct network_thread *t, int turnon);
 int network_scale_up(uint16_t old, uint16_t new);
 int network_scale_down(uint16_t old, uint16_t new);
 
-
 static inline void network_buf_reset(struct network_buf_handle *bh)
 {
   struct rte_mbuf *mb = (struct rte_mbuf *) bh;

@@ -22,8 +22,8 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef INTERNAL_H_
-#define INTERNAL_H_
+#ifndef INTERNAL_H_SLOW
+#define INTERNAL_H_SLOW
 
 /** @addtogroup tas-sp
  *  @brief TAS Slow Path
@@ -808,4 +808,4 @@ unsigned kni_poll(void);
 
 /** @} */
 
-#endif // ndef INTERNAL_H_
+#endif // ndef INTERNAL_H_SLOW
