@@ -221,7 +221,7 @@ int network_thread_init(struct dataplane_context *ctx)
     goto error_mpool;
   }
 
-  /* initialize tx queue for each application */
+  /* initialize tx queue */
   t->queue_id = ctx->id;
   rte_spinlock_lock(&initlock);
   ret = rte_eth_tx_queue_setup(net_port_id, t->queue_id, TX_DESCRIPTORS, 
@@ -237,7 +237,7 @@ int network_thread_init(struct dataplane_context *ctx)
   __sync_add_and_fetch(&tx_init_done, 1);
   while (tx_init_done < num_threads);
 
-  /* initialize rx queue for each application */
+  /* initialize rx queue */
   t->queue_id = ctx->id;
   rte_spinlock_lock(&initlock);
     ret = rte_eth_rx_queue_setup(net_port_id, t->queue_id, RX_DESCRIPTORS, 

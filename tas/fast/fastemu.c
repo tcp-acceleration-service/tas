@@ -373,7 +373,8 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
     ctx->poll_next_app = (ctx->poll_next_app + 1) % FLEXNIC_PL_APPST_NUM;
   }
 
-  for (j = 0; j < k; j++) {
+  for (j = 0; j < k; j++) 
+  {
     ret = fast_appctx_poll_bump(ctx, aqes[j], handles[num_bufs], ts);
     if (ret == 0)
       num_bufs++;
@@ -384,8 +385,10 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
 
   for (aid = 0; aid < FLEXNIC_PL_APPST_NUM; aid++)
   {
-    for (n = 0; n < FLEXNIC_PL_APPCTX_NUM; n++)
+    for (n = 0; n < FLEXNIC_PL_APPCTX_NUM; n++) 
+    { 
       fast_actx_rxq_probe(ctx, n, aid);
+    }
   }
 
   STATS_ADD(ctx, qs_total, total);
@@ -615,13 +618,13 @@ static void poll_scale(struct dataplane_context *ctx)
 
 static void arx_cache_flush(struct dataplane_context *ctx, uint64_t tsc)
 {
-  uint16_t i, app_id;
+  uint16_t i, aid;
   struct flextcp_pl_appctx *actx;
   struct flextcp_pl_arx *parx[BATCH_SIZE];
 
   for (i = 0; i < ctx->arx_num; i++) {
-    app_id = ctx->arx_ctx_appid[i];
-    actx = &fp_state->appctx[ctx->id][app_id][ctx->arx_ctx[i]];
+    aid = ctx->arx_ctx_appid[i];
+    actx = &fp_state->appctx[ctx->id][aid][ctx->arx_ctx[i]];
     if (fast_actx_rxq_alloc(ctx, actx, &parx[i]) != 0) {
       /* TODO: how do we handle this? */
       fprintf(stderr, "arx_cache_flush: no space in app rx queue\n");
@@ -638,8 +641,8 @@ static void arx_cache_flush(struct dataplane_context *ctx, uint64_t tsc)
   }
 
   for (i = 0; i < ctx->arx_num; i++) {
-    app_id = ctx->arx_ctx_appid[i];
-    actx = &fp_state->appctx[ctx->id][app_id][ctx->arx_ctx[i]];
+    aid = ctx->arx_ctx_appid[i];
+    actx = &fp_state->appctx[ctx->id][aid][ctx->arx_ctx[i]];
     notify_appctx(actx, tsc);
   }
 
