@@ -56,7 +56,7 @@
 #define TIMESTAMP_MASK 0xFFFFFFFF
 
 /** Queue container for an application */
-struct app_cont {
+struct app_qman {
   /** Application queue */
   struct app_queue *queues;
   /** Idx of head of queue */
@@ -66,7 +66,7 @@ struct app_cont {
 };
 
 /** Queue container for a flow **/
-struct flow_cont {
+struct flow_qman {
   /** Flow queue */ 
   struct flow_queue *queues;
   /** Idx of heads of each level in the skiplist */
@@ -84,7 +84,7 @@ struct app_queue {
   /** Next pointer */
   uint32_t next_idx;
   /** Pointer to container with flows for this app */
-  struct flow_cont *f_cont;
+  struct flow_qman *fqman;
   /** Number of entries for this app */
   uint32_t avail;
   /** Flags: FLAG_INNOLIMITL */
@@ -119,42 +119,42 @@ static inline int timestamp_lessthaneq(struct qman_thread *t, uint32_t a,
 
 /** Qman functions for app */
 static inline int appcont_init(struct qman_thread *t);
-static inline int app_qman_poll(struct qman_thread *t, struct app_cont *ac,
+static inline int app_qman_poll(struct qman_thread *t, struct app_qman *aqman,
     unsigned num, unsigned *app_id, unsigned *q_ids, uint16_t *q_bytes);
 static inline int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id,
     uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags);
-static inline void app_queue_fire(struct app_cont *ac, struct app_queue *q,
+static inline void app_queue_fire(struct app_qman *aqman, struct app_queue *q,
     uint32_t idx, uint16_t *q_bytes, unsigned start, unsigned end);
 /** Actually update queue state for app queue */
-static inline void app_set_impl(struct app_cont *ac, uint32_t a_idx,
+static inline void app_set_impl(struct app_qman *aqman, uint32_t a_idx,
     uint32_t f_idx, uint32_t avail, uint8_t flags);
-static inline void app_queue_activate(struct app_cont *ac,
+static inline void app_queue_activate(struct app_qman *aqman,
     struct app_queue *q, uint32_t idx);
 
 /** Qman management functions for flows */
 static inline int flowcont_init(struct app_queue *aq);
-static inline int flow_qman_poll(struct qman_thread *t, struct flow_cont *fc,
+static inline int flow_qman_poll(struct qman_thread *t, struct flow_qman *fqman,
     unsigned num, unsigned *q_ids, uint16_t *q_bytes);
-int flow_qman_set(struct qman_thread *t, struct flow_cont *fc, uint32_t flow_id,
+int flow_qman_set(struct qman_thread *t, struct flow_qman *fqman, uint32_t flow_id,
     uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags);
 /** Actually update queue state for flow queue: must run on queue's home core */
-static inline void flow_set_impl(struct qman_thread *t, struct flow_cont *fc, 
+static inline void flow_set_impl(struct qman_thread *t, struct flow_qman *fqman, 
     uint32_t id, uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags);
 /** Add queue to the flow no limit list */
-static inline void flow_queue_activate_nolimit(struct flow_cont *fc,
+static inline void flow_queue_activate_nolimit(struct flow_qman *fqman,
     struct flow_queue *q, uint32_t idx);
-static inline unsigned flow_poll_nolimit(struct qman_thread *t, struct flow_cont *fc, 
+static inline unsigned flow_poll_nolimit(struct qman_thread *t, struct flow_qman *fqman, 
     uint32_t cur_ts, unsigned num, unsigned *q_ids, uint16_t *q_bytes);
 /** Add queue to the flow skip list list */
 static inline void flow_queue_activate_skiplist(struct qman_thread *t,
-    struct flow_cont *fc, struct flow_queue *q, uint32_t idx);
-static inline unsigned flow_poll_skiplist(struct qman_thread *t, struct flow_cont *fc,
+    struct flow_qman *fqman, struct flow_queue *q, uint32_t idx);
+static inline unsigned flow_poll_skiplist(struct qman_thread *t, struct flow_qman *fqman,
     uint32_t cur_ts, unsigned num, unsigned *q_ids, uint16_t *q_bytes);
 static inline uint8_t flow_queue_level(struct qman_thread *t, 
-    struct flow_cont *fc);
-static inline void flow_queue_fire(struct qman_thread *t, struct flow_cont *fc,
+    struct flow_qman *fqman);
+static inline void flow_queue_fire(struct qman_thread *t, struct flow_qman *fqman,
     struct flow_queue *q, uint32_t idx, unsigned *q_id, uint16_t *q_bytes);
-static inline void flow_queue_activate(struct qman_thread *t, struct flow_cont *fc, 
+static inline void flow_queue_activate(struct qman_thread *t, struct flow_qman *fqman, 
     struct flow_queue *q, uint32_t idx);
 static inline uint32_t flow_queue_new_ts(struct qman_thread *t, struct flow_queue *q,
     uint32_t bytes);
@@ -184,9 +184,9 @@ int qman_poll(struct qman_thread *t, unsigned num, unsigned *app_id,
               unsigned *q_ids, uint16_t *q_bytes)
 {
   int ret;
-  struct app_cont *ac = t->a_cont;
+  struct app_qman *aqman = t->aqman;
 
-  ret = app_qman_poll(t, ac, num, app_id, q_ids, q_bytes);
+  ret = app_qman_poll(t, aqman, num, app_id, q_ids, q_bytes);
   return ret;
 }
 
@@ -202,30 +202,30 @@ int qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id, uint32_t 
 uint32_t qman_next_ts(struct qman_thread *t, uint32_t cur_ts)
 {
   struct app_queue *aq;
-  struct flow_cont *fc;
+  struct flow_qman *fqman;
   uint32_t ts = timestamp();
   uint32_t ret_ts = t->ts_virtual + (ts - t->ts_real);
-  struct app_cont *ac = t->a_cont;
+  struct app_qman *aqman = t->aqman;
 
-  if (ac->head_idx == IDXLIST_INVAL)
+  if (aqman->head_idx == IDXLIST_INVAL)
   {
     return -1;
   }
 
-  aq = &ac->queues[ac->head_idx];
-  fc = aq->f_cont;
+  aq = &aqman->queues[aqman->head_idx];
+  fqman = aq->fqman;
 
-  if (fc->nolimit_head_idx != IDXLIST_INVAL)
+  if (fqman->nolimit_head_idx != IDXLIST_INVAL)
   {
     // Nolimit queue has work - immediate timeout
     fprintf(stderr, "QMan nolimit has work\n");
     return 0;
   }
 
-  uint32_t idx = fc->head_idx[0];
+  uint32_t idx = fqman->head_idx[0];
   if (idx != IDXLIST_INVAL)
   {
-    struct flow_queue *q = &fc->queues[idx];
+    struct flow_queue *q = &fqman->queues[idx];
 
     if (timestamp_lessthaneq(t, q->next_ts, ret_ts))
     {
@@ -329,11 +329,11 @@ int appcont_init(struct qman_thread *t)
   int ret;
   unsigned i;
   struct app_queue *aq;
-  t->a_cont = malloc(sizeof(struct app_cont));
-  struct app_cont *ac = t->a_cont;
+  t->aqman = malloc(sizeof(struct app_qman));
+  struct app_qman *aqman = t->aqman;
 
-  ac->queues = calloc(1, sizeof(*ac->queues) * FLEXNIC_PL_APPST_NUM);
-  if (ac->queues == NULL)
+  aqman->queues = calloc(1, sizeof(*aqman->queues) * FLEXNIC_PL_APPST_NUM);
+  if (aqman->queues == NULL)
   {
     fprintf(stderr, "appcont_init: queues malloc failed\n");
     return -1;
@@ -341,7 +341,7 @@ int appcont_init(struct qman_thread *t)
 
   for (i = 0; i < FLEXNIC_PL_APPST_NUM; i++)
   {
-    aq = &ac->queues[i];
+    aq = &aqman->queues[i];
     aq->avail = 0;
     aq->dc = BATCH_SIZE;
     ret = flowcont_init(aq);
@@ -352,38 +352,38 @@ int appcont_init(struct qman_thread *t)
     }
   }
 
-  ac->head_idx = ac->tail_idx = IDXLIST_INVAL;
+  aqman->head_idx = aqman->tail_idx = IDXLIST_INVAL;
   return 0;
 }
 
-static inline int app_qman_poll(struct qman_thread *t, struct app_cont *ac, unsigned num, 
+static inline int app_qman_poll(struct qman_thread *t, struct app_qman *aqman, unsigned num, 
     unsigned *app_id, unsigned *q_ids, uint16_t *q_bytes)
 {
   int i, cnt, x;
   uint16_t quanta = num / 2;
   uint32_t idx;
 
-  for (cnt = 0; cnt < num && ac->head_idx != IDXLIST_INVAL;)
+  for (cnt = 0; cnt < num && aqman->head_idx != IDXLIST_INVAL;)
   {
-    idx = ac->head_idx;
-    struct app_queue *aq = &ac->queues[idx];
-    struct flow_cont *fc = aq->f_cont;
+    idx = aqman->head_idx;
+    struct app_queue *aq = &aqman->queues[idx];
+    struct flow_qman *fqman = aq->fqman;
 
-    ac->head_idx = aq->next_idx;
+    aqman->head_idx = aq->next_idx;
     if (aq->next_idx == IDXLIST_INVAL)
     {
-      ac->tail_idx = IDXLIST_INVAL;
+      aqman->tail_idx = IDXLIST_INVAL;
     }
 
     aq->flags &= ~FLAG_INNOLIMITL;
 
     if (aq->dc < num - cnt)
     {
-      x = flow_qman_poll(t, fc, aq->dc, q_ids + cnt, q_bytes + cnt);
+      x = flow_qman_poll(t, fqman, aq->dc, q_ids + cnt, q_bytes + cnt);
     }
     else
     {
-      x = flow_qman_poll(t, fc, num - cnt, q_ids + cnt, q_bytes + cnt);
+      x = flow_qman_poll(t, fqman, num - cnt, q_ids + cnt, q_bytes + cnt);
     }
 
     aq->dc -= x;
@@ -397,7 +397,7 @@ static inline int app_qman_poll(struct qman_thread *t, struct app_cont *ac, unsi
 
     if (aq->avail > 0)
     {
-      app_queue_fire(ac, aq, idx, q_bytes, cnt - x, cnt);
+      app_queue_fire(aqman, aq, idx, q_bytes, cnt - x, cnt);
     }
   
     if ((aq->dc + quanta) > BATCH_SIZE)
@@ -418,9 +418,9 @@ static inline int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t 
     uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags)
 {
   int ret;
-  struct app_cont *ac = t->a_cont;
-  struct app_queue *aq = &ac->queues[app_id];
-  struct flow_cont *fc = aq->f_cont;
+  struct app_qman *aqman = t->aqman;
+  struct app_queue *aq = &aqman->queues[app_id];
+  struct flow_qman *fqman = aq->fqman;
 
   if (app_id >= FLEXNIC_PL_APPST_NUM) 
   {
@@ -429,13 +429,13 @@ static inline int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t 
     return -1;
   }
 
-  app_set_impl(ac, app_id, flow_id, avail, flags);
-  ret = flow_qman_set(t, fc, flow_id, rate, avail, max_chunk, flags);
+  app_set_impl(aqman, app_id, flow_id, avail, flags);
+  ret = flow_qman_set(t, fqman, flow_id, rate, avail, max_chunk, flags);
 
   return ret;
 }
 
-static inline void app_queue_fire(struct app_cont *ac, struct app_queue *q,
+static inline void app_queue_fire(struct app_qman *aqman, struct app_queue *q,
     uint32_t idx, uint16_t *q_bytes, unsigned start, unsigned end)
 {
   uint32_t bytes;
@@ -445,17 +445,17 @@ static inline void app_queue_fire(struct app_cont *ac, struct app_queue *q,
   q->avail -= bytes;
 
   if (q->avail > 0) {
-    app_queue_activate(ac, q, idx);
+    app_queue_activate(aqman, q, idx);
   }
 
 }
 
-static inline void app_set_impl(struct app_cont *ac, uint32_t a_idx,
+static inline void app_set_impl(struct app_qman *aqman, uint32_t a_idx,
     uint32_t f_idx, uint32_t avail, uint8_t flags)
 {
-  struct app_queue *aq = &ac->queues[a_idx];
-  struct flow_cont *fc = aq->f_cont;
-  struct flow_queue *fq = &fc->queues[f_idx];
+  struct app_queue *aq = &aqman->queues[a_idx];
+  struct flow_qman *fqman = aq->fqman;
+  struct flow_queue *fq = &fqman->queues[f_idx];
 
   int new_avail = 0;
 
@@ -474,12 +474,12 @@ static inline void app_set_impl(struct app_cont *ac, uint32_t a_idx,
 
   if (new_avail && aq->avail > 0 && ((aq->flags & (FLAG_INNOLIMITL)) == 0)) 
   {
-    app_queue_activate(ac, aq, a_idx);
+    app_queue_activate(aqman, aq, a_idx);
   }
 
 }
 
-static inline void app_queue_activate(struct app_cont *ac,
+static inline void app_queue_activate(struct app_qman *aqman,
     struct app_queue *q, uint32_t idx)
 {
   struct app_queue *q_tail;
@@ -488,15 +488,15 @@ static inline void app_queue_activate(struct app_cont *ac,
 
   q->flags |= FLAG_INNOLIMITL;
   q->next_idx = IDXLIST_INVAL;
-  if (ac->tail_idx == IDXLIST_INVAL)
+  if (aqman->tail_idx == IDXLIST_INVAL)
   {
-    ac->head_idx = ac->tail_idx = idx;
+    aqman->head_idx = aqman->tail_idx = idx;
     return;
   }
 
-  q_tail = &ac->queues[ac->tail_idx];
+  q_tail = &aqman->queues[aqman->tail_idx];
   q_tail->next_idx = idx;
-  ac->tail_idx = idx;
+  aqman->tail_idx = idx;
 }
 
 static inline uint32_t sum_bytes(uint16_t *q_bytes, unsigned start, unsigned end)
@@ -519,13 +519,13 @@ static inline uint32_t sum_bytes(uint16_t *q_bytes, unsigned start, unsigned end
 int flowcont_init(struct app_queue *aq) 
 {
   unsigned i;
-  struct flow_cont *fc;
+  struct flow_qman *fqman;
 
-  aq->f_cont = malloc(sizeof(struct flow_cont));
-  fc = aq->f_cont;
+  aq->fqman = malloc(sizeof(struct flow_qman));
+  fqman = aq->fqman;
 
-  fc->queues = calloc(1, sizeof(*fc->queues) * FLEXNIC_NUM_QMFLOWQUEUES);
-  if (fc->queues == NULL)
+  fqman->queues = calloc(1, sizeof(*fqman->queues) * FLEXNIC_NUM_QMFLOWQUEUES);
+  if (fqman->queues == NULL)
   {
     fprintf(stderr, "flowcont_init: queues malloc failed\n");
     return -1;
@@ -533,33 +533,33 @@ int flowcont_init(struct app_queue *aq)
 
   for (i = 0; i < QMAN_SKIPLIST_LEVELS; i++) 
   {
-    fc->head_idx[i] = IDXLIST_INVAL;
+    fqman->head_idx[i] = IDXLIST_INVAL;
   }
-  fc->nolimit_head_idx = fc->nolimit_tail_idx = IDXLIST_INVAL;
+  fqman->nolimit_head_idx = fqman->nolimit_tail_idx = IDXLIST_INVAL;
 
   return 0;
 }
 
-static inline int flow_qman_poll(struct qman_thread *t, struct flow_cont *fc, unsigned num, 
+static inline int flow_qman_poll(struct qman_thread *t, struct flow_qman *fqman, unsigned num, 
     unsigned *q_ids, uint16_t *q_bytes)
 {
   unsigned x, y;
   uint32_t ts = timestamp();
 
   /* poll nolimit list and skiplist alternating the order between */
-  if (fc->nolimit_first) {
-    x = flow_poll_nolimit(t, fc, ts, num, q_ids, q_bytes);
-    y = flow_poll_skiplist(t, fc, ts, num - x, q_ids + x, q_bytes + x);
+  if (fqman->nolimit_first) {
+    x = flow_poll_nolimit(t, fqman, ts, num, q_ids, q_bytes);
+    y = flow_poll_skiplist(t, fqman, ts, num - x, q_ids + x, q_bytes + x);
   } else {
-    x = flow_poll_skiplist(t, fc, ts, num, q_ids, q_bytes);
-    y = flow_poll_nolimit(t, fc, ts, num - x, q_ids + x, q_bytes + x);
+    x = flow_poll_skiplist(t, fqman, ts, num, q_ids, q_bytes);
+    y = flow_poll_nolimit(t, fqman, ts, num - x, q_ids + x, q_bytes + x);
   }
-  fc->nolimit_first = !fc->nolimit_first;
+  fqman->nolimit_first = !fqman->nolimit_first;
 
   return x + y;
 }
 
-int flow_qman_set(struct qman_thread *t, struct flow_cont *fc, uint32_t id, 
+int flow_qman_set(struct qman_thread *t, struct flow_qman *fqman, uint32_t id, 
     uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags)
 {
 #ifdef FLEXNIC_TRACE_QMAN
@@ -579,16 +579,16 @@ int flow_qman_set(struct qman_thread *t, struct flow_cont *fc, uint32_t id,
     return -1;
   }
 
-  flow_set_impl(t, fc, id, rate, avail, max_chunk, flags);
+  flow_set_impl(t, fqman, id, rate, avail, max_chunk, flags);
 
   return 0;
 }
 
 /** Actually update queue state: must run on queue's home core */
-static void inline flow_set_impl(struct qman_thread *t, struct flow_cont *fc, 
+static void inline flow_set_impl(struct qman_thread *t, struct flow_qman *fqman, 
     uint32_t idx, uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags)
 {
-  struct flow_queue *q = &fc->queues[idx];
+  struct flow_queue *q = &fqman->queues[idx];
   int new_avail = 0;
 
   if ((flags & QMAN_SET_RATE) != 0) {
@@ -611,12 +611,12 @@ static void inline flow_set_impl(struct qman_thread *t, struct flow_cont *fc,
 
   if (new_avail && q->avail > 0
       && ((q->flags & (FLAG_INSKIPLIST | FLAG_INNOLIMITL)) == 0)) {
-    flow_queue_activate(t, fc, q, idx);
+    flow_queue_activate(t, fqman, q, idx);
   }
 }
 
 /** Add queue to the no limit list for flows */
-static inline void flow_queue_activate_nolimit(struct flow_cont *fc,
+static inline void flow_queue_activate_nolimit(struct flow_qman *fqman,
     struct flow_queue *q, uint32_t idx)
 {
   struct flow_queue *q_tail;
@@ -627,37 +627,37 @@ static inline void flow_queue_activate_nolimit(struct flow_cont *fc,
 
   q->flags |= FLAG_INNOLIMITL;
   q->next_idxs[0] = IDXLIST_INVAL;
-  if (fc->nolimit_tail_idx == IDXLIST_INVAL) 
+  if (fqman->nolimit_tail_idx == IDXLIST_INVAL) 
   {
-    fc->nolimit_head_idx = fc->nolimit_tail_idx = idx;
+    fqman->nolimit_head_idx = fqman->nolimit_tail_idx = idx;
     return;
   }
 
-  q_tail = &fc->queues[fc->nolimit_tail_idx];
+  q_tail = &fqman->queues[fqman->nolimit_tail_idx];
   q_tail->next_idxs[0] = idx;
-  fc->nolimit_tail_idx = idx;
+  fqman->nolimit_tail_idx = idx;
 }
 
 /** Poll no-limit queues for flows */
-static inline unsigned flow_poll_nolimit(struct qman_thread *t, struct flow_cont *fc,
+static inline unsigned flow_poll_nolimit(struct qman_thread *t, struct flow_qman *fqman,
     uint32_t cur_ts, unsigned num, unsigned *q_ids, uint16_t *q_bytes)
 {
   unsigned cnt;
   struct flow_queue *q;
   uint32_t idx;
 
-  for (cnt = 0; cnt < num && fc->nolimit_head_idx != IDXLIST_INVAL;) {
-    idx = fc->nolimit_head_idx;
-    q = fc->queues + idx;
+  for (cnt = 0; cnt < num && fqman->nolimit_head_idx != IDXLIST_INVAL;) {
+    idx = fqman->nolimit_head_idx;
+    q = fqman->queues + idx;
 
-    fc->nolimit_head_idx = q->next_idxs[0];
+    fqman->nolimit_head_idx = q->next_idxs[0];
     if (q->next_idxs[0] == IDXLIST_INVAL)
-      fc->nolimit_tail_idx = IDXLIST_INVAL;
+      fqman->nolimit_tail_idx = IDXLIST_INVAL;
 
     q->flags &= ~FLAG_INNOLIMITL;
     dprintf("flow_poll_nolimit: t=%p q=%p idx=%u avail=%u rate=%u flags=%x\n", t, q, idx, q->avail, q->rate, q->flags);
     if (q->avail > 0) {
-      flow_queue_fire(t, fc, q, idx, q_ids + cnt, q_bytes + cnt);
+      flow_queue_fire(t, fqman, q, idx, q_ids + cnt, q_bytes + cnt);
       cnt++;
     }
   }
@@ -667,7 +667,7 @@ static inline unsigned flow_poll_nolimit(struct qman_thread *t, struct flow_cont
 
 /** Add queue to the flows skip list */
 static inline void flow_queue_activate_skiplist(struct qman_thread *t, 
-    struct flow_cont *fc, struct flow_queue *q, uint32_t q_idx)
+    struct flow_qman *fqman, struct flow_queue *q, uint32_t q_idx)
 {
   uint8_t level;
   int8_t l;
@@ -695,20 +695,20 @@ static inline void flow_queue_activate_skiplist(struct qman_thread *t,
   /* find predecessors at all levels top-down */
   pred = IDXLIST_INVAL;
   for (l = QMAN_SKIPLIST_LEVELS - 1; l >= 0; l--) {
-    idx = (pred != IDXLIST_INVAL ? pred : fc->head_idx[l]);
+    idx = (pred != IDXLIST_INVAL ? pred : fqman->head_idx[l]);
     while (idx != IDXLIST_INVAL &&
-        timestamp_lessthaneq(t, fc->queues[idx].next_ts, ts))
+        timestamp_lessthaneq(t, fqman->queues[idx].next_ts, ts))
     {
       
       pred = idx;
-      idx = fc->queues[idx].next_idxs[l];
+      idx = fqman->queues[idx].next_idxs[l];
     }
     preds[l] = pred;
     dprintf("    pred[%u] = %d\n", l, pred);
   }
 
   /* determine level for this queue */
-  level = flow_queue_level(t, fc);
+  level = flow_queue_level(t, fqman);
   dprintf("    level = %u\n", level);
 
   /* insert into skip-list */
@@ -718,11 +718,11 @@ static inline void flow_queue_activate_skiplist(struct qman_thread *t,
     } else {
       idx = preds[l];
       if (idx != IDXLIST_INVAL) {
-        q->next_idxs[l] = fc->queues[idx].next_idxs[l];
-        fc->queues[idx].next_idxs[l] = q_idx;
+        q->next_idxs[l] = fqman->queues[idx].next_idxs[l];
+        fqman->queues[idx].next_idxs[l] = q_idx;
       } else {
-        q->next_idxs[l] = fc->head_idx[l];
-        fc->head_idx[l] = q_idx;
+        q->next_idxs[l] = fqman->head_idx[l];
+        fqman->head_idx[l] = q_idx;
       }
     }
   }
@@ -731,7 +731,7 @@ static inline void flow_queue_activate_skiplist(struct qman_thread *t,
 }
 
 /** Poll skiplist queues for flows */
-static inline unsigned flow_poll_skiplist(struct qman_thread *t, struct flow_cont *fc,
+static inline unsigned flow_poll_skiplist(struct qman_thread *t, struct flow_qman *fqman,
     uint32_t cur_ts, unsigned num, unsigned *q_ids, uint16_t *q_bytes)
 {
   unsigned cnt;
@@ -743,7 +743,7 @@ static inline unsigned flow_poll_skiplist(struct qman_thread *t, struct flow_con
   max_vts = t->ts_virtual + (cur_ts - t->ts_real);
 
   for (cnt = 0; cnt < num;) {
-    idx = fc->head_idx[0];
+    idx = fqman->head_idx[0];
 
     /* no more queues */
     if (idx == IDXLIST_INVAL) {
@@ -751,7 +751,7 @@ static inline unsigned flow_poll_skiplist(struct qman_thread *t, struct flow_con
       break;
     }
 
-    q = &fc->queues[idx];
+    q = &fqman->queues[idx];
 
     /* beyond max_vts */
     dprintf("flow_poll_skiplist: next_ts=%u vts=%u rts=%u max_vts=%u cur_ts=%u\n",
@@ -762,8 +762,8 @@ static inline unsigned flow_poll_skiplist(struct qman_thread *t, struct flow_con
     }
 
     /* remove queue from skiplist */
-    for (l = 0; l < QMAN_SKIPLIST_LEVELS && fc->head_idx[l] == idx; l++) {
-      fc->head_idx[l] = q->next_idxs[l];
+    for (l = 0; l < QMAN_SKIPLIST_LEVELS && fqman->head_idx[l] == idx; l++) {
+      fqman->head_idx[l] = q->next_idxs[l];
     }
     assert((q->flags & FLAG_INSKIPLIST) != 0);
     q->flags &= ~FLAG_INSKIPLIST;
@@ -774,18 +774,18 @@ static inline unsigned flow_poll_skiplist(struct qman_thread *t, struct flow_con
     dprintf("flow_poll_skiplist: t=%p q=%p idx=%u avail=%u rate=%u flags=%x\n", t, q, idx, q->avail, q->rate, q->flags);
 
     if (q->avail > 0) {
-      flow_queue_fire(t, fc, q, idx, q_ids + cnt, q_bytes + cnt);
+      flow_queue_fire(t, fqman, q, idx, q_ids + cnt, q_bytes + cnt);
       cnt++;
     }
   }
 
   /* if we reached the limit, update the virtual timestamp correctly */
   if (cnt == num) {
-    idx = fc->head_idx[0];
+    idx = fqman->head_idx[0];
     if (idx != IDXLIST_INVAL &&
-        timestamp_lessthaneq(t, fc->queues[idx].next_ts, max_vts))
+        timestamp_lessthaneq(t, fqman->queues[idx].next_ts, max_vts))
     {
-      t->ts_virtual = fc->queues[idx].next_ts;
+      t->ts_virtual = fqman->queues[idx].next_ts;
     } else 
     {
       t->ts_virtual = max_vts;
@@ -803,13 +803,13 @@ static inline uint32_t flow_queue_new_ts(struct qman_thread *t, struct flow_queu
 }
 
 /** Level for queue added to skiplist for flows*/
-static inline uint8_t flow_queue_level(struct qman_thread *t, struct flow_cont *fc)
+static inline uint8_t flow_queue_level(struct qman_thread *t, struct flow_qman *fqman)
 {
   uint8_t x = (__builtin_ffs(utils_rng_gen32(&t->rng)) - 1) / SKIPLIST_BITS;
   return (x < QMAN_SKIPLIST_LEVELS ? x : QMAN_SKIPLIST_LEVELS - 1);
 }
 
-static inline void flow_queue_fire(struct qman_thread *t, struct flow_cont *fc,
+static inline void flow_queue_fire(struct qman_thread *t, struct flow_qman *fqman,
     struct flow_queue *q, uint32_t idx, unsigned *q_id, uint16_t *q_bytes)
 {
   uint32_t bytes;
@@ -827,7 +827,7 @@ static inline void flow_queue_fire(struct qman_thread *t, struct flow_cont *fc,
 
   if (q->avail > 0) 
   {
-    flow_queue_activate(t, fc, q, idx);
+    flow_queue_activate(t, fqman, q, idx);
   }
 
   *q_bytes = bytes;
@@ -841,13 +841,13 @@ static inline void flow_queue_fire(struct qman_thread *t, struct flow_cont *fc,
 #endif
 }
 
-static inline void flow_queue_activate(struct qman_thread *t, struct flow_cont *fc,
+static inline void flow_queue_activate(struct qman_thread *t, struct flow_qman *fqman,
     struct flow_queue *q, uint32_t idx)
 {
   if (q->rate == 0) {
-    flow_queue_activate_nolimit(fc, q, idx);
+    flow_queue_activate_nolimit(fqman, q, idx);
   } else {
-    flow_queue_activate_skiplist(t, fc, q, idx);
+    flow_queue_activate_skiplist(t, fqman, q, idx);
   }
 }
 
@@ -859,32 +859,32 @@ static inline void flow_queue_activate(struct qman_thread *t, struct flow_cont *
 void qman_free_app_cont(struct dataplane_context *ctx)
 {
   int i;
-  struct app_cont *ac;
+  struct app_qman *aqman;
   struct app_queue *aq;
-  struct flow_cont *fc;
+  struct flow_qman *fqman;
 
-  ac = ctx->qman.a_cont;
+  aqman = ctx->qman.aqman;
 
   for (i = 0; i < FLEXNIC_PL_APPST_NUM; i++)
   {
-    aq = &ac->queues[i];
-    fc = aq->f_cont;
-    free(fc->queues);
-    free(fc);
+    aq = &aqman->queues[i];
+    fqman = aq->fqman;
+    free(fqman->queues);
+    free(fqman);
   }
 
-  free(ac->queues);
-  free(ac);
+  free(aqman->queues);
+  free(aqman);
 }
 
 uint32_t qman_app_get_avail(struct dataplane_context *ctx, uint32_t app_id)
 {
   uint32_t avail;
-  struct app_cont *ac;
+  struct app_qman *aqman;
   struct app_queue *aq;
   
-  ac = ctx->qman.a_cont;
-  aq = &ac->queues[app_id];
+  aqman = ctx->qman.aqman;
+  aq = &aqman->queues[app_id];
   avail = aq->avail;
   
   return avail;
