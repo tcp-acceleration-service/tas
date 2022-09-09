@@ -418,11 +418,11 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
     cid = act_app->act_ctx_head;
     while(cid != IDXLIST_INVAL) 
     {
-      act_ctx = &ctx->polled_apps[aid].ctxs[cid];     
+      act_ctx = &act_app->ctxs[cid];     
       fast_appctx_poll_pf(ctx, cid, aid);
-      cid = ctx->polled_apps[aid].ctxs[cid].next;
+      cid = act_ctx->next;
     }
-    aid = ctx->polled_apps[aid].next;
+    aid = act_app->next;
   }
 
   /* fetch packets from all active contexts */
@@ -465,7 +465,7 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
       }
       cid = act_ctx->next;
     }
-    aid = ctx->polled_apps[aid].next;
+    aid = act_app->next;
   }
 
   for (j = 0; j < k; j++) 
