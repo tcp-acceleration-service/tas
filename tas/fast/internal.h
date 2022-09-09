@@ -62,6 +62,9 @@ extern volatile unsigned fp_scale_to;
 #define QMAN_SET_AVAIL    (1 << 3)
 #define QMAN_ADD_AVAIL    (1 << 4)
 
+/** Index list: invalid index */
+#define IDXLIST_INVAL (-1U)
+
 /** Qman functions */
 int qman_thread_init(struct dataplane_context *ctx);
 int qman_poll(struct qman_thread *t, unsigned num, unsigned *app_id, 

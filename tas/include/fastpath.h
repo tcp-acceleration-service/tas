@@ -37,6 +37,9 @@
 #define BUFCACHE_SIZE 128
 #define TXBUF_SIZE (2 * BATCH_SIZE)
 
+#define FLAG_ACTIVE 1
+#define MAX_POLL_ROUNDS 10
+#define MAX_NULL_ROUNDS 1
 
 struct network_thread {
   struct rte_mempool *pool;
@@ -53,6 +56,27 @@ struct qman_thread {
   uint32_t ts_real;
   uint32_t ts_virtual;
   struct utils_rng rng;
+};
+
+struct polled_context {
+  uint32_t id;
+  uint32_t next;
+  uint32_t prev;
+  uint16_t flags;
+  uint16_t null_rounds;
+};
+
+struct polled_app {
+  uint32_t id;
+  uint32_t next;
+  uint32_t prev;
+  uint16_t flags;
+  uint32_t poll_next_ctx;
+
+  /* polled contexts for each app */
+  uint32_t act_ctx_head;
+  uint32_t act_ctx_tail;
+  struct polled_context ctxs[FLEXNIC_PL_APPST_CTX_NUM];
 };
 
 struct dataplane_context {
@@ -77,8 +101,12 @@ struct dataplane_context {
 
   /********************************************************/
   /* polling queues */
-  uint16_t poll_next_app;
-  uint32_t poll_next_ctx[FLEXNIC_PL_APPST_NUM];
+  /* polling rounds counter until we have to poll every queue */
+  uint16_t poll_rounds;
+  uint32_t poll_next_app;
+  uint32_t act_head;
+  uint32_t act_tail;
+  struct polled_app polled_apps[FLEXNIC_PL_APPST_NUM];  
 
   /********************************************************/
   /* pre-allocated buffers for polling doorbells and queue manager */

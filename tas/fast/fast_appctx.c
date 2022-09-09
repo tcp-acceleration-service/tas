@@ -74,7 +74,7 @@ int fast_appctx_poll_fetch(struct dataplane_context *ctx, uint32_t actx_id,
   void *fs = &fp_state->flowst[flow_id];
   rte_prefetch0(fs);
   rte_prefetch0(fs + 64);
-
+ 
   actx->tx_head += sizeof(*atx);
   if (actx->tx_head >= actx->tx_len)
     actx->tx_head -= actx->tx_len;

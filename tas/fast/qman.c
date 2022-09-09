@@ -22,6 +22,9 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+// TODO: Add skiplist to app queues
+// TODO: Make deficit round robin use bytes transmitted rather than number of packets
+
 /**
  * Complete queue manager implementation
  */
@@ -48,8 +51,6 @@
 
 /** Skiplist: bits per level */
 #define SKIPLIST_BITS 3
-/** Index list: invalid index */
-#define IDXLIST_INVAL (-1U)
 
 #define RNG_SEED 0x12345678
 #define TIMESTAMP_BITS 32

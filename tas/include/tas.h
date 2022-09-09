@@ -77,7 +77,7 @@ void notify_canblock_reset(struct notify_blockstate *nbs);
 
 
 #define FLEXNIC_NUM_QMFLOWQUEUES (128 * 1024)
-#define FLEXNIC_NUM_QMAPPQUEUES (30)
+#define FLEXNIC_NUM_QMAPPQUEUES (FLEXNIC_PL_APPST_NUM)
 #define FLEXNIC_NUM_QMQUEUES (FLEXNIC_NUM_QMAPPQUEUES * FLEXNIC_NUM_QMFLOWQUEUES)
 
 #endif /* ndef TAS_H_ */
