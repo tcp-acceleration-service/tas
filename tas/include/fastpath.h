@@ -38,8 +38,8 @@
 #define TXBUF_SIZE (2 * BATCH_SIZE)
 
 #define FLAG_ACTIVE 1
-#define MAX_POLL_ROUNDS 10
-#define MAX_NULL_ROUNDS 10
+#define MAX_POLL_ROUNDS 5
+#define MAX_NULL_ROUNDS 5
 
 struct network_thread {
   struct rte_mempool *pool;
