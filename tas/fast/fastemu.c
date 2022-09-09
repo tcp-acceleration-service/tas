@@ -596,7 +596,6 @@ static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts)
 
 static void enqueue_ctx_to_active(struct polled_app *act_app, uint32_t cid) 
 {
-  printf("enqueued ctx=%d\n", cid);
   struct polled_context *new_act;
   uint32_t head, tail;
   
@@ -645,7 +644,6 @@ static void remove_ctx_from_active(struct polled_app *act_app,
 
 static void enqueue_app_to_active(struct dataplane_context *ctx, uint16_t aid)
 {
-  printf("enqueued app=%d\n", aid);
   struct polled_app *new_act;
   uint32_t head, tail;
 
