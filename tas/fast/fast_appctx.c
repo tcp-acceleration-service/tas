@@ -127,6 +127,7 @@ int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
     } while(cid != act_app->act_ctx_head && k < max);
 
     act_app->act_ctx_head = act_app->ctxs[act_app->act_ctx_head].next;
+    act_app->act_ctx_tail = act_app->ctxs[act_app->act_ctx_tail].next;
 
     aid = ctx->polled_apps[aid].next; 
   } while (aid != ctx->act_head && k < max);

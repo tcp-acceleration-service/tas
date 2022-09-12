@@ -421,6 +421,7 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
 
   /* update round */
   ctx->act_head = ctx->polled_apps[ctx->act_head].next;
+  ctx->act_tail = ctx->polled_apps[ctx->act_tail].next;
 
   /* remove contexts and apps that have not sent for a few rounds 
      from active list */
