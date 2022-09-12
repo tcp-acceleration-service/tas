@@ -126,12 +126,7 @@ int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
       cid = act_ctx->next;
     } while(cid != act_app->act_ctx_head && k < max);
 
-    // /* Add app to list to remove if no more active contexts */
-    // if (act_app->act_ctx_head == IDXLIST_INVAL)
-    // {
-    //   rem_apps[*n_rem] = aid; 
-    //   *n_rem = *n_rem + 1;
-    // }
+    act_app->act_ctx_head = act_app->ctxs[act_app->act_ctx_head].next;
 
     aid = ctx->polled_apps[aid].next; 
   } while (aid != ctx->act_head && k < max);
@@ -371,8 +366,8 @@ void remove_ctxs_from_active(struct dataplane_context *ctx,
 
   for (i = 0; i < n; i++)
   {
-    aid = ctxs[i]->id;
-    cid = ctxs[i]->aid;
+    cid = ctxs[i]->id;
+    aid = ctxs[i]->aid;
     p_app = &ctx->polled_apps[aid];
     remove_ctx_from_active(p_app, &p_app->ctxs[cid]);
 

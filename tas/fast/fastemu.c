@@ -417,13 +417,13 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
 
   /* probe receive queue on all active contexts */
   fast_actx_rxq_probe_active(ctx);
-  remove_ctxs_from_active(ctx, rem_ctxs, n_rem);
 
   /* update round */
-  if (ctx->act_head != IDXLIST_INVAL)
-  {
-    ctx->act_head = ctx->polled_apps[ctx->act_head].next;
-  }
+  ctx->act_head = ctx->polled_apps[ctx->act_head].next;
+
+  /* remove contexts and apps that have not sent for a few rounds 
+     from active list */
+  remove_ctxs_from_active(ctx, rem_ctxs, n_rem);
 
   STATS_ADD(ctx, qs_total, total);
   if (total == 0)
