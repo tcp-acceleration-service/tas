@@ -170,6 +170,7 @@ static void polled_app_init(struct polled_app *app, uint16_t id)
 static void polled_ctx_init(struct polled_context *ctx, uint32_t id, uint32_t a_id)
 {
   ctx->id = id;
+  ctx->aid = a_id;
   ctx->next = IDXLIST_INVAL;
   ctx->prev = IDXLIST_INVAL;
   ctx->flags = 0;
