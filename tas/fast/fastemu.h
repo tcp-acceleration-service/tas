@@ -36,19 +36,25 @@ void fast_kernel_packet(struct dataplane_context *ctx,
     struct network_buf_handle *nbh);
 
 /* fast_appctx.c */
-void fast_appctx_poll_pf(struct dataplane_context *ctx, uint32_t id, 
-        uint16_t app_id);
-int fast_appctx_poll_fetch(struct dataplane_context *ctx, uint32_t id,
-    uint16_t app_id, void **pqe);
+void fast_appctx_poll_pf_all(struct dataplane_context *ctx);
+void fast_appctx_poll_pf_active(struct dataplane_context *ctx);
+int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
+        unsigned *total, void *aqes[BATCH_SIZE]);
+int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
+        unsigned *total, int *n_rem, uint32_t rem_apps[BATCH_SIZE], 
+        void *aqes[BATCH_SIZE]);
 int fast_appctx_poll_bump(struct dataplane_context *ctx, void *pqe,
     struct network_buf_handle *nbh, uint32_t ts);
+
 
 int fast_appctx_poll(struct dataplane_context *ctx, uint32_t id,
     struct network_buf_handle *nbh, uint32_t ts);
 int fast_actx_rxq_alloc(struct dataplane_context *ctx,
     struct flextcp_pl_appctx *actx, struct flextcp_pl_arx **arx);
-int fast_actx_rxq_probe(struct dataplane_context *ctx, uint32_t id,
-    uint16_t app_id);
+void fast_actx_rxq_probe_all(struct dataplane_context *ctx);
+void fast_actx_rxq_probe_active(struct dataplane_context *ctx);
+void remove_apps_from_active(struct dataplane_context *ctx, 
+    uint32_t apps[BATCH_SIZE], int n);
 
 /* fast_flows.c */
 void fast_flows_qman_pf(struct dataplane_context *ctx, uint32_t *queues,

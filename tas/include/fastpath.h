@@ -39,7 +39,7 @@
 
 #define FLAG_ACTIVE 1
 #define MAX_POLL_ROUNDS 10
-#define MAX_NULL_ROUNDS 50
+#define MAX_NULL_ROUNDS 100
 
 struct network_thread {
   struct rte_mempool *pool;
