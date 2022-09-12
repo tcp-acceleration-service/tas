@@ -57,15 +57,15 @@ static void dataplane_block(struct dataplane_context *ctx, uint32_t ts);
 static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
     uint64_t tsc) __attribute__((noinline));
 static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)  __attribute__((noinline));
-static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts);
-static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts);
+static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
+static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));;
 static unsigned poll_kernel(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
 static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
 static unsigned poll_qman_fwd(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
 static void poll_scale(struct dataplane_context *ctx);
 
 static void polled_app_init(struct polled_app *app, uint16_t id);
-static void polled_ctx_init(struct polled_context *ctx, uint32_t id);
+static void polled_ctx_init(struct polled_context *ctx, uint32_t id, uint32_t a_id);
 
 static inline uint8_t bufcache_prealloc(struct dataplane_context *ctx, uint16_t num,
     struct network_buf_handle ***handles);
@@ -138,7 +138,7 @@ int dataplane_context_init(struct dataplane_context *ctx)
     for (j = 0; j < FLEXNIC_PL_APPST_CTX_NUM; j++)
     {
       p_ctx = &p_app->ctxs[j];
-      polled_ctx_init(p_ctx, j);
+      polled_ctx_init(p_ctx, j, i);
     }
   }
   ctx->poll_rounds = 0;
@@ -167,7 +167,7 @@ static void polled_app_init(struct polled_app *app, uint16_t id)
   app->act_ctx_tail = IDXLIST_INVAL;
 }
 
-static void polled_ctx_init(struct polled_context *ctx, uint32_t id)
+static void polled_ctx_init(struct polled_context *ctx, uint32_t id, uint32_t a_id)
 {
   ctx->id = id;
   ctx->next = IDXLIST_INVAL;
@@ -382,9 +382,9 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
   int ret, n_rem = 0;
   struct network_buf_handle **handles;
   void *aqes[BATCH_SIZE];
+  struct polled_context *rem_ctxs[BATCH_SIZE];
   unsigned total = 0;
   uint16_t max, i, k = 0, num_bufs = 0;
-  uint32_t rem_apps[BATCH_SIZE];
 
   STATS_ADD(ctx, qs_poll, 1);
 
@@ -403,7 +403,7 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
   fast_appctx_poll_pf_active(ctx);
 
   /* fetch packets from active contexts */
-  k = fast_appctx_poll_fetch_active(ctx, max, &total, &n_rem, rem_apps, aqes);
+  k = fast_appctx_poll_fetch_active(ctx, max, &total, &n_rem, rem_ctxs, aqes);
   
   for (i = 0; i < k; i++) 
   {
@@ -417,7 +417,7 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
 
   /* probe receive queue on all active contexts */
   fast_actx_rxq_probe_active(ctx);
-  remove_apps_from_active(ctx, rem_apps, n_rem);
+  remove_ctxs_from_active(ctx, rem_ctxs, n_rem);
 
   /* update round */
   if (ctx->act_head != IDXLIST_INVAL)

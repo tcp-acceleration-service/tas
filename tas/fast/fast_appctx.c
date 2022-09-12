@@ -48,20 +48,19 @@ void fast_appctx_poll_pf_active(struct dataplane_context *ctx)
 {
   uint32_t cid, aid;
   struct polled_app *act_app;
-  struct polled_context *act_ctx;
+
   aid = ctx->act_head;
   do {
     act_app = &ctx->polled_apps[aid];
+
     cid = act_app->act_ctx_head;
-    while(cid != IDXLIST_INVAL) 
-    {
-      act_ctx = &act_app->ctxs[cid];     
+    do {
       fast_appctx_poll_pf(ctx, cid, aid);
-      cid = act_ctx->next;
-    }
+      cid = act_app->ctxs[cid].next;
+    } while(cid != act_app->act_ctx_head);
+    
     aid = ctx->polled_apps[aid].next;
   } while (aid != ctx->act_head);
-
 } 
 
 void fast_appctx_poll_pf_all(struct dataplane_context *ctx)
@@ -87,7 +86,7 @@ static void fast_appctx_poll_pf(struct dataplane_context *ctx, uint32_t id,
 }
 
 int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
-    unsigned *total, int *n_rem, uint32_t rem_apps[BATCH_SIZE], 
+    unsigned *total, int *n_rem, struct polled_context *rem_ctxs[BATCH_SIZE], 
     void *aqes[BATCH_SIZE])
 {
   int ret;
@@ -100,9 +99,9 @@ int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
   aid = ctx->act_head;
   do {
     act_app = &ctx->polled_apps[aid];
+
     cid = act_app->act_ctx_head;
-    while(cid != IDXLIST_INVAL && k < max) 
-    {
+    do  {
       act_ctx = &act_app->ctxs[cid];
       for (i_b = 0; i_b < BATCH_SIZE && k < max; i_b++) 
       {
@@ -111,32 +110,31 @@ int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
         {
           k++;
           act_ctx->null_rounds = 0;
-        }
-        else
+        } else
         {
           act_ctx->null_rounds = act_ctx->null_rounds == MAX_NULL_ROUNDS ? 
               MAX_NULL_ROUNDS : act_ctx->null_rounds + 1;
           if (act_ctx->null_rounds >= MAX_NULL_ROUNDS)
           {
-            remove_ctx_from_active(act_app, act_ctx);
+            rem_ctxs[*n_rem] = act_ctx;
+            *n_rem = *n_rem + 1;
           }
-
           break;
         }
         *total = *total + 1;
       }
       cid = act_ctx->next;
-    }
+    } while(cid != act_app->act_ctx_head && k < max);
 
-    /* Add app to list to remove if no more active contexts */
-    if (act_app->act_ctx_head == IDXLIST_INVAL)
-    {
-      rem_apps[*n_rem] = aid; 
-      *n_rem = *n_rem + 1;
-    }
+    // /* Add app to list to remove if no more active contexts */
+    // if (act_app->act_ctx_head == IDXLIST_INVAL)
+    // {
+    //   rem_apps[*n_rem] = aid; 
+    //   *n_rem = *n_rem + 1;
+    // }
 
     aid = ctx->polled_apps[aid].next; 
-  } while (aid != ctx->act_head);
+  } while (aid != ctx->act_head && k < max);
 
   return k;
 }
@@ -333,18 +331,17 @@ void fast_actx_rxq_probe_active(struct dataplane_context *ctx)
 {
   uint32_t cid, aid;
   struct polled_app *act_app;
-  struct polled_context *act_ctx;
 
   aid = ctx->act_head;
   do {
     act_app = &ctx->polled_apps[aid];
+   
     cid = act_app->act_ctx_head;
-    while(cid != IDXLIST_INVAL) 
-    {
-      act_ctx = &act_app->ctxs[cid];     
-      fast_actx_rxq_probe(ctx, cid, aid);
-      cid = act_ctx->next;
-    }
+    do {
+    fast_actx_rxq_probe(ctx, cid, aid);
+    cid = act_app->ctxs[cid].next;
+    } while(cid != act_app->act_ctx_head); 
+    
     aid = ctx->polled_apps[aid].next;
   } while (aid != ctx->act_head);
 }
@@ -363,39 +360,47 @@ void fast_actx_rxq_probe_all(struct dataplane_context *ctx)
 }
 
 /*****************************************************************************/
-/* Manages active app and contexts queues */
+/* Manages active app and contexts rings */
 
-void remove_apps_from_active(struct dataplane_context *ctx, 
-    uint32_t apps[BATCH_SIZE], int n)
+void remove_ctxs_from_active(struct dataplane_context *ctx, 
+    struct polled_context *ctxs[BATCH_SIZE], int n)
 {
   int i;
+  uint32_t aid, cid;
+  struct polled_app *p_app;
+
   for (i = 0; i < n; i++)
   {
-    remove_app_from_active(ctx, &ctx->polled_apps[apps[i]]);
+    aid = ctxs[i]->id;
+    cid = ctxs[i]->aid;
+    p_app = &ctx->polled_apps[aid];
+    remove_ctx_from_active(p_app, &p_app->ctxs[cid]);
+
+    if (p_app->act_ctx_head == IDXLIST_INVAL)
+    {
+      remove_app_from_active(ctx, p_app);
+    }
   }
 }
 
 static void enqueue_ctx_to_active(struct polled_app *act_app, uint32_t cid) 
 {
-  // printf("before: enqueued ctx tail=%d, head=%d, aid=%d, cid=%d\n", act_app->act_ctx_tail, act_app->act_ctx_head, act_app->id, cid);
-  struct polled_context *new_act;
-  uint32_t head, tail;
-  
-  new_act = &act_app->ctxs[cid];
-  head = act_app->act_ctx_head;
-  tail = act_app->act_ctx_tail;
-
-  if (head == IDXLIST_INVAL)
+  if (act_app->act_ctx_tail == IDXLIST_INVAL)
   {
-    act_app->act_ctx_head = cid; 
-    act_app->act_ctx_tail = cid;
-  } else {
-    act_app->ctxs[act_app->act_ctx_tail].next = cid;
-    new_act->prev = tail;
+    act_app->act_ctx_tail = act_app->act_ctx_head = cid;
+    act_app->ctxs[cid].prev = act_app->act_ctx_tail;
+    act_app->ctxs[cid].next = act_app->act_ctx_head;
+    act_app->ctxs[cid].flags |= FLAG_ACTIVE;
+    // printf("after: enqueued app tail=%d head=%d\n", ctx->act_tail, ctx->act_head);
+    return;
   }
 
+  act_app->ctxs[act_app->act_ctx_tail].next = cid;
+  act_app->ctxs[act_app->act_ctx_head].prev = cid;
+  act_app->ctxs[cid].prev = act_app->act_ctx_tail;
+  act_app->ctxs[cid].next = act_app->act_ctx_head;
+  act_app->ctxs[cid].flags |= FLAG_ACTIVE;
   act_app->act_ctx_tail = cid;
-  new_act->flags |= FLAG_ACTIVE;
   // printf("after: enqueued ctx tail=%d, head=%d, aid=%d, cid=%d\n", act_app->act_ctx_tail, act_app->act_ctx_head, act_app->id, cid);
 }
 
@@ -403,25 +408,26 @@ static void remove_ctx_from_active(struct polled_app *act_app,
     struct polled_context *act_ctx)
 {
   // printf("before: removed ctx tail=%d, head=%d, aid=%d, cid=%d\n", act_app->act_ctx_tail, act_app->act_ctx_head, act_app->id, act_ctx->id);
-  if (act_ctx->next == IDXLIST_INVAL && act_ctx->prev == IDXLIST_INVAL)
+  if (act_app->act_ctx_tail == act_app->act_ctx_head)
   {
-    act_app->act_ctx_head = IDXLIST_INVAL;
-    act_app->act_ctx_head = IDXLIST_INVAL;
-  } else if (act_ctx->next == IDXLIST_INVAL)
+    act_app->act_ctx_head = act_app->act_ctx_tail = IDXLIST_INVAL;
+    act_ctx->next = IDXLIST_INVAL;
+    act_ctx->prev = IDXLIST_INVAL;
+    act_ctx->flags &= ~FLAG_ACTIVE;
+    return;
+  }
+  
+  /* element is tail */
+  if (act_ctx->next == act_app->act_ctx_head)
   {
-    act_app->act_ctx_tail = act_ctx->prev;    
-    act_app->ctxs[act_ctx->prev].next = IDXLIST_INVAL;
-  } else if (act_ctx->prev == IDXLIST_INVAL)
+    act_app->act_ctx_tail = act_ctx->prev;
+  } else if (act_ctx->prev == act_app->act_ctx_tail) /* element is head */
   {
     act_app->act_ctx_head = act_ctx->next;
-    act_app->ctxs[act_ctx->next].prev = IDXLIST_INVAL;
-  } else
-  {
-    act_app->ctxs[act_ctx->prev].next = act_ctx->next;
-    act_app->ctxs[act_ctx->next].prev = act_ctx->prev;
   }
-
-
+  
+  act_app->ctxs[act_ctx->prev].next = act_ctx->next;
+  act_app->ctxs[act_ctx->next].prev = act_ctx->prev;
   act_ctx->next = IDXLIST_INVAL;
   act_ctx->prev = IDXLIST_INVAL;
   act_ctx->flags &= ~FLAG_ACTIVE;
@@ -469,14 +475,11 @@ static void remove_app_from_active(struct dataplane_context *ctx,
   if (act_app->next == ctx->act_head)
   {
     ctx->act_tail = act_app->prev;
-  }
-  
-  /* element is head */
-  if (act_app->prev == ctx->act_tail) 
+  } else if (act_app->prev == ctx->act_tail) /* element is head */
   {
     ctx->act_head = act_app->next;
   }
-
+  
   ctx->polled_apps[act_app->prev].next = act_app->next;
   ctx->polled_apps[act_app->next].prev = act_app->prev;
   act_app->next = IDXLIST_INVAL;

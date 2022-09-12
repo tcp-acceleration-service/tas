@@ -38,8 +38,8 @@
 #define TXBUF_SIZE (2 * BATCH_SIZE)
 
 #define FLAG_ACTIVE 1
-#define MAX_POLL_ROUNDS 10
-#define MAX_NULL_ROUNDS 100
+#define MAX_POLL_ROUNDS 5
+#define MAX_NULL_ROUNDS 5
 
 struct network_thread {
   struct rte_mempool *pool;
@@ -60,6 +60,7 @@ struct qman_thread {
 
 struct polled_context {
   uint32_t id;
+  uint32_t aid;
   uint32_t next;
   uint32_t prev;
   uint16_t flags;
