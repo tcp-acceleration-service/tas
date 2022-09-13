@@ -365,7 +365,7 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
 {
   unsigned total;
 
-  if (ctx->poll_rounds % MAX_POLL_ROUNDS == 0)
+  if (ctx->poll_rounds % MAX_POLL_ROUNDS == 0 || ctx->act_head == IDXLIST_INVAL)
   {
     total = poll_all_queues(ctx, ts);
   } else 
@@ -389,10 +389,6 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
 
   STATS_ADD(ctx, qs_poll, 1);
 
-  if (ctx->act_head == IDXLIST_INVAL)
-  {
-    return 0;
-  }
   max = BATCH_SIZE;
   if (TXBUF_SIZE - ctx->tx_num < max)
     max = TXBUF_SIZE - ctx->tx_num;
