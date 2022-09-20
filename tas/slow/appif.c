@@ -107,12 +107,12 @@ int appif_init(void)
   }
 
   /* create freelist of doorbells (0 is used by kernel) */
-  for (i = FLEXNIC_PL_APPST_CTX_NUM; i > 0; i--) {
+  for (i = FLEXNIC_PL_APPST_CTX_NUM * FLEXNIC_PL_APPST_NUM; i > 0; i--) {
     if ((adb = malloc(sizeof(*adb))) == NULL) {
       perror("appif_init: malloc doorbell failed");
       return -1;
     }
-    adb->id = i;
+    adb->id = i % FLEXNIC_PL_APPST_CTX_NUM;
     adb->next = free_doorbells;
     free_doorbells = adb;
   }
@@ -543,7 +543,6 @@ static void uxsocket_receive(struct application *app)
     goto error_dballoc;
   }
   free_doorbells = ctx->doorbell->next;
-
 
   /* initialize queuepair struct and queues */
   ctx->app = app;
