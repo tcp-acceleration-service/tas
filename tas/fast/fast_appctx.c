@@ -72,7 +72,7 @@ void fast_appctx_poll_pf_all(struct dataplane_context *ctx)
     for (j = 0; j < FLEXNIC_PL_APPCTX_NUM; j++) 
     {
       aid = (ctx->poll_next_app + i) % FLEXNIC_PL_APPST_NUM;
-      cid = (ctx->polled_apps[aid].poll_next_ctx + j) % FLEXNIC_PL_APPST_CTX_NUM;
+      cid = (ctx->polled_apps[aid].poll_next_ctx + j) % FLEXNIC_PL_APPCTX_NUM;
       fast_appctx_poll_pf(ctx, cid, aid);
     }
   }
@@ -151,11 +151,13 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
     p_app = &ctx->polled_apps[next_app];
     for (i_c = 0; i_c < FLEXNIC_PL_APPCTX_NUM && k < max; i_c++) 
     {
-      next_ctx = ctx->polled_apps[next_app].poll_next_ctx;
+      next_ctx = p_app->poll_next_ctx;
       p_ctx = &p_app->ctxs[next_ctx];
+      int ret_sum = 0;
       for (i_b = 0; i_b < BATCH_SIZE && k < max; i_b++) 
       {
         ret = fast_appctx_poll_fetch(ctx, next_ctx, next_app, &aqes[k]);
+        ret_sum += ret;
         if (ret == 0) 
         {
           p_ctx->null_rounds = 0;
@@ -182,7 +184,6 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
 
         *total = *total + 1;
       }
-
       p_app->poll_next_ctx = (next_ctx + 1) % FLEXNIC_PL_APPCTX_NUM;
     }
     ctx->poll_next_app = (next_app + 1) % FLEXNIC_PL_APPST_NUM;

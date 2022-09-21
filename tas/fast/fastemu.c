@@ -135,7 +135,7 @@ int dataplane_context_init(struct dataplane_context *ctx)
   {
     p_app = &ctx->polled_apps[i];
     polled_app_init(p_app, i);
-    for (j = 0; j < FLEXNIC_PL_APPST_CTX_NUM; j++)
+    for (j = 0; j < FLEXNIC_PL_APPCTX_NUM; j++)
     {
       p_ctx = &p_app->ctxs[j];
       polled_ctx_init(p_ctx, j, i);
@@ -167,10 +167,10 @@ static void polled_app_init(struct polled_app *app, uint16_t id)
   app->act_ctx_tail = IDXLIST_INVAL;
 }
 
-static void polled_ctx_init(struct polled_context *ctx, uint32_t id, uint32_t a_id)
+static void polled_ctx_init(struct polled_context *ctx, uint32_t id, uint32_t aid)
 {
   ctx->id = id;
-  ctx->aid = a_id;
+  ctx->aid = aid;
   ctx->next = IDXLIST_INVAL;
   ctx->prev = IDXLIST_INVAL;
   ctx->flags = 0;
@@ -372,8 +372,8 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
   {
     total = poll_active_queues(ctx, ts);
   }
-
-  ctx->poll_rounds = ctx->poll_rounds + 1 % MAX_POLL_ROUNDS;
+  
+  ctx->poll_rounds = (ctx->poll_rounds + 1) % MAX_POLL_ROUNDS;
   return total;
 }
 
