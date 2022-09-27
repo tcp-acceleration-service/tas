@@ -69,10 +69,10 @@ void fast_appctx_poll_pf_all(struct dataplane_context *ctx)
   }
 }
 
-static void fast_appctx_poll_pf(struct dataplane_context *ctx, uint32_t id, 
-    uint16_t app_id)
+static void fast_appctx_poll_pf(struct dataplane_context *ctx, uint32_t cid, 
+    uint16_t aid)
 {
-  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][app_id][id];
+  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][aid][cid];
   rte_prefetch0(dma_pointer(actx->tx_base + actx->tx_head, 1));
 }
 
@@ -134,7 +134,7 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
   uint16_t k = 0;
   uint32_t next_app, next_ctx;
   struct polled_app *p_app;
-  struct polled_context *p_ctx;
+  // struct polled_context *p_ctx;
 
   for (i_a = 0; i_a < FLEXNIC_PL_APPST_NUM && k < max; i_a++)
   {
@@ -143,39 +143,39 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
     for (i_c = 0; i_c < FLEXNIC_PL_APPCTX_NUM && k < max; i_c++) 
     {
       next_ctx = p_app->poll_next_ctx;
-      p_ctx = &p_app->ctxs[next_ctx];
+      // p_ctx = &p_app->ctxs[next_ctx];
       for (i_b = 0; i_b < BATCH_SIZE && k < max; i_b++) 
       {
         ret = fast_appctx_poll_fetch(ctx, next_ctx, next_app, &aqes[k]);
         if (ret == 0) 
         {
-          p_ctx->null_rounds = 0;
+          // p_ctx->null_rounds = 0;
           
-          /* Add app to active list if it is not already in list */
-          if ((p_app->flags & FLAG_ACTIVE) == 0)
-          {
-            enqueue_app_to_active(ctx, next_app);
-          }
+          // /* Add app to active list if it is not already in list */
+          // if ((p_app->flags & FLAG_ACTIVE) == 0)
+          // {
+          //   enqueue_app_to_active(ctx, next_app);
+          // }
 
-          /* Add app ctx to active list if it is not already in list */
-          if ((p_ctx->flags & FLAG_ACTIVE) == 0)
-          {
-            enqueue_ctx_to_active(p_app, next_ctx);
-          }
+          // /* Add app ctx to active list if it is not already in list */
+          // if ((p_ctx->flags & FLAG_ACTIVE) == 0)
+          // {
+          //   enqueue_ctx_to_active(p_app, next_ctx);
+          // }
 
           k++;
         } else
         {
-          p_ctx->null_rounds = p_ctx->null_rounds == MAX_NULL_ROUNDS ? 
-              MAX_NULL_ROUNDS : p_ctx->null_rounds + 1;
+          // p_ctx->null_rounds = p_ctx->null_rounds == MAX_NULL_ROUNDS ? 
+          //     MAX_NULL_ROUNDS : p_ctx->null_rounds + 1;
           break;
         }
 
         *total = *total + 1;
       }
-      p_app->poll_next_ctx = (next_ctx + 1) % FLEXNIC_PL_APPCTX_NUM;
+      p_app->poll_next_ctx = (p_app->poll_next_ctx + 1) % FLEXNIC_PL_APPCTX_NUM;
     }
-    ctx->poll_next_app = (next_app + 1) % FLEXNIC_PL_APPST_NUM;
+    ctx->poll_next_app = (ctx->poll_next_app + 1) % FLEXNIC_PL_APPST_NUM;
   }
 
   return k;
@@ -278,10 +278,10 @@ int fast_actx_rxq_alloc(struct dataplane_context *ctx,
   return ret;
 }
 
-static int fast_actx_rxq_probe(struct dataplane_context *ctx, uint32_t id,
-    uint16_t app_id)
+static int fast_actx_rxq_probe(struct dataplane_context *ctx, uint32_t cid,
+    uint16_t aid)
 {
-  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][app_id][id];
+  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][aid][cid];
   struct flextcp_pl_arx *parx;
   uint32_t pos, i;
 
