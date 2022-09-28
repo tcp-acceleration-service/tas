@@ -361,7 +361,7 @@ static inline int app_qman_poll(struct qman_thread *t, struct app_qman *aqman, u
     unsigned *app_id, unsigned *q_ids, uint16_t *q_bytes)
 {
   int i, cnt, x;
-  uint16_t quanta = num / 2;
+  uint16_t quanta = BATCH_SIZE / 2;
   uint32_t idx;
 
   for (cnt = 0; cnt < num && aqman->head_idx != IDXLIST_INVAL;)

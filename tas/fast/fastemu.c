@@ -57,7 +57,7 @@ static void dataplane_block(struct dataplane_context *ctx, uint32_t ts);
 static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
     uint64_t tsc) __attribute__((noinline));
 static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)  __attribute__((noinline));
-//static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
+static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
 static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));;
 static unsigned poll_kernel(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
 static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
@@ -365,72 +365,70 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
 {
   unsigned total;
 
-  total = poll_all_queues(ctx, ts);
-
-  // if (ctx->poll_rounds % MAX_POLL_ROUNDS == 0 || ctx->act_head == IDXLIST_INVAL)
-  // {
-  //   total = poll_all_queues(ctx, ts);
-  // } else 
-  // {
-  //   total = poll_active_queues(ctx, ts);
-  // }
+  if (ctx->poll_rounds % MAX_POLL_ROUNDS == 0 || ctx->act_head == IDXLIST_INVAL)
+  {
+    total = poll_all_queues(ctx, ts);
+  } else 
+  {
+    total = poll_active_queues(ctx, ts);
+  }
   
-  // ctx->poll_rounds = (ctx->poll_rounds + 1) % MAX_POLL_ROUNDS;
+  ctx->poll_rounds = (ctx->poll_rounds + 1) % MAX_POLL_ROUNDS;
   return total;
 }
 
 /* Polls active applications that have recently sent data */
-// static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
-// {
-//   int ret, n_rem = 0;
-//   struct network_buf_handle **handles;
-//   void *aqes[BATCH_SIZE];
-//   struct polled_context *rem_ctxs[BATCH_SIZE];
-//   unsigned total = 0;
-//   uint16_t max, i, k = 0, num_bufs = 0;
+static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
+{
+  int ret, n_rem = 0;
+  struct network_buf_handle **handles;
+  void *aqes[BATCH_SIZE];
+  struct polled_context *rem_ctxs[BATCH_SIZE];
+  unsigned total = 0;
+  uint16_t max, i, k = 0, num_bufs = 0;
 
-//   STATS_ADD(ctx, qs_poll, 1);
+  STATS_ADD(ctx, qs_poll, 1);
 
-//   max = BATCH_SIZE;
-//   if (TXBUF_SIZE - ctx->tx_num < max)
-//     max = TXBUF_SIZE - ctx->tx_num;
+  max = BATCH_SIZE;
+  if (TXBUF_SIZE - ctx->tx_num < max)
+    max = TXBUF_SIZE - ctx->tx_num;
 
-//   /* allocate buffers contents */
-//   max = bufcache_prealloc(ctx, max, &handles);
+  /* allocate buffers contents */
+  max = bufcache_prealloc(ctx, max, &handles);
 
-//   /* prefetch all active contexts */
-//   fast_appctx_poll_pf_active(ctx);
+  /* prefetch all active contexts */
+  fast_appctx_poll_pf_active(ctx);
 
-//   /* fetch packets from active contexts */
-//   k = fast_appctx_poll_fetch_active(ctx, max, &total, &n_rem, rem_ctxs, aqes);
+  /* fetch packets from active contexts */
+  k = fast_appctx_poll_fetch_active(ctx, max, &total, &n_rem, rem_ctxs, aqes);
   
-//   for (i = 0; i < k; i++) 
-//   {
-//     ret = fast_appctx_poll_bump(ctx, aqes[i], handles[num_bufs], ts);
-//     if (ret == 0)
-//       num_bufs++;
-//   }
+  for (i = 0; i < k; i++) 
+  {
+    ret = fast_appctx_poll_bump(ctx, aqes[i], handles[num_bufs], ts);
+    if (ret == 0)
+      num_bufs++;
+  }
 
-//   /* apply buffer reservations */
-//   bufcache_alloc(ctx, num_bufs);
+  /* apply buffer reservations */
+  bufcache_alloc(ctx, num_bufs);
 
-//   /* probe receive queue on all active contexts */
-//   fast_actx_rxq_probe_active(ctx);
+  /* probe receive queue on all active contexts */
+  fast_actx_rxq_probe_active(ctx);
 
-//   /* update round */
-//   ctx->act_head = ctx->polled_apps[ctx->act_head].next;
-//   ctx->act_tail = ctx->polled_apps[ctx->act_tail].next;
+  /* update round */
+  ctx->act_head = ctx->polled_apps[ctx->act_head].next;
+  ctx->act_tail = ctx->polled_apps[ctx->act_tail].next;
 
-//   /* remove contexts and apps that have not sent for a few rounds 
-//      from active list */
-//   remove_ctxs_from_active(ctx, rem_ctxs, n_rem);
+  /* remove contexts and apps that have not sent for a few rounds 
+     from active list */
+  remove_ctxs_from_active(ctx, rem_ctxs, n_rem);
 
-//   STATS_ADD(ctx, qs_total, total);
-//   if (total == 0)
-//     STATS_ADD(ctx, qs_empty, total);
+  STATS_ADD(ctx, qs_total, total);
+  if (total == 0)
+    STATS_ADD(ctx, qs_empty, total);
 
-//   return total;
-// }
+  return total;
+}
 
 /* Polls the queues for every application and context */
 static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts)
