@@ -9,15 +9,35 @@ virtualized environments.
 ## Building
 Requirements:
   * vTAS is built on top of Intel DPDK for direct access to the NIC. We have
-    tested this version with dpdk versions (17.11.9, 18.11.5, 19.11).
+    tested this version with dpdk version 21.
 
-Assuming that dpdk is installed in `~/dpdk-inst` vTAS can be built as follows:
+Assuming that dpdk is installed through the system package manager, the
+following suffices to build TAS:
 ```
-make RTE_SDK=~/dpdk-inst
+make
 ```
 
 This will build the vTAS service (binary `tas/tas`), client libraries (in
 `lib/`), and a few debugging tools (in `tools/`).
+
+
+### Using Separate DPDK Build
+
+The Makefile uses `pkg-config` to locate the dpdk libraries and headers. If you
+want to build TAS against a non-system dpdk version, the
+`PKG_CONFIG_PATH` environmental variable can point pkg-config to the right dpdk
+location. For example, with dpdk installed in `/local/antoinek/dpdk` I set
+
+```
+PKG_CONFIG_PATH=/local/antoinek/dpdk/usr/local/lib/x86_64-linux-gnu/pkgconfig/
+```
+
+Instead of manually exporting the environment variable every time, it can also
+be set by creating a `Makefile.local` file including the following line:
+
+```
+PKG_CONFIG= PKG_CONFIG_PATH=/local/antoinek/dpdk/usr/local/lib/x86_64-linux-gnu/pkgconfig/ pkg-config
+```
 
 ## Running
 
