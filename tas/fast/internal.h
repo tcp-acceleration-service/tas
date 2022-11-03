@@ -77,6 +77,7 @@ uint32_t qman_next_ts(struct qman_thread *t, uint32_t cur_ts);
 uint32_t qman_app_get_avail(struct dataplane_context *ctx, uint32_t app_id);
 void qman_free_app_cont(struct dataplane_context *ctx);
 
-void *util_create_shmsiszed(const char *name, size_t size, void *addr);
+void *util_create_shmsiszed(const char *name, size_t size, void *addr,
+    int *pfd);
 
 #endif /* ndef INTERNAL_H_ */

@@ -58,6 +58,8 @@ struct flexnic_info {
   uint64_t flags;
   /** Size of flexnic dma memory in bytes. */
   uint64_t dma_mem_size;
+  /** Offset of flexnic dma memory in bytes */
+  uint64_t dma_mem_off;
   /** Size of internal flexnic memory in bytes. */
   uint64_t internal_mem_size;
   /** export mac address */

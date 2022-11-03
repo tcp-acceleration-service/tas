@@ -62,7 +62,7 @@ int trace_thread_init(uint16_t id)
   }
 
   snprintf(name, sizeof(name), FLEXNIC_TRACE_NAME, id);
-  if ((t->hdr = util_create_shmsiszed(name, FLEXNIC_TRACE_LEN, NULL))
+  if ((t->hdr = util_create_shmsiszed(name, FLEXNIC_TRACE_LEN, NULL, NULL))
       == NULL)
   {
     free(t);

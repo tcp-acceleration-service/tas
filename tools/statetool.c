@@ -38,18 +38,21 @@ static int connect_flexnic(void)
   struct flexnic_info *info;
   void *mem_start, *int_mem_start;
 
-  if (flexnic_driver_connect(&info, &mem_start) != 0) {
+  if (flexnic_driver_connect(&info, &mem_start, -1) != 0) 
+  {
     fprintf(stderr, "flexnic_driver_connect failed\n");
     return -1;
   }
 
-  if (flexnic_driver_internal(&int_mem_start) != 0) {
+  if (flexnic_driver_internal(&int_mem_start) != 0) 
+  {
     fprintf(stderr, "flexnic_driver_internal failed\n");
     return -1;
   }
   plm = int_mem_start;
 
-  if (info->internal_mem_size < sizeof(*plm)) {
+  if (info->internal_mem_size < sizeof(*plm)) 
+  {
     fprintf(stderr, "internal memory smaller than expected\n");
     return -1;
   }

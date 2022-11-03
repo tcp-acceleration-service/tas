@@ -39,6 +39,11 @@
 #include <utils_timeout.h>
 #include "internal.h"
 
+void *flexnic_mem = NULL;
+int flexnic_shmfd = -1;
+struct flexnic_info *flexnic_info = NULL;
+int flexnic_evfd[FLEXTCP_MAX_FTCPCORES];
+
 static inline int event_kappin_conn_opened(
     struct kernel_appin_conn_opened *inev, struct flextcp_event *outev,
     unsigned avail);
@@ -68,18 +73,17 @@ static int fastpath_poll_vec(struct flextcp_context *ctx, int num,
 static void conns_bump(struct flextcp_context *ctx) __attribute__((noinline));
 static void txq_probe(struct flextcp_context *ctx, unsigned n) __attribute__((noinline));
 
-void *flexnic_mem = NULL;
-struct flexnic_info *flexnic_info = NULL;
-int flexnic_evfd[FLEXTCP_MAX_FTCPCORES];
-
 int flextcp_init(void)
 {
-  if (flextcp_kernel_connect() != 0) {
+  if ((flextcp_kernel_connect(&flexnic_shmfd)) < 0) 
+  {
     fprintf(stderr, "flextcp_init: connecting to kernel failed\n");
     return -1;
   }
 
-  if (flexnic_driver_connect(&flexnic_info, &flexnic_mem) != 0) {
+  if (flexnic_driver_connect(&flexnic_info, &flexnic_mem, flexnic_shmfd)
+      != 0) 
+  {
     fprintf(stderr, "flextcp_init: connecting to flexnic failed\n");
     return -1;
   }

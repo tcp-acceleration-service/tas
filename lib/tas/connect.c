@@ -36,13 +36,14 @@
 #include <tas_ll_connect.h>
 #include <tas_memif.h>
 
-static void *map_region(const char *name, size_t len);
-static void *map_region_huge(const char *name, size_t len)
-  __attribute__((used));
+static void *map_region(const char *name, size_t len, int fd, off_t off);
+static void *map_region_huge(const char *name, size_t len, int fd, off_t off)
+    __attribute__((used));
 
 static struct flexnic_info *info = NULL;
 
-int flexnic_driver_connect(struct flexnic_info **p_info, void **p_mem_start)
+int flexnic_driver_connect(struct flexnic_info **p_info, void **p_mem_start,
+    int shmfd)
 {
   void *m;
   volatile struct flexnic_info *fi;
@@ -55,7 +56,7 @@ int flexnic_driver_connect(struct flexnic_info **p_info, void **p_mem_start)
   }
 
   /* open and map flexnic info shm region */
-  if ((m = map_region(FLEXNIC_NAME_INFO, FLEXNIC_INFO_BYTES)) == NULL) {
+  if ((m = map_region(FLEXNIC_NAME_INFO, FLEXNIC_INFO_BYTES, -1, 0)) == NULL) {
     perror("flexnic_driver_connect: map_region info failed");
     goto error_exit;
   }
@@ -69,9 +70,11 @@ int flexnic_driver_connect(struct flexnic_info **p_info, void **p_mem_start)
 
   /* open and map dma shm region */
   if ((fi->flags & FLEXNIC_FLAG_HUGEPAGES) == FLEXNIC_FLAG_HUGEPAGES) {
-    m = map_region_huge(FLEXNIC_NAME_DMA_MEM, fi->dma_mem_size);
+    m = map_region_huge(FLEXNIC_NAME_DMA_MEM, fi->dma_mem_size, 
+        shmfd, fi->dma_mem_off);
   } else {
-    m = map_region(FLEXNIC_NAME_DMA_MEM, fi->dma_mem_size);
+    m = map_region(FLEXNIC_NAME_DMA_MEM, fi->dma_mem_size, 
+        shmfd, fi->dma_mem_off);
   }
   if (m == NULL) {
     perror("flexnic_driver_connect: mapping dma memory failed");
@@ -99,9 +102,11 @@ int flexnic_driver_internal(void **int_mem_start)
 
   /* open and map flexnic internal memory shm region */
   if ((info->flags & FLEXNIC_FLAG_HUGEPAGES) == FLEXNIC_FLAG_HUGEPAGES) {
-    m = map_region_huge(FLEXNIC_NAME_INTERNAL_MEM, info->internal_mem_size);
+    m = map_region_huge(FLEXNIC_NAME_INTERNAL_MEM, info->internal_mem_size,
+        -1, 0);
   } else {
-    m = map_region(FLEXNIC_NAME_INTERNAL_MEM, info->internal_mem_size);
+    m = map_region(FLEXNIC_NAME_INTERNAL_MEM, info->internal_mem_size,
+        -1, 0);
   }
   if (m == NULL) {
     perror("flexnic_driver_internal: map_region failed");
@@ -112,39 +117,63 @@ int flexnic_driver_internal(void **int_mem_start)
   return 0;
 }
 
-static void *map_region(const char *name, size_t len)
+static void *map_region(const char *name, size_t len, int fd, off_t off)
 {
-  int fd;
   void *m;
+  int fd_old = fd;
 
-  if ((fd = shm_open(name, O_RDWR, 0)) == -1) {
-    perror("map_region: shm_open memory failed");
-    return NULL;
+  if (fd == -1)
+  {
+    if ((fd = shm_open(name, O_RDWR, 0)) == -1) 
+    {
+      perror("map_region: shm_open memory failed");
+      return NULL;
+    }
   }
-  m = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, 0);
-  close(fd);
-  if (m == (void *) -1) {
-    perror("flexnic_driver_connect: mmap failed");
+
+  m = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE,
+      fd, off);
+
+  /* Close fd only if it wasn't passed in */
+  if (fd_old == -1)
+  {
+    close(fd);
+
+  }
+
+  if (m == (void *) -1) 
+  {
+    perror("map_region: mmap failed");
     return NULL;
   }
 
   return m;
 }
 
-static void *map_region_huge(const char *name, size_t len)
+static void *map_region_huge(const char *name, size_t len, int fd, off_t off)
 {
-  int fd;
   void *m;
   char path[128];
+  int fd_old = fd;
 
   snprintf(path, sizeof(path), "%s/%s", FLEXNIC_HUGE_PREFIX, name);
 
-  if ((fd = open(path, O_RDWR)) == -1) {
-    perror("map_region: shm_open memory failed");
-    return NULL;
+  if (fd == -1)
+  {
+    if ((fd = open(path, O_RDWR)) == -1) {
+      perror("map_region: shm_open memory failed");
+      return NULL;
+    }
   }
+
   m = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, 0);
-  close(fd);
+
+  /* Close fd only if it wasn't passed in */
+  if (fd_old == -1)
+  {
+    close(fd);
+  }
+
   if (m == (void *) -1) {
     perror("flexnic_driver_connect: mmap failed");
     return NULL;

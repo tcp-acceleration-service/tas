@@ -58,7 +58,7 @@ void flextcp_kernel_kick(void)
   last_ts = now;
 }
 
-int flextcp_kernel_connect(void)
+int flextcp_kernel_connect(int *shmfd)
 {
   int fd, *pfd;
   uint8_t b;
@@ -101,7 +101,8 @@ int flextcp_kernel_connect(void)
   };
 
   /* receive welcome message:
-   *   contains the fd for the kernel, and the count of flexnic fds */
+   *   contains the fd for the kernel, the shared memory fd,
+       and the count of flexnic fds */
   if ((r = recvmsg(fd, &msg, 0)) != sizeof(uint32_t)) {
     fprintf(stderr, "flextcp_kernel_connect: recvmsg failed (%zd)\n", r);
     abort();
@@ -110,12 +111,13 @@ int flextcp_kernel_connect(void)
   /* get kernel fd from welcome message */
   cmsg = CMSG_FIRSTHDR(&msg);
   pfd = (int *) CMSG_DATA(cmsg);
-  if (msg.msg_controllen <= 0 || cmsg->cmsg_len != CMSG_LEN(sizeof(int))) {
+  if (msg.msg_controllen <= 0 || cmsg->cmsg_len != CMSG_LEN(sizeof(int) * 2)) {
     fprintf(stderr, "flextcp_kernel_connect: accessing ancillary data "
         "failed\n");
     abort();
   }
-  kernel_evfd = *pfd;
+  kernel_evfd = pfd[0];
+  *shmfd = pfd[1];
 
   /* receive fast path fds in batches of 4 */
   off = 0;

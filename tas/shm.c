@@ -43,6 +43,7 @@
 #include <tas_memif.h>
 
 void *tas_shm = NULL;
+int tas_shm_fd = -1;
 struct flextcp_pl_mem *fp_state = NULL;
 struct flexnic_info *tas_info = NULL;
 
@@ -50,7 +51,7 @@ struct flexnic_info *tas_info = NULL;
 static void destroy_shm(const char *name, size_t size, void *addr);
 /* create shared memory region using huge pages */
 static void *util_create_shmsiszed_huge(const char *name, size_t size,
-    void *addr) __attribute__((used));
+    void *addr, int *fd) __attribute__((used));
 /* destroy shared huge page memory region */
 static void destroy_shm_huge(const char *name, size_t size, void *addr)
     __attribute__((used));
@@ -63,10 +64,10 @@ int shm_preinit(void)
   /* create shm for dma memory */
   if (config.fp_hugepages) {
     tas_shm = util_create_shmsiszed_huge(FLEXNIC_NAME_DMA_MEM,
-        config.shm_len, NULL);
+        config.shm_len, NULL, &tas_shm_fd);
   } else {
     tas_shm = util_create_shmsiszed(FLEXNIC_NAME_DMA_MEM, config.shm_len,
-        NULL);
+        NULL, &tas_shm_fd);
   }
   if (tas_shm == NULL) {
     fprintf(stderr, "mapping flexnic dma memory failed\n");
@@ -76,10 +77,10 @@ int shm_preinit(void)
   /* create shm for internal memory */
   if (config.fp_hugepages) {
     fp_state = util_create_shmsiszed_huge(FLEXNIC_NAME_INTERNAL_MEM,
-        FLEXNIC_INTERNAL_MEM_SIZE, NULL);
+        FLEXNIC_INTERNAL_MEM_SIZE, NULL, NULL);
   } else {
     fp_state = util_create_shmsiszed(FLEXNIC_NAME_INTERNAL_MEM,
-        FLEXNIC_INTERNAL_MEM_SIZE, NULL);
+        FLEXNIC_INTERNAL_MEM_SIZE, NULL, NULL);
   }
   if (fp_state == NULL) {
     fprintf(stderr, "mapping flexnic internal memory failed\n");
@@ -95,7 +96,8 @@ int shm_init(unsigned num)
   umask(0);
 
   /* create shm for tas_info */
-  tas_info = util_create_shmsiszed(FLEXNIC_NAME_INFO, FLEXNIC_INFO_BYTES, NULL);
+  tas_info = util_create_shmsiszed(FLEXNIC_NAME_INFO, FLEXNIC_INFO_BYTES,
+      NULL, NULL);
   if (tas_info == NULL) {
     fprintf(stderr, "mapping flexnic tas_info failed\n");
     shm_cleanup();
@@ -103,6 +105,7 @@ int shm_init(unsigned num)
   }
 
   tas_info->dma_mem_size = config.shm_len;
+  tas_info->dma_mem_off = 0;
   tas_info->internal_mem_size = FLEXNIC_INTERNAL_MEM_SIZE;
   tas_info->qmq_num = FLEXNIC_NUM_QMQUEUES;
   tas_info->cores_num = num;
@@ -149,7 +152,7 @@ void shm_set_ready(void)
   tas_info->flags |= FLEXNIC_FLAG_READY;
 }
 
-void *util_create_shmsiszed(const char *name, size_t size, void *addr)
+void *util_create_shmsiszed(const char *name, size_t size, void *addr, int *pfd)
 {
   int fd;
   void *p;
@@ -173,7 +176,11 @@ void *util_create_shmsiszed(const char *name, size_t size, void *addr)
 
   memset(p, 0, size);
 
-  close(fd);
+  if (pfd != NULL)
+    *pfd = fd;
+  else
+    close(fd);
+
   return p;
 
 error_remove:
@@ -192,7 +199,7 @@ static void destroy_shm(const char *name, size_t size, void *addr)
 }
 
 static void *util_create_shmsiszed_huge(const char *name, size_t size,
-    void *addr)
+    void *addr, int *pfd)
 {
   int fd;
   void *p;
@@ -218,6 +225,11 @@ static void *util_create_shmsiszed_huge(const char *name, size_t size,
   }
 
   memset(p, 0, size);
+
+  if (pfd != NULL)
+    *pfd = fd;
+  else
+    close(fd);
 
   close(fd);
   return p;

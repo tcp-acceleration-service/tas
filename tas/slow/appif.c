@@ -320,10 +320,11 @@ static void uxsocket_accept(void)
   struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
   cmsg->cmsg_level = SOL_SOCKET;
   cmsg->cmsg_type = SCM_RIGHTS;
-  cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+  cmsg->cmsg_len = CMSG_LEN(sizeof(int) * 2);
 
   pfd = (int *) CMSG_DATA(cmsg);
-  *pfd = kernel_notifyfd;
+  pfd[0] = kernel_notifyfd;
+  pfd[1] = tas_shm_fd;
 
   /* send out kernel notify fd */
   if((tx = sendmsg(cfd, &msg, 0)) != sizeof(uint32_t)) {
