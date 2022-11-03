@@ -1,16 +1,19 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <string.h>
 #include <sys/epoll.h>
 
-#include "../../tas/lib/tas/internal.h"
+// #include "../../tas/lib/tas/internal.h"
 #include "../proxy.h"
 #include "../channel.h"
 #include "internal.h"
 #include "vfio.h"
 
+int ivshmem_setup(struct guest_proxy *pxy);
+
 int ivshmem_init(struct guest_proxy *pxy)
 {
-  struct channel *chan;
   void *tx_addr, *rx_addr;
 
   /* Create epoll that will wait for events from host */
@@ -38,7 +41,7 @@ int ivshmem_init(struct guest_proxy *pxy)
   }
 
   /* Setup guest proxy with host proxy */
-  if (ivshmem_setup_with_host(pxy) < 0)
+  if (ivshmem_setup(pxy) < 0)
   {
     fprintf(stderr, "ivshmem_init: failed handshake with host.\n");
     return -1;
@@ -52,19 +55,21 @@ int ivshmem_init(struct guest_proxy *pxy)
 int ivshmem_poll(struct guest_proxy *pxy)
 {
   // TODO: Do poll for ivshmem
+  return 0;
 }
 
 int flextcp_poll(struct guest_proxy *pxy)
 {
   // TODO: Do poll for flextcp
+  return 0;
 }
 
-int ivshmem_setup_with_host(struct guest_proxy *pxy)
+int ivshmem_setup(struct guest_proxy *pxy)
 {
   struct epoll_event evs[1];
   int n_cores, ret, t_req;
-  char *tasinfo;
-  void *buf;
+  size_t tasinfo_len;
+  char *tasinfo = NULL;
 
   /* Get number of cores from host */
   ret = channel_read(pxy->chan, &n_cores, sizeof(n_cores));
@@ -76,7 +81,7 @@ int ivshmem_setup_with_host(struct guest_proxy *pxy)
 
   /* Send tasinfo request */
   t_req = 1;
-  ret = channel_write(pxy->chan, t_req, sizeof(t_req));
+  ret = channel_write(pxy->chan, &t_req, sizeof(t_req));
 
   /* Receive tasinfo response */
   ret = epoll_wait(pxy->epfd, evs, 1, -1);
@@ -93,17 +98,20 @@ int ivshmem_setup_with_host(struct guest_proxy *pxy)
   }
 
   /* Copy tasinfo response into flexnic_info */
-  pxy->flexnic_info = malloc(FLEXNIC_INFO_BYTES);
+  // TODO: Use FLEXNIC_INFO_BYTES macro
+  pxy->flexnic_info = malloc(0x1000);
   if (pxy->flexnic_info == NULL)
   {
     fprintf(stderr, "ivshmem_handshake: failed to allocate flexnic_info.\n");
     return -1;
   }
 
+  // TODO: Get tasinfo_len somehow
+  tasinfo_len = 0;
   memcpy(pxy->flexnic_info, tasinfo, tasinfo_len);
 
   /* Set proper offset and size of memory region */
-  // pxy->flexnic_info->dma_mem_off = pxy->shm_off;
+  pxy->flexnic_info->dma_mem_off = pxy->shm_off;
   pxy->flexnic_info->dma_mem_size = pxy->shm_size;
 
   /* Create shm region for tas_info */

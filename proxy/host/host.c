@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 #include <tas_ll.h>
-#include "host/ivshmem.h"
+#include "ivshmem.h"
 
 int exited = 0;
 

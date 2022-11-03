@@ -1,7 +1,7 @@
 #include <stdio.h>
 
-#include "guest/internal.h"
-#include "guest/ivshmem.h"
+#include "internal.h"
+#include "ivshmem.h"
 
 int exited = 0;
 

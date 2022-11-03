@@ -72,6 +72,9 @@ include $(dir)/rules.mk
 dir := tas
 include $(dir)/rules.mk
 
+dir := proxy
+include $(dir)/rules.mk
+
 dir := tools
 include $(dir)/rules.mk
 

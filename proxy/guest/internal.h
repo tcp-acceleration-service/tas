@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include "../../include/tas_memif.h"
 #include "../channel.h"
 
 struct guest_proxy {
@@ -20,12 +21,12 @@ struct guest_proxy {
     int cont;
 
     /* Shared memory region between guest and TAS */
-    uint8_t *shm;
+    void *shm;
     size_t shm_size;
     size_t shm_off;
 
     /* Inter-vm signal memory used for interrupts */
-    uint8_t *sgm;
+    void *sgm;
     size_t sgm_size;
     size_t sgm_off;
 

@@ -3,11 +3,20 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/epoll.h>
+#include <sys/ioctl.h>
+#include <sys/eventfd.h>
 #include <linux/vfio.h>
 #include <linux/pci.h>
 
+#include "../proxy.h"
 #include "internal.h"
+#include "vfio.h"
 
+int vfio_set_irq(struct guest_proxy *pxy);
+int vfio_subscribe_irqs(struct guest_proxy *pxy);
+int vfio_map_all_regions(struct guest_proxy *pxy);
+int vfio_map_region(int dev, int idx, void **addr, size_t *len, size_t *off);
+int vfio_get_region_info(int dev, int i, struct vfio_region_info *reg);
 
 int vfio_init(struct guest_proxy *pxy)
 {
@@ -158,7 +167,7 @@ int vfio_map_all_regions(struct guest_proxy *pxy)
 {
   /* Map BAR 0 to receive interrupts */
   if (vfio_map_region(pxy->dev, 0, pxy->sgm, 
-      pxy->sgm_size, pxy->sgm_off) != 0)
+      &pxy->sgm_size, &pxy->sgm_off) != 0)
   {
     fprintf(stderr, "vfio_map_all_regions: failed to map sgm region.\n");    
     return -1;
@@ -166,7 +175,7 @@ int vfio_map_all_regions(struct guest_proxy *pxy)
 
   /* Map BAR 2 for shm between TAS and guest */
   if (vfio_map_region(pxy->dev, 2, pxy->shm, 
-      pxy->shm_size, pxy->shm_off) != 0)
+      &pxy->shm_size, &pxy->shm_off) != 0)
   {
     fprintf(stderr, "vfio_map_all_regions: failed to map shm region.\n");    
     return -1;

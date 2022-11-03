@@ -1,24 +1,38 @@
 include mk/subdir_pre.mk
 
-objs_proxy := guest_main.o host_main.o channel.o shmring.o
-objs_host := ivshmem.o
+objs_proxy := channel.o shmring.o
+objs_host := host.o ivshmem.o
+objs_guest := guest.o ivshmem.o vfio.o
 
-PROXY_OBJS := $(addprefix $(d)/, \
+PROXY_HOST_OBJS := $(addprefix $(d)/, \
   $(objs_proxy) \
   $(addprefix host/, $(objs_host)))
 
-exec := $(d)/host_main
+PROXY_GUEST_OBJS := $(addprefix $(d)/, \
+  $(objs_proxy) \
+  $(addprefix guest/, $(objs_guest)))
 
-PROXY_CPPFLAGS := -Iinclude/ -Ilib/tas/include -I/lib/tas
-PROXY_CFLAGS := $()
+host := $(d)/host/host
+guest := $(d)/guest/guest
 
-$(PROXY_OBJS): CPPFLAGS += $(PROXY_CPPFLAGS)
-$(PROXY_OBJS): CFLAGS += $(PROXY_CFLAGS)
+PROXY_HOST_CPPFLAGS := -Iinclude/ -Ilib/tas/include/
+PROXY_HOST_CFLAGS := $()
 
-$(exec): $(PROXY_OBJS)
+PROXY_GUEST_CPPFLAGS := $()
+PROXY_GUEST_CFLAGS := $()
 
-DEPS += $(PROXY_OBJS:.o=.d)
-CLEAN += $(PROXY_OBJS) $(exec)
-TARGETS += $(exec) $(LIB_UTILS_OBJS)
+$(PROXY_HOST_OBJS): CPPFLAGS += $(PROXY_HOST_CPPFLAGS)
+$(PROXY_HOST_OBJS): CFLAGS += $(PROXY_HOST_CFLAGS)
+
+$(PROXY_GUEST_OBJS): CPPFLAGS += $(PROXY_GUEST_CPPFLAGS)
+$(PROXY_GUEST_OBJS): CFLAGS += $(PROXY_GUEST_CFLAGS)
+
+$(host): $(PROXY_HOST_OBJS) $(LIB_UTILS_OBJS) $(LIB_TAS_OBJS)
+$(guest): $(PROXY_GUEST_OBJS)
+
+DEPS += $(PROXY_HOST_OBJS:.o=.d)
+DEPS += $(PROXY_GUEST_OBJS:.o=.d)
+CLEAN += $(PROXY_HOST_OBJS) $(PROXY_GUEST_OBJS) $(host) $(guest)
+TARGETS += $(host) $(guest)
 
 include mk/subdir_post.mk
