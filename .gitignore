@@ -4,6 +4,7 @@
 *.swp
 *.swo
 *.json
+__pycache__/
 tas/tas
 tests/bench_ll_echo
 tests/lowlevel
@@ -30,3 +31,4 @@ doc/_build
 .dockerwrap
 .vscode
 Makefile.local
+virt-manager
