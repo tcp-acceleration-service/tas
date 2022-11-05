@@ -50,8 +50,8 @@ int packetmem_init(void)
     return -1;
   }
 
-  ph->base = 0;
-  ph->len = tas_info->dma_mem_size;
+  ph->base = config.data_mem_off;
+  ph->len = tas_info->dma_mem_size - config.data_mem_off;
   ph->next = NULL;
   freelist = ph;
 

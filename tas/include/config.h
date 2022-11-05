@@ -59,6 +59,8 @@ struct configuration {
   uint64_t app_kin_len;
   /** App context <- kernel queue length. */
   uint64_t app_kout_len;
+  /** Data memory reserved offset */
+  uint64_t data_mem_off;
   /** TCP receive buffer size. */
   uint64_t tcp_rxbuf_len;
   /** TCP transmit buffer size. */
