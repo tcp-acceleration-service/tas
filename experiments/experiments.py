@@ -120,8 +120,6 @@ class Host(object):
             pane.send_keys(cmd(num))
             time.sleep(2)
 
-        import pdb
-        pdb.set_trace()
         """ Start VM using VM-manager.sh """
         pane.send_keys('cd ' + self.config.vm_manager_dir)
 
@@ -134,6 +132,8 @@ class Host(object):
         print("CMD : " + cmd)
         print("Server VM"+ window_name + " started.")
         time.sleep(15)
+        import pdb
+        pdb.set_trace()
         self.login_vm(pane, window_name)
         pane.send_keys('tmux set-option remain-on-exit on')
         """ Run setup commands """

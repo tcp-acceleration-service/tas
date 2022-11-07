@@ -22,7 +22,7 @@ class HostConfig:
         self.tas_lib_so = self.tas_comp_dir + 'tas/lib/libtas_interpose.so'
         self.tas_args = ' --fp-cores-max=1' + \
             ' --cc=const-rate --cc-const-rate=0 --fp-no-ints' + \
-            ' --fp-no-autoscale --dpdk-extra="-w3b:00.0"'
+            ' --fp-no-autoscale --dpdk-extra="-w3b:00.0" --fp-no-hugepages'
         if is_server:
             self.tas_args = ' --ip-addr=192.168.10.13/24' + self.tas_args
             self.tas_out_file = self.tas_server_out_file
