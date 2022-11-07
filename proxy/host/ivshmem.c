@@ -6,6 +6,9 @@
 #include <sys/stat.h>
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
+#include <sys/un.h>
+
+#include <errno.h>
 
 #include "../proxy.h"
 #include "../channel.h"
@@ -19,16 +22,10 @@
 static int epfd = -1;
 /* Unix socket that connects host proxy to guest proxy */
 static int uxfd = -1;
-
 /* ID of next virtual machine to connect */
 static int next_id = 0;
 /* List of VMs */
 static struct v_machine vms[MAX_VMS];
-
-/* Shared memory region from TAS library */
-// extern int flexnic_shmfd;
-// extern void *flexnic_mem;
-// extern struct flexnic_info *flexnic_info;
 
 static int ivshmem_uxsocket_init();
 static int ivshmem_poll_uxsocket();
@@ -36,8 +33,8 @@ static int ivshmem_uxsocket_accept();
 static int ivshmem_uxsocket_notif();
 static int ivshmem_uxsocket_error();
 static int ivshmem_uxsocket_newmsg();
-static int ivshmem_uxsocket_send(int fd, void *payload, size_t len);
-static int ivshmem_uxsocket_sendfd(int fd, int sfd, int vmid);
+static int ivshmem_uxsocket_send_int(int fd, int64_t i);
+static int ivshmem_uxsocket_sendfd(int uxfd, int fd, int64_t i);
 
 int ivshmem_init()
 {
@@ -174,12 +171,18 @@ static int ivshmem_poll_uxsocket()
     return 0;
 }
 
+/* Accepts connection when a qemu vm starts and uses the
+   uxsocket to set up the shared memory region */
 static int ivshmem_uxsocket_accept()
-{   int ret, n_cores;
+{   
+    int ret, n_cores;
     int cfd, ifd, nfd;
     void *tx_addr, *rx_addr;
     struct epoll_event ev;
     struct channel *chan;
+
+    int64_t version = IVSHMEM_PROTOCOL_VERSION;
+    int64_t hostid = HOST_PEERID;
 
     /* Return error if max number of VMs has been reached */
     if (next_id > MAX_VMS)
@@ -188,77 +191,97 @@ static int ivshmem_uxsocket_accept()
         return -1;
     }
 
-    /* Accept connection from the guest proxy */
+    /* Accept connection from qemu ivshmem */
     if ((cfd = accept(uxfd, NULL, NULL)) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: accept failed.\n");
         return -1;
     }
+    printf("cfd accepted.\n");
+
+    /* Send protocol version as required by qemu ivshmem */
+    ret = ivshmem_uxsocket_send_int(cfd, version);
+    if (ret < 0)
+    {
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
+                "protocol version.\n");
+        goto close_cfd;
+    }
 
     /* Send vm id to the guest proxy */
-    ret = ivshmem_uxsocket_send(cfd, &next_id, sizeof(next_id));
+    ret = ivshmem_uxsocket_send_int(cfd, next_id);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send vm id.\n");
         goto close_cfd;
     }
+    printf("sent vm id.\n");
 
     /* Send shared memory fd to the guest proxy */
-    ret = ivshmem_uxsocket_sendfd(cfd, flexnic_shmfd, next_id);
+    ret = ivshmem_uxsocket_sendfd(cfd, flexnic_shmfd, -1);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send shm fd.\n");
         goto close_cfd;
     }
-
-    /* Create and send interrupt fd to the guest proxy */
-    if ((ifd = eventfd(0, EFD_NONBLOCK)) < 0)
-    {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to create"
-                "interrupt fd.\n");
-        goto close_cfd;
-    }
-
-    ret = ivshmem_uxsocket_sendfd(cfd, ifd, next_id);
-    if (ret < 0)
-    {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send"
-                "interrupt fd.\n");
-        goto close_ifd;
-    }
+    printf("sent shm fd.\n");
 
     /* Create and send notify fd to the guest proxy */
     if ((nfd = eventfd(0, EFD_NONBLOCK)) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_acccept: failed to create"
                 "notify fd.\n");
-        goto close_nfd;
+        goto close_cfd;
     }
+    printf("created notify fd.\n");
 
-    ret = ivshmem_uxsocket_sendfd(cfd, nfd, next_id);
+    /* Ivshmem protocol requires to send host id
+       with the notify fd */
+    ret = ivshmem_uxsocket_sendfd(cfd, nfd, hostid);
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send"
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
                 "notify fd.\n");
-        goto close_nfd;
+        goto close_ifd;
         
     }
+    printf("sent notify fd.\n");
+
+    /* Create and send interrupt fd to the guest proxy */
+    if ((ifd = eventfd(0, EFD_NONBLOCK)) < 0)
+    {
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to create "
+                "interrupt fd.\n");
+        goto close_nfd;
+    }
+    printf("created interrupt fd.\n");
+
+    ret = ivshmem_uxsocket_sendfd(cfd, ifd, next_id);
+    if (ret < 0)
+    {
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
+                "interrupt fd.\n");
+        goto close_ifd;
+    }
+    printf("sent interrupt fd.\n");
 
     /* Add connection fd to the epoll interest list */
-    if (epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &ev) != 0)
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &ev) < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to add"
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
                 "cfd to epoll.\n");
-        goto close_nfd;
+        goto close_ifd;
     }
+    printf("added cfd to epoll.\n");
 
     /* Add notify fd to the epoll interest list */
-    if (epoll_ctl(epfd, EPOLL_CTL_ADD, nfd, &ev) != 0)
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, nfd, &ev) < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to add"
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
                 "nfd to epoll.\n");
-        goto close_nfd;
+        goto close_ifd;
     }
+    printf("added nfd to epoll.\n");
 
     /* Init channel in shared memory */
     tx_addr = flexnic_mem + CHAN_OFFSET + (next_id * CHAN_SIZE * 2)
@@ -268,17 +291,19 @@ static int ivshmem_uxsocket_accept()
     if (chan == NULL)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to init chan.\n");
-        goto close_nfd;
+        goto close_ifd;
     }
+    printf("created chan.\n");
 
-    /* Send number of cores to guest proxy */
+    /* Write number of cores to channel for guest proxy to receive */
     n_cores = flexnic_info->cores_num;
     ret = channel_write(chan, &n_cores, sizeof(n_cores));
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send number"
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send number "
                 "of cores to guest.\n");
     }
+    printf("wrote to chan.\n");
 
     vms[next_id].ifd = ifd;
     vms[next_id].nfd = nfd;
@@ -288,10 +313,10 @@ static int ivshmem_uxsocket_accept()
     
     return 0;
 
-close_nfd:
-    close(nfd);
 close_ifd:
     close(ifd);
+close_nfd:
+    close(nfd);
 close_cfd:
     close(cfd);
 
@@ -305,7 +330,7 @@ static int ivshmem_uxsocket_notif()
 
 static int ivshmem_uxsocket_error()
 {
-    fprintf(stderr, "ivshmem_uxsocket_error: epoll_wait error.\n");
+    // fprintf(stderr, "ivshmem_uxsocket_error: epoll_wait error.\n");
     return 0;
 }
 
@@ -318,13 +343,13 @@ static int ivshmem_uxsocket_newmsg()
     return 0;
 }
 
-static int ivshmem_uxsocket_send(int fd, void *payload, size_t len)
+static int ivshmem_uxsocket_send_int(int fd, int64_t i)
 {
     int n;
 
     struct iovec iov = {
-        .iov_base = payload,
-        .iov_len = len,
+        .iov_base = &i,
+        .iov_len = sizeof(i),
     };
 
     struct msghdr msg = {
@@ -337,51 +362,54 @@ static int ivshmem_uxsocket_send(int fd, void *payload, size_t len)
         .msg_flags = 0,
     };
 
-    if ((n = sendmsg(fd, &msg, 0)) < 0) 
+    if ((n = sendmsg(fd, &msg, 0)) != sizeof(int64_t)) 
     {
         fprintf(stderr, "ivshmem_uxsocket_send: failed to send msg.\n");
+
         return -1;
     }
 
     return n;
 }
 
-static int ivshmem_uxsocket_sendfd(int fd, int sfd, int vmid)
+static int ivshmem_uxsocket_sendfd(int uxfd, int fd, int64_t i)
 {
     int n;
-    struct iovec iov;
-    struct msghdr msg;
     struct cmsghdr *chdr;
 
     /* Need to pass at least one byte of data to send control data */
-    iov.iov_base = &vmid;
-    iov.iov_len = sizeof(vmid);
+    struct iovec iov = {
+        .iov_base = &i,
+        .iov_len = sizeof(i),
+    };
 
     /* Allocate a char array but use a union to ensure that it
        is alligned properly */
     union {
-        char buf[CMSG_SPACE(sizeof(sfd))];
+        char buf[CMSG_SPACE(sizeof(fd))];
         struct cmsghdr align;
     } cmsg;
-    memset(cmsg.buf, 0, sizeof(cmsg.buf));
+    memset(&cmsg, 0, sizeof(cmsg));
 
     /* Add control data (file descriptor) to msg */
-    msg.msg_name = NULL,
-    msg.msg_namelen = 0,
-    msg.msg_iov = &iov,
-    msg.msg_iovlen = 1,
-    msg.msg_control = cmsg.buf,
-    msg.msg_controllen = sizeof(cmsg.buf),
-    msg.msg_flags = 0,
+    struct msghdr msg = {
+        .msg_name = NULL,
+        .msg_namelen = 0,
+        .msg_iov = &iov,
+        .msg_iovlen = 1,
+        .msg_control = &cmsg,
+        .msg_controllen = sizeof(cmsg),
+        .msg_flags = 0,
+    };
 
     /* Set message header to describe ancillary data */
     chdr = CMSG_FIRSTHDR(&msg);
     chdr->cmsg_level = SOL_SOCKET;
     chdr->cmsg_type = SCM_RIGHTS;
     chdr->cmsg_len = CMSG_LEN(sizeof(int));
-    memcpy(CMSG_DATA(chdr), &sfd, sizeof(sfd));
+    memcpy(CMSG_DATA(chdr), &fd, sizeof(fd));
 
-    if ((n = sendmsg(fd, &msg, 0)) < 0) 
+    if ((n = sendmsg(uxfd, &msg, 0)) != sizeof(i)) 
     {
         fprintf(stderr, "ivshmem_uxsocket_sendfd: failed to send msg.\n");
         return -1;
@@ -389,4 +417,3 @@ static int ivshmem_uxsocket_sendfd(int fd, int sfd, int vmid)
 
     return n;
 }
-

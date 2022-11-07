@@ -4,8 +4,11 @@
 #include "../channel.h"
 
 #define IVSHMEM_SOCK_PATH "/run/tasproxy"
-#define PEERID_LOCAL 0
-#define PEERID_VM 1
+
+/* These variables are all pre-determined by QEMU
+   to get ivshmem to work */
+#define IVSHMEM_PROTOCOL_VERSION 0
+#define HOST_PEERID 255
 
 #define MAX_VMS 16
 
