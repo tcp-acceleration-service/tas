@@ -1,0 +1,9 @@
+#cloud-config
+users:
+  - default
+  - name: tas
+    lock_passwd: false
+    passwd: $6$rounds=4096$pqh5LWl.J$WNpL2T9mZw/NFwu1B.u7MbWVt8rxwFciffPlU8PJDyb3OGwV7mlsQJLMhZV09ltmqDKBEpcqym3Wr8PyVJmzD/
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: sudo

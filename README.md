@@ -119,6 +119,44 @@ sudo code/tas/tas --ip-addr=10.0.0.1/24 --kni-name=tas0
 sudo ifconfig tas0 10.0.0.1/24 up
 ```
 
+### Building Images from QEMU
+
+You can download cloud images from the Ubuntu website. Here we get
+the cloud image for Ubuntu 20.04:
+```
+wget https://cloud-images.ubuntu.com/releases/focal/release/ubuntu-20.04-server-cloudimg-amd64.img
+```
+
+You now need to resize the image with the following command
+```
+qemu-img resize ubuntu-20.04-server-cloudimg-amd64.img +15G
+```
+
+After you have downloaded an image, you need to set it up by
+creating a user-data and metadata file to create a user and
+configure your image. Sample .yaml files that create a user
+named `tas` with password `tas` can be found in the images
+directory. Afterwards create a seed.img that is used to set-up
+your image.
+
+```
+cloud-localds seed.img user-data.yaml metadata.yaml
+```
+
+Start your VM with the following command:
+
+```
+sudo qemu-system-x86_64 \
+  -nographic -monitor none -serial stdio \
+  -machine accel=kvm,type=q35 \
+  -cpu host \
+  -smp 16 \
+  -m 12G \
+  -device virtio-net-pci,netdev=net0 \
+  -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+  -drive if=virtio,format=qcow2,file=ubuntu-20.04-server-cloudimg-amd64.img \
+  -drive if=virtio,format=raw,file=seed.img
+```
 
 ## Code Structure
   * `tas/`: service implementation

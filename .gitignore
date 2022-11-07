@@ -4,6 +4,8 @@
 *.swp
 *.swo
 *.json
+*.img
+*.qcow2
 __pycache__/
 tas/tas
 tests/bench_ll_echo
