@@ -19,7 +19,7 @@ disk_img="base.img"
 seed_img="seed.img"
 disk_img_snapshot="${machineName}.snapshot.qcow2"
 
-qemu-system-x86_64 \
+sudo qemu-system-x86_64 \
   -nographic -monitor none -serial stdio \
   -machine accel=kvm,type=q35 \
   -cpu host \
@@ -27,8 +27,8 @@ qemu-system-x86_64 \
   -m 12G \
   -device virtio-net-pci,netdev=net0 \
   -netdev user,id=net0,hostfwd=tcp::2222-:22 \
-  -drive if=virtio,format=qcow2,file=${disk_img_snapshot} \
-  -drive if=virtio,format=raw,file=${seed_img} \
+  -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
+  -drive if=virtio,format=raw,file="seed.img" \
   -chardev socket,path="/run/tasproxy",id="tas" \
   -device ivshmem-doorbell,vectors=1,chardev="tas"
 

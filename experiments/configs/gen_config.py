@@ -51,7 +51,12 @@ class HostConfig:
         # vm manager configurations
         self.node_pane = name + '_node'
         self.vm_manager_preboot_cmds = []
-        self.vm_manager_postboot_cmds = []
+        self.vm_manager_postboot_cmds = [
+            "sudo su -",
+            "sudo echo 1 > /sys/module/vfio/parameters/enable_unsafe_noiommu_mode",
+            "sudo echo 1af4 1110 > /sys/bus/pci/drivers/vfio-pci/new_id",
+            "exit"
+        ]
         self.vm_manager_dir = self.project_dir + 'images/'
         self.vm_manager = lambda machine, stack, id : self.vm_manager_dir + \
                 'virtual-manager.sh' + ' ' + str(machine) + \

@@ -163,6 +163,38 @@ You can then ssh to your vm from your local machine by executing:
 ssh -p 2222 tas@localhost
 ```
 
+We use vfio to access the shared memory region in the guest. It may be the
+case that your image does not have noiommu enabled, so you need to enable it
+and bind the ivshmem PCI device to the vfio-pci driver. So first get the device
+vendor code and device code
+
+```
+$ lspci -n
+00:00.0 0600: 8086:29c0
+00:01.0 0300: 1234:1111 (rev 02)
+00:02.0 0200: 1af4:1000
+00:03.0 0500: 1af4:1110 (rev 01)
+00:04.0 0100: 1af4:1001
+00:05.0 0100: 1af4:1001
+00:1f.0 0601: 8086:2918 (rev 02)
+00:1f.2 0106: 8086:2922 (rev 02)
+00:1f.3 0c05: 8086:2930 (rev 02)
+```
+
+In this example, the ivshmem device vendor code and device code is `1af4:1110`.
+You can find the bus info for your device by running `lshw -class memory` and
+looking for Inter-VM shared memory. The device in this example has id 00:03.0.
+
+Now enable noiommu and bind the kernel driver to the PCI device. If vfio-pci is
+not compiled with your kernel, you need to first load it as a module using
+modprobe.
+
+```
+modprobe vfio_pci
+echo 1 > /sys/module/vfio/parameters/enable_unsafe_noiommu_mode
+echo 1af4 1110 > /sys/bus/pci/drivers/vfio-pci/new_id
+```
+
 ## Code Structure
   * `tas/`: service implementation
     * `tas/fast`: TAS fast path

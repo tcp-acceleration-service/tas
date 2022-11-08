@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/epoll.h>
 #include <sys/ioctl.h>
@@ -73,12 +74,12 @@ int vfio_init(struct guest_proxy *pxy)
     goto error_group;
   }
 
-  /* Device reset and go */
-  if (ioctl(pxy->dev, VFIO_DEVICE_RESET) < 0)
-  {
-    fprintf(stderr, "vfio_init: dev reset failed.\n");
-    goto error_dev;
-  }
+  // /* Device reset and go */
+  // if (ioctl(pxy->dev, VFIO_DEVICE_RESET) < 0)
+  // {
+  //   fprintf(stderr, "vfio_init: dev reset failed.\n");
+  //   goto error_dev;
+  // }
 
   /* Set interrupt request fd */
   if (vfio_set_irq(pxy) < 0)
@@ -116,31 +117,36 @@ error_cont:
 
 int vfio_set_irq(struct guest_proxy *pxy)
 {
-  struct vfio_irq_set irq;
+  int fd;
+  struct vfio_irq_set *irq_set;
+  char buf[sizeof(struct vfio_irq_set) + sizeof(int)];
 
-  if ((pxy->irq_fd = eventfd(0, EFD_NONBLOCK)) < 0)
+  if ((fd = eventfd(0, EFD_NONBLOCK)) < 0)
   {
     fprintf(stderr, "vfio_set_irq: failed to create event fd.\n");
     return -1;
   }
 
-  irq.flags = VFIO_IRQ_SET_DATA_EVENTFD | VFIO_IRQ_SET_ACTION_TRIGGER;
-  irq.index = 2;
-  irq.start = 0;
-  irq.count = 1;
-  irq.data[0] = pxy->irq_fd;
-  irq.argsz = sizeof(struct vfio_irq_set) + sizeof(int);
+  irq_set = (struct vfio_irq_set *) buf;
+  irq_set->argsz = sizeof(buf);
+  irq_set->flags = VFIO_IRQ_SET_DATA_EVENTFD | VFIO_IRQ_SET_ACTION_TRIGGER;
+  irq_set->index = 2;
+  irq_set->start = 0;
+  irq_set->count = 1;
+  memcpy(&irq_set->data, &fd, sizeof(int));
 
-  if (ioctl(pxy->irq_fd, VFIO_DEVICE_SET_IRQS, &irq) < 0)
+  if (ioctl(fd, VFIO_DEVICE_SET_IRQS, &irq_set) < 0)
   {
     fprintf(stderr, "vfio_set_irq: failed to set interrupt request.\n");
     goto error_close;
   }
 
+  pxy->irq_fd = fd;
+
   return 0;
 
 error_close:
-  close(pxy->irq_fd);
+  close(fd);
 
 return -1;
 

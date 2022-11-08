@@ -134,11 +134,19 @@ class Host(object):
         time.sleep(20)
         self.login_vm(pane, window_name)
         pane.send_keys('tmux set-option remain-on-exit on')
+       
         """ Run setup commands """
         for cmd in self.node_config.setup_cmds:
             pane.send_keys(cmd(num))
             time.sleep(2)
 
+        """ Run VM specific postboot setup commands """
+        for cmd in self.node_config.vm_manager_postboot_cmds:
+            pane.send_keys(cmd)
+            time.sleep(2)
+
+        import pdb
+        pdb.set_trace()
         """ Run TAS proxy """
         if self.hstack == 'tas':
             time.sleep(3)
