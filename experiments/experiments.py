@@ -139,8 +139,6 @@ class Host(object):
             pane.send_keys(cmd(num))
             time.sleep(2)
 
-        import pdb
-        pdb.set_trace()
         """ Run TAS proxy """
         if self.hstack == 'tas':
             time.sleep(3)
@@ -156,8 +154,6 @@ class Host(object):
             print("  * VM TAS proxy : " + cmd)
             time.sleep(10)
             
-            import pdb
-            pdb.set_trace()
             pane.send_keys('tmux new-window')
 
 

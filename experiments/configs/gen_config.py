@@ -45,7 +45,7 @@ class HostConfig:
         # guest proxy configurations
         self.guest_proxy_comp_dir = self.vm_project_dir
         self.guest_proxy_comp_cmd = 'make'
-        self.guest_proxy_exec_file = self.guest_proxy_comp_dir + 'proxy/guest'
+        self.guest_proxy_exec_file = self.guest_proxy_comp_dir + 'proxy/guest/guest'
         self.guest_proxy_out_file = self.vm_output_dir + 'proxy_g'
 
         # vm manager configurations
