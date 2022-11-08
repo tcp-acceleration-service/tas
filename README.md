@@ -121,23 +121,22 @@ sudo ifconfig tas0 10.0.0.1/24 up
 
 ### Building Images from QEMU
 
-You can download cloud images from the Ubuntu website. Here we get
+You can find cloud images from the Ubuntu website. In this example we get
 the cloud image for Ubuntu 20.04:
 ```
 wget https://cloud-images.ubuntu.com/releases/focal/release/ubuntu-20.04-server-cloudimg-amd64.img
 ```
 
-You now need to resize the image with the following command
+Resize the image to give you more disk space with the following command
 ```
 qemu-img resize ubuntu-20.04-server-cloudimg-amd64.img +15G
 ```
 
-After you have downloaded an image, you need to set it up by
-creating a user-data and metadata file to create a user and
-configure your image. Sample .yaml files that create a user
-named `tas` with password `tas` can be found in the images
-directory. Afterwards create a seed.img that is used to set-up
-your image.
+After downloading an image, set it up by writing a user-data
+and metadata that creates a user and configures your image.
+Sample .yaml files that create a user named `tas` with password
+tas` can be found in the images directory. Afterwards use `cloud-localds`
+to create a seed.img that sets up the initial config for your base image.
 
 ```
 cloud-localds seed.img user-data.yaml metadata.yaml
@@ -156,6 +155,12 @@ sudo qemu-system-x86_64 \
   -netdev user,id=net0,hostfwd=tcp::2222-:22 \
   -drive if=virtio,format=qcow2,file=ubuntu-20.04-server-cloudimg-amd64.img \
   -drive if=virtio,format=raw,file=seed.img
+```
+
+You can then ssh to your vm from your local machine by executing:
+
+```
+ssh -p 2222 tas@localhost
 ```
 
 ## Code Structure
