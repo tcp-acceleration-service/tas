@@ -4,7 +4,9 @@ class HostConfig:
         self.is_server = is_server
         self.is_remote = is_remote
         self.project_dir = '/local/mstolet/projects/tas/'
+        self.vm_project_dir = '/home/tas/projects/tas'
         self.output_dir = self.project_dir + 'experiments/out/'
+        self.vm_output_dir = self.vm_project_dir + "experiments/out/"
 
         # pre-start commands
         self.setup_cmds = []
@@ -30,22 +32,27 @@ class HostConfig:
             self.tas_args = ' --ip-addr=192.168.10.14/24' + self.tas_args
             self.tas_out_file = self.tas_client_out_file
 
-        # tas proxy configurations
+        # general proxy configurations
         self.proxy_ivshm_socket_path = '/run/tasproxy'
         self.proxy_pane = name + '_proxy'
-        self.proxy_comp_dir = self.project_dir
+
+        # host proxy configurations
+        self.host_proxy_comp_dir = self.project_dir
         self.proxy_host_comp_cmd = 'make'
-        self.proxy_host_exec_file = self.proxy_comp_dir + 'proxy/host/host'
+        self.proxy_host_exec_file = self.host_proxy_comp_dir + 'proxy/host/host'
         self.proxy_host_out_file = self.output_dir + 'proxy_h'
+        
+        # guest proxy configurations
+        self.guest_proxy_comp_dir = self.vm_project_dir
         self.proxy_guest_comp_cmd = 'make'
-        self.proxy_guest_exec_file = self.proxy_comp_dir + 'proxy/guest'
-        self.proxy_guest_out_file = self.output_dir + 'proxy_g'
+        self.proxy_guest_exec_file = self.guest_proxy_comp_dir + 'proxy/guest'
+        self.proxy_guest_out_file = self.vm_output_dir + 'proxy_g'
 
         # vm manager configurations
         self.node_pane = name + '_node'
         self.vm_manager_preboot_cmds = []
         self.vm_manager_postboot_cmds = []
-        self.vm_manager_dir = self.project_dir + 'virt-manager/'
+        self.vm_manager_dir = self.project_dir + 'images/'
         self.vm_manager = lambda machine, stack, id : self.vm_manager_dir + \
                 'virtual-manager.sh' + ' ' + str(machine) + \
                 ' ' + str(stack) + ' ' + str(id)

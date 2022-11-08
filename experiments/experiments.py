@@ -36,7 +36,7 @@ class Host(object):
         pane.send_keys('sudo rm ' + self.config.proxy_ivshm_socket_path)
         Host.compile_and_run(
                 pane=pane,
-                comp_dir=self.config.proxy_comp_dir,
+                comp_dir=self.config.host_proxy_comp_dir,
                 comp_cmd=self.config.proxy_host_comp_cmd,
                 exec_file=self.config.proxy_host_exec_file,
                 out_file=self.config.proxy_host_out_file,
@@ -106,9 +106,9 @@ class Host(object):
     def login_vm(self, pane, window_name):
         print("logging in. ("+ window_name + ")")
         pane.enter()
-        pane.send_keys(suppress_history=False, cmd='client')
+        pane.send_keys(suppress_history=False, cmd='tas')
         time.sleep(2)
-        pane.send_keys(suppress_history=False, cmd='client')
+        pane.send_keys(suppress_history=False, cmd='tas')
         pane.enter()
         time.sleep(2)
         pane.send_keys('tmux')
@@ -131,9 +131,7 @@ class Host(object):
         pane.send_keys(cmd)
         print("CMD : " + cmd)
         print("Server VM"+ window_name + " started.")
-        time.sleep(15)
-        import pdb
-        pdb.set_trace()
+        time.sleep(20)
         self.login_vm(pane, window_name)
         pane.send_keys('tmux set-option remain-on-exit on')
         """ Run setup commands """
@@ -146,7 +144,7 @@ class Host(object):
             time.sleep(3)
             Host.compile_and_run(
                     pane=pane,
-                    comp_dir=self.node_config.proxy_comp_dir,
+                    comp_dir=self.node_config.guest_proxy_comp_dir,
                     comp_cmd=self.node_config.proxy_guest_comp_cmd,
                     exec_file=self.node_config.proxy_guest_exec_file,
                     out_file=self.node_config.proxy_guest_out_file,
@@ -156,7 +154,10 @@ class Host(object):
             print("  * VM TAS proxy : " + cmd)
             time.sleep(10)
             
+            import pdb
+            pdb.set_trace()
             pane.send_keys('tmux new-window')
+
 
         # """ Run Benchmark """
         # if self.node_config.is_server:
