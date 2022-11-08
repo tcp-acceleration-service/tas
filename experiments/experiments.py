@@ -37,9 +37,9 @@ class Host(object):
         Host.compile_and_run(
                 pane=pane,
                 comp_dir=self.config.host_proxy_comp_dir,
-                comp_cmd=self.config.proxy_host_comp_cmd,
-                exec_file=self.config.proxy_host_exec_file,
-                out_file=self.config.proxy_host_out_file,
+                comp_cmd=self.config.host_proxy_comp_cmd,
+                exec_file=self.config.host_proxy_exec_file,
+                out_file=self.config.host_proxy_out_file,
                 args='')
 
     def run_vms(self, num, exp):
@@ -139,15 +139,17 @@ class Host(object):
             pane.send_keys(cmd(num))
             time.sleep(2)
 
+        import pdb
+        pdb.set_trace()
         """ Run TAS proxy """
         if self.hstack == 'tas':
             time.sleep(3)
             Host.compile_and_run(
                     pane=pane,
                     comp_dir=self.node_config.guest_proxy_comp_dir,
-                    comp_cmd=self.node_config.proxy_guest_comp_cmd,
-                    exec_file=self.node_config.proxy_guest_exec_file,
-                    out_file=self.node_config.proxy_guest_out_file,
+                    comp_cmd=self.node_config.guest_proxy_comp_cmd,
+                    exec_file=self.node_config.guest_proxy_exec_file,
+                    out_file=self.node_config.guest_proxy_out_file,
                     args=' ',
                     bg=True)
             time.sleep(3)

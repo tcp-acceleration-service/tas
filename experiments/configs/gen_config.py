@@ -4,7 +4,7 @@ class HostConfig:
         self.is_server = is_server
         self.is_remote = is_remote
         self.project_dir = '/local/mstolet/projects/tas/'
-        self.vm_project_dir = '/home/tas/projects/tas'
+        self.vm_project_dir = '/home/tas/projects/tas/'
         self.output_dir = self.project_dir + 'experiments/out/'
         self.vm_output_dir = self.vm_project_dir + "experiments/out/"
 
@@ -38,15 +38,15 @@ class HostConfig:
 
         # host proxy configurations
         self.host_proxy_comp_dir = self.project_dir
-        self.proxy_host_comp_cmd = 'make'
-        self.proxy_host_exec_file = self.host_proxy_comp_dir + 'proxy/host/host'
-        self.proxy_host_out_file = self.output_dir + 'proxy_h'
+        self.host_proxy_comp_cmd = 'make'
+        self.host_proxy_exec_file = self.host_proxy_comp_dir + 'proxy/host/host'
+        self.host_proxy_out_file = self.output_dir + 'proxy_h'
         
         # guest proxy configurations
         self.guest_proxy_comp_dir = self.vm_project_dir
-        self.proxy_guest_comp_cmd = 'make'
-        self.proxy_guest_exec_file = self.guest_proxy_comp_dir + 'proxy/guest'
-        self.proxy_guest_out_file = self.vm_output_dir + 'proxy_g'
+        self.guest_proxy_comp_cmd = 'make'
+        self.guest_proxy_exec_file = self.guest_proxy_comp_dir + 'proxy/guest'
+        self.guest_proxy_out_file = self.vm_output_dir + 'proxy_g'
 
         # vm manager configurations
         self.node_pane = name + '_node'
