@@ -30,9 +30,9 @@ static struct v_machine vms[MAX_VMS];
 static int ivshmem_uxsocket_init();
 static int ivshmem_poll_uxsocket();
 static int ivshmem_uxsocket_accept();
-static int ivshmem_uxsocket_notif();
-static int ivshmem_uxsocket_error();
-static int ivshmem_uxsocket_newmsg();
+static int ivshmem_uxsocket_handle_notif();
+static int ivshmem_uxsocket_handle_error();
+static int ivshmem_uxsocket_handle_msg();
 static int ivshmem_uxsocket_send_int(int fd, int64_t i);
 static int ivshmem_uxsocket_sendfd(int uxfd, int fd, int64_t i);
 
@@ -155,16 +155,15 @@ static int ivshmem_poll_uxsocket()
         }
         else if (ev.data.u32 == EP_NOTIFY)
         {
-            // TODO: Figure out whether we need this
-            ivshmem_uxsocket_notif();
+            ivshmem_uxsocket_handle_notif();
         }
         else if (evs[i].events & (EPOLLHUP | EPOLLRDHUP | EPOLLERR))
         {
-            ivshmem_uxsocket_error();
+            ivshmem_uxsocket_handle_error();
         }
         else if (evs[i].events & EPOLLIN)
         {
-            ivshmem_uxsocket_newmsg();
+            ivshmem_uxsocket_handle_msg();
         }
     }
 
@@ -197,7 +196,6 @@ static int ivshmem_uxsocket_accept()
         fprintf(stderr, "ivshmem_uxsocket_accept: accept failed.\n");
         return -1;
     }
-    printf("cfd accepted.\n");
 
     /* Send protocol version as required by qemu ivshmem */
     ret = ivshmem_uxsocket_send_int(cfd, version);
@@ -215,7 +213,6 @@ static int ivshmem_uxsocket_accept()
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send vm id.\n");
         goto close_cfd;
     }
-    printf("sent vm id.\n");
 
     /* Send shared memory fd to the guest proxy */
     ret = ivshmem_uxsocket_sendfd(cfd, flexnic_shmfd, -1);
@@ -224,16 +221,14 @@ static int ivshmem_uxsocket_accept()
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send shm fd.\n");
         goto close_cfd;
     }
-    printf("sent shm fd.\n");
 
-    /* Create and send notify fd to the guest proxy */
+    /* Create and send fd so that vm can interrupt host */
     if ((nfd = eventfd(0, EFD_NONBLOCK)) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_acccept: failed to create"
                 "notify fd.\n");
         goto close_cfd;
     }
-    printf("created notify fd.\n");
 
     /* Ivshmem protocol requires to send host id
        with the notify fd */
@@ -245,16 +240,14 @@ static int ivshmem_uxsocket_accept()
         goto close_ifd;
         
     }
-    printf("sent notify fd.\n");
 
-    /* Create and send interrupt fd to the guest proxy */
+    /* Create and send fd so that host can interrupt vm */
     if ((ifd = eventfd(0, EFD_NONBLOCK)) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to create "
                 "interrupt fd.\n");
         goto close_nfd;
     }
-    printf("created interrupt fd.\n");
 
     ret = ivshmem_uxsocket_sendfd(cfd, ifd, next_id);
     if (ret < 0)
@@ -263,7 +256,6 @@ static int ivshmem_uxsocket_accept()
                 "interrupt fd.\n");
         goto close_ifd;
     }
-    printf("sent interrupt fd.\n");
 
     /* Add connection fd to the epoll interest list */
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &ev) < 0)
@@ -272,7 +264,6 @@ static int ivshmem_uxsocket_accept()
                 "cfd to epoll.\n");
         goto close_ifd;
     }
-    printf("added cfd to epoll.\n");
 
     /* Add notify fd to the epoll interest list */
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, nfd, &ev) < 0)
@@ -281,7 +272,6 @@ static int ivshmem_uxsocket_accept()
                 "nfd to epoll.\n");
         goto close_ifd;
     }
-    printf("added nfd to epoll.\n");
 
     /* Init channel in shared memory */
     tx_addr = flexnic_mem + CHAN_OFFSET + (next_id * CHAN_SIZE * 2)
@@ -293,7 +283,6 @@ static int ivshmem_uxsocket_accept()
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to init chan.\n");
         goto close_ifd;
     }
-    printf("created chan.\n");
 
     /* Write number of cores to channel for guest proxy to receive */
     n_cores = flexnic_info->cores_num;
@@ -303,7 +292,6 @@ static int ivshmem_uxsocket_accept()
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send number "
                 "of cores to guest.\n");
     }
-    printf("wrote to chan.\n");
 
     vms[next_id].ifd = ifd;
     vms[next_id].nfd = nfd;
@@ -323,18 +311,18 @@ close_cfd:
     return -1;
 }
 
-static int ivshmem_uxsocket_notif()
+static int ivshmem_uxsocket_handle_notif()
 {
     return 0;
 }
 
-static int ivshmem_uxsocket_error()
+static int ivshmem_uxsocket_handle_error()
 {
-    // fprintf(stderr, "ivshmem_uxsocket_error: epoll_wait error.\n");
+    fprintf(stderr, "ivshmem_uxsocket_error: epoll_wait error.\n");
     return 0;
 }
 
-static int ivshmem_uxsocket_newmsg()
+static int ivshmem_uxsocket_handle_msg()
 {
     // TODO: Handle the different types of messages
     //   - TAS_INFO

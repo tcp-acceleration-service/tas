@@ -3,7 +3,7 @@
 
 #include "internal.h"
 
-#define VFIO_GROUP "/dev/vfio/0"
+#define VFIO_GROUP "/dev/vfio/noiommu-0"
 #define VFIO_PCI_DEV "0000:00:03.0"
 
 #define VFIO_API_VERSION 0

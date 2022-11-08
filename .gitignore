@@ -8,6 +8,8 @@
 *.qcow2
 __pycache__/
 tas/tas
+proxy/host/host
+proxy/guest/guest
 tests/bench_ll_echo
 tests/lowlevel
 tests/lowlevel_echo
