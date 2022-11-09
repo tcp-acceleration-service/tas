@@ -33,11 +33,6 @@ int ivshmem_init(struct guest_proxy *pxy)
   /* Setup communication channel between guest and host */
   tx_addr = pxy->shm + CHAN_OFFSET;
   rx_addr = pxy->shm + CHAN_OFFSET + CHAN_SIZE;
-  printf("ivshmem_init: CHAN_SIZE=%d.\n", CHAN_SIZE);
-  printf("ivshmem_init: CHAN_OFFSET=%d.\n", CHAN_OFFSET);
-  printf("ivshmem_init: shm=%p.\n", pxy->shm);
-  printf("ivshmem_init: tx_addr=%p.\n", tx_addr);
-  printf("ivshmem_init: rx_addr=%p.\n", rx_addr);
   pxy->chan = channel_init(tx_addr, rx_addr, CHAN_SIZE);
   if (pxy->chan == NULL)
   {

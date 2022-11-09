@@ -218,7 +218,6 @@ int vfio_map_region(int dev, int idx, void **addr, size_t *len, size_t *off)
     return -1;
   }
 
-  printf("vfio_map_region: ret=%p.\n", ret);
   *addr = ret;
   *len = reg.size;
   *off = reg.offset;

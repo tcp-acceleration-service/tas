@@ -46,8 +46,6 @@ int shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
 
   hdr = (struct ring_header *) rx_ring->hdr_addr;
 
-  printf("shmring_pop: rx_ring=%p.\n", rx_ring);
-  printf("shmring_pop: hdr=%p.\n", hdr);
   /* Return error if there is not enough written bytes
      to read in the ring */
   freesz = shmring_get_freesz(rx_ring);
@@ -204,7 +202,7 @@ size_t shmring_get_freesz(struct ring_buffer *ring)
   int w_pos = hdr->write_pos;
   int r_pos = hdr->read_pos;
 
-  if (!hdr->full)
+  if (!hdr->full && (w_pos == r_pos))
     return hdr->ring_size;
 
   if (w_pos > r_pos)

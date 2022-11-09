@@ -40,8 +40,6 @@ struct channel * channel_init(void* tx_addr, void* rx_addr, uint64_t size)
 
   chan->tx = tx_buf;
   chan->rx = rx_buf; 
-  printf("channel_init: chan->tx=%p.\n", chan->tx);
-  printf("channel_init: chan->rx=%p.\n", chan->rx);
   return chan;
 
 free_tx_buf:
