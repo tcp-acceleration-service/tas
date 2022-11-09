@@ -22,18 +22,26 @@ int vfio_get_region_info(int dev, int i, struct vfio_region_info *reg);
 int vfio_init(struct guest_proxy *pxy)
 {
   struct vfio_group_status g_status = { .argsz = sizeof(g_status) };
+  struct vfio_iommu_type1_info iommu_info = { .argsz = sizeof(iommu_info) };
+  struct vfio_device_info device_info = { .argsz = sizeof(device_info) };
 
   /* Create vfio container */
   if ((pxy->cont = open("/dev/vfio/vfio", O_RDWR)) < 0)
   {
-    fprintf(stderr, "vfio_init: failed to open vfio container");
-    goto error_cont;
+    fprintf(stderr, "vfio_init: failed to open vfio container.\n");
+    return -1;
   }
 
   /* Check API version of container */
   if (ioctl(pxy->cont, VFIO_GET_API_VERSION) != VFIO_API_VERSION)
   {
     fprintf(stderr, "vfio_init: api version doesn't match.\n");
+    goto error_cont;
+  }
+
+  if (!ioctl(pxy->cont, VFIO_CHECK_EXTENSION, VFIO_NOIOMMU_IOMMU))
+  {
+    fprintf(stderr, "vfio_init: noiommu driver not suppoer.\n");
     goto error_cont;
   }
 
@@ -66,6 +74,13 @@ int vfio_init(struct guest_proxy *pxy)
     goto error_group;
   }
 
+  /* Get IOMMU info */
+  if (ioctl(pxy->cont, VFIO_IOMMU_GET_INFO, &iommu_info) < 0)
+  {
+    fprintf(stderr, "vfio_init: failed to get IOMMU info.\n");
+    goto error_group;
+  }
+
   /* Get file descriptor for device */
   if ((pxy->dev = ioctl(pxy->group, 
       VFIO_GROUP_GET_DEVICE_FD, VFIO_PCI_DEV)) < 0)
@@ -74,12 +89,11 @@ int vfio_init(struct guest_proxy *pxy)
     goto error_group;
   }
 
-  // /* Device reset and go */
-  // if (ioctl(pxy->dev, VFIO_DEVICE_RESET) < 0)
-  // {
-  //   fprintf(stderr, "vfio_init: dev reset failed.\n");
-  //   goto error_dev;
-  // }
+  /* Get device info */
+  if (ioctl(pxy->dev, VFIO_DEVICE_GET_INFO, &device_info) < 0)
+  {
+    fprintf(stderr, "vfio_init: failed to get device info.\n");
+  }
 
   /* Set interrupt request fd */
   if (vfio_set_irq(pxy) < 0)
@@ -100,6 +114,13 @@ int vfio_init(struct guest_proxy *pxy)
   if (vfio_subscribe_irqs(pxy) < 0)
   {
     fprintf(stderr, "vfio_init: failed to subscrive to interrupts.\n");
+    goto error_dev;
+  }
+
+  /* Device reset and go */
+  if (ioctl(pxy->dev, VFIO_DEVICE_RESET) < 0)
+  {
+    fprintf(stderr, "vfio_init: dev reset failed.\n");
     goto error_dev;
   }
 
