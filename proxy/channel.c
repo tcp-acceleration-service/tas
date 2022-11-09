@@ -18,6 +18,8 @@ struct channel * channel_init(void* tx_addr, void* rx_addr, uint64_t size)
     goto free_chan;
   }
 
+  /* Only init the tx channel, since the other side will
+     already have initialized the rx channel */
   tx_buf = shmring_init(tx_addr, CHAN_SIZE);
   if (tx_buf == NULL)
   {
@@ -28,13 +30,18 @@ struct channel * channel_init(void* tx_addr, void* rx_addr, uint64_t size)
   rx_buf = shmring_init(rx_addr, CHAN_SIZE);
   if (rx_buf == NULL)
   {
-    fprintf(stderr, "channel_init: failed to allocate rx buf.\n");
+    fprintf(stderr, "channel_init: failed to malloc rx_buf.\n");
     goto free_tx_buf;
   }
 
-  chan->tx = tx_buf;
-  chan->rx = rx_buf;
+  /* Only reset tx_ring since other side will have already
+     reset the rx_ring */
+  shmring_reset(tx_buf, CHAN_SIZE);
 
+  chan->tx = tx_buf;
+  chan->rx = rx_buf; 
+  printf("channel_init: chan->tx=%p.\n", chan->tx);
+  printf("channel_init: chan->rx=%p.\n", chan->rx);
   return chan;
 
 free_tx_buf:

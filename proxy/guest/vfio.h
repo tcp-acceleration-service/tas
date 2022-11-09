@@ -9,6 +9,5 @@
 #define VFIO_API_VERSION 0
 
 int vfio_init(struct guest_proxy *ctx);
-int vfio_map_region(int dev, int idx, void **addr, size_t *len, size_t *off);
 
 #endif /* ndef GUEST_VFIO_H_ */

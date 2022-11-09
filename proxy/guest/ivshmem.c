@@ -33,6 +33,11 @@ int ivshmem_init(struct guest_proxy *pxy)
   /* Setup communication channel between guest and host */
   tx_addr = pxy->shm + CHAN_OFFSET;
   rx_addr = pxy->shm + CHAN_OFFSET + CHAN_SIZE;
+  printf("ivshmem_init: CHAN_SIZE=%d.\n", CHAN_SIZE);
+  printf("ivshmem_init: CHAN_OFFSET=%d.\n", CHAN_OFFSET);
+  printf("ivshmem_init: shm=%p.\n", pxy->shm);
+  printf("ivshmem_init: tx_addr=%p.\n", tx_addr);
+  printf("ivshmem_init: rx_addr=%p.\n", rx_addr);
   pxy->chan = channel_init(tx_addr, rx_addr, CHAN_SIZE);
   if (pxy->chan == NULL)
   {
@@ -73,7 +78,7 @@ int ivshmem_setup(struct guest_proxy *pxy)
 
   /* Get number of cores from host */
   ret = channel_read(pxy->chan, &n_cores, sizeof(n_cores));
-  if (ret == 0)
+  if (ret <= 0)
   {
     fprintf(stderr, "ivshmem_handshake: failed to get number of cores.\n");
     return -1;
@@ -85,14 +90,14 @@ int ivshmem_setup(struct guest_proxy *pxy)
 
   /* Receive tasinfo response */
   ret = epoll_wait(pxy->epfd, evs, 1, -1);
-  if (ret <= 0)
+  if (ret < 0)
   {
     fprintf(stderr, "ivshmem_handshake: failed to receive"
         "tasinfo response.\n");
   }
 
   ret = channel_read(pxy->chan, tasinfo, sizeof(*tasinfo));
-  if (ret <= 0)
+  if (ret < 0)
   {
     fprintf(stderr, "ivshmem_handshake: failed to read tasinfo.\n");
   }

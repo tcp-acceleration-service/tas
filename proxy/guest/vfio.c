@@ -22,7 +22,6 @@ int vfio_get_region_info(int dev, int i, struct vfio_region_info *reg);
 int vfio_init(struct guest_proxy *pxy)
 {
   struct vfio_group_status g_status = { .argsz = sizeof(g_status) };
-  struct vfio_iommu_type1_info iommu_info = { .argsz = sizeof(iommu_info) };
   struct vfio_device_info device_info = { .argsz = sizeof(device_info) };
 
   /* Create vfio container */
@@ -74,13 +73,6 @@ int vfio_init(struct guest_proxy *pxy)
     goto error_group;
   }
 
-  /* Get IOMMU info */
-  if (ioctl(pxy->cont, VFIO_IOMMU_GET_INFO, &iommu_info) < 0)
-  {
-    fprintf(stderr, "vfio_init: failed to get IOMMU info.\n");
-    goto error_group;
-  }
-
   /* Get file descriptor for device */
   if ((pxy->dev = ioctl(pxy->group, 
       VFIO_GROUP_GET_DEVICE_FD, VFIO_PCI_DEV)) < 0)
@@ -117,13 +109,6 @@ int vfio_init(struct guest_proxy *pxy)
     goto error_dev;
   }
 
-  /* Device reset and go */
-  if (ioctl(pxy->dev, VFIO_DEVICE_RESET) < 0)
-  {
-    fprintf(stderr, "vfio_init: dev reset failed.\n");
-    goto error_dev;
-  }
-
   return 0;
 
 error_dev:
@@ -156,8 +141,9 @@ int vfio_set_irq(struct guest_proxy *pxy)
   irq_set->count = 1;
   memcpy(&irq_set->data, &fd, sizeof(int));
 
-  if (ioctl(fd, VFIO_DEVICE_SET_IRQS, &irq_set) < 0)
+  if (ioctl(pxy->dev, VFIO_DEVICE_SET_IRQS, irq_set) < 0)
   {
+    perror("");
     fprintf(stderr, "vfio_set_irq: failed to set interrupt request.\n");
     goto error_close;
   }
@@ -169,7 +155,7 @@ int vfio_set_irq(struct guest_proxy *pxy)
 error_close:
   close(fd);
 
-return -1;
+  return -1;
 
 }
 
@@ -193,7 +179,7 @@ int vfio_subscribe_irqs(struct guest_proxy *pxy)
 int vfio_map_all_regions(struct guest_proxy *pxy)
 {
   /* Map BAR 0 to receive interrupts */
-  if (vfio_map_region(pxy->dev, 0, pxy->sgm, 
+  if (vfio_map_region(pxy->dev, 0, &pxy->sgm, 
       &pxy->sgm_size, &pxy->sgm_off) != 0)
   {
     fprintf(stderr, "vfio_map_all_regions: failed to map sgm region.\n");    
@@ -201,7 +187,7 @@ int vfio_map_all_regions(struct guest_proxy *pxy)
   }
 
   /* Map BAR 2 for shm between TAS and guest */
-  if (vfio_map_region(pxy->dev, 2, pxy->shm, 
+  if (vfio_map_region(pxy->dev, 2, &pxy->shm, 
       &pxy->shm_size, &pxy->shm_off) != 0)
   {
     fprintf(stderr, "vfio_map_all_regions: failed to map shm region.\n");    
@@ -232,6 +218,7 @@ int vfio_map_region(int dev, int idx, void **addr, size_t *len, size_t *off)
     return -1;
   }
 
+  printf("vfio_map_region: ret=%p.\n", ret);
   *addr = ret;
   *len = reg.size;
   *off = reg.offset;

@@ -4,16 +4,15 @@
 
 #include "shmring.h"
 
+size_t shmring_get_freesz(struct ring_buffer *ring);
 int shmring_read_fragmented(struct ring_buffer *rx_ring, 
     void *dst, size_t size);
 int shmring_write_fragmented(struct ring_buffer *tx_ring, 
     void *src, size_t size);
-size_t shmring_get_freesz(struct ring_buffer *ring);
 
 struct ring_buffer* shmring_init(void *base_addr, size_t size)
 {
     struct ring_buffer *ring;
-    struct ring_header *hdr;
 
     ring = (struct ring_buffer *) malloc(sizeof(struct ring_buffer));
     if (ring == NULL)
@@ -26,27 +25,35 @@ struct ring_buffer* shmring_init(void *base_addr, size_t size)
     ring->buf_addr = base_addr + sizeof(struct ring_header);
     ring->size = size;
 
-    hdr = (struct ring_header *) ring->hdr_addr;
+    return ring;
+}
+
+/* Resets read and write pos to zero and sets ring size to full */
+void shmring_reset(struct ring_buffer *ring, size_t size)
+{
+    struct ring_header *hdr = (struct ring_header *) ring->hdr_addr;
+
     hdr->read_pos = 0;
     hdr->write_pos = 0;
     hdr->full = 0;
     hdr->ring_size = size - sizeof(struct ring_header);
-
-  return ring;
 }
 
 int shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
 {
-  int ret,freesz;
+  int ret, freesz;
   struct ring_header *hdr;
 
   hdr = (struct ring_header *) rx_ring->hdr_addr;
 
+  printf("shmring_pop: rx_ring=%p.\n", rx_ring);
+  printf("shmring_pop: hdr=%p.\n", hdr);
   /* Return error if there is not enough written bytes
      to read in the ring */
   freesz = shmring_get_freesz(rx_ring);
   if ((hdr->ring_size - freesz) < size)
   {
+    fprintf(stderr, "shmring_pop: not enough written bytes in ring.\n");
     return -1;
   }
 
