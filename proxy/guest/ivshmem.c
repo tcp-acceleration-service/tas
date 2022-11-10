@@ -11,6 +11,10 @@
 #include "vfio.h"
 
 int ivshmem_setup(struct guest_proxy *pxy);
+int ivshmem_handle_msg(struct guest_proxy * pxy);
+
+void ivshmem_notify_host(struct guest_proxy *pxy);
+void ivshmem_drain_evfd(int fd);
 
 int ivshmem_init(struct guest_proxy *pxy)
 {
@@ -52,36 +56,27 @@ int ivshmem_init(struct guest_proxy *pxy)
   return 0;
 }
 
-int ivshmem_poll(struct guest_proxy *pxy)
-{
-  // TODO: Do poll for ivshmem
-  return 0;
-}
-
-int flextcp_poll(struct guest_proxy *pxy)
-{
-  // TODO: Do poll for flextcp
-  return 0;
-}
-
 int ivshmem_setup(struct guest_proxy *pxy)
 {
   struct epoll_event evs[1];
-  int n_cores, ret, t_req;
-  size_t tasinfo_len;
+  int ret;
   char *tasinfo = NULL;
+  struct hello_msg *h_msg;
+  struct tasinfo_req_msg treq_msg;
+  struct tasinfo_res_msg tres_msg;
 
   /* Get number of cores from host */
-  ret = channel_read(pxy->chan, &n_cores, sizeof(n_cores));
-  if (ret < sizeof(n_cores))
+  ret = channel_read(pxy->chan, &h_msg, sizeof(struct hello_msg));
+  if (ret < sizeof(struct hello_msg))
   {
     fprintf(stderr, "ivshmem_handshake: failed to get number of cores.\n");
     return -1;
   }
 
   /* Send tasinfo request */
-  t_req = 1;
-  ret = channel_write(pxy->chan, &t_req, sizeof(t_req));
+  treq_msg.msg_type = MSG_TYPE_TASINFO_REQ;
+  ret = channel_write(pxy->chan, &treq_msg, sizeof(struct tasinfo_req_msg));
+  ivshmem_notify_host(pxy);
 
   /* Receive tasinfo response */
   ret = epoll_wait(pxy->epfd, evs, 1, -1);
@@ -91,30 +86,94 @@ int ivshmem_setup(struct guest_proxy *pxy)
         "tasinfo response.\n");
   }
 
-  ret = channel_read(pxy->chan, tasinfo, sizeof(*tasinfo));
+  ivshmem_drain_evfd(pxy->irq_fd);
+  ret = channel_read(pxy->chan, &tres_msg,
+      sizeof(struct tasinfo_res_msg));
   if (ret < sizeof(*tasinfo))
   {
     fprintf(stderr, "ivshmem_handshake: failed to read tasinfo.\n");
   }
 
-  /* Copy tasinfo response into flexnic_info */
-  // TODO: Use FLEXNIC_INFO_BYTES macro
-  pxy->flexnic_info = malloc(0x1000);
+  pxy->flexnic_info = malloc(FLEXNIC_INFO_BYTES);
   if (pxy->flexnic_info == NULL)
   {
     fprintf(stderr, "ivshmem_handshake: failed to allocate flexnic_info.\n");
     return -1;
   }
 
-  // TODO: Get tasinfo_len somehow
-  tasinfo_len = 0;
-  memcpy(pxy->flexnic_info, tasinfo, tasinfo_len);
+  memcpy(pxy->flexnic_info, tasinfo, FLEXNIC_INFO_BYTES);
 
   /* Set proper offset and size of memory region */
   pxy->flexnic_info->dma_mem_off = pxy->shm_off;
   pxy->flexnic_info->dma_mem_size = pxy->shm_size;
 
-  /* Create shm region for tas_info */
+  /* TODO: Create shm region for tas_info */
 
   return 0;
+}
+
+int ivshmem_poll(struct guest_proxy *pxy)
+{
+  int n, i;
+  struct epoll_event events[2];
+  n = epoll_wait(pxy->epfd, events, 2, 1000); 
+  
+  if (n > 0) 
+  {
+    for (i = 0; i < n; i++) 
+    {
+        ivshmem_drain_evfd(pxy->irq_fd);
+        ivshmem_handle_msg(pxy);
+    }
+  }
+  
+  return n;
+}
+
+int flextcp_poll(struct guest_proxy *pxy)
+{
+  // TODO: Do poll for flextcp
+  return 0;
+}
+
+int ivshmem_handle_msg(struct guest_proxy * pxy) {
+  int ret;
+  void *msg;
+  uint8_t msg_type;
+  size_t msg_size;
+
+  msg_type = channel_get_msg_type(pxy->chan);
+  msg_size = channel_get_type_size(msg_type);
+  msg = malloc(msg_size);
+
+  ret = channel_read(pxy->chan, msg, msg_size);
+  if (ret <= 0)
+  {
+    fprintf(stderr, "ivshmem_handle_msg: channel read failed.\n");
+    return -1;
+  }
+
+  switch(msg_type)
+  {
+    case MSG_TYPE_CONTEXT_RES:
+      break;
+    default:
+      fprintf(stderr, "ivshmem_handle_msg: unknown message.\n");
+  }
+
+  return 0;
+}
+
+void ivshmem_notify_host(struct guest_proxy *pxy)
+{
+  /* Signal memory at offset 12 is the doorbell
+     according to the ivshmem spec */
+  volatile uint32_t *doorbell = (uint32_t *) (pxy->sgm + 12);
+  *doorbell = (uint16_t) 0 | (uint16_t) HOST_PEERID << 16;
+}
+
+void ivshmem_drain_evfd(int fd)
+{
+  uint8_t buf[8];
+  read(fd, buf, 8);
 }

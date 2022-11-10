@@ -68,6 +68,7 @@ int channel_write(struct channel *chan, void *buf, size_t size)
 int channel_read(struct channel *chan, void *buf, size_t size)
 {
   int ret;
+
   ret = shmring_pop(chan->rx, buf, size);
 
   if (ret < 0)
@@ -77,4 +78,46 @@ int channel_read(struct channel *chan, void *buf, size_t size)
   }
   
   return ret;
+}
+
+/* Gets the type of the next message to read */
+uint8_t channel_get_msg_type(struct channel *chan)
+{
+  int ret;
+  uint8_t type;
+
+  /* First byte is always message type */
+  ret = shmring_read(chan->rx, &type, sizeof(uint8_t));
+  if (ret < sizeof(uint8_t))
+  {
+    fprintf(stderr, "channel_get_msg_type: failed to get msg type.\n");
+    return -1;
+  }
+
+  return type;
+}
+
+size_t channel_get_type_size(uint8_t type)
+{
+  switch(type)
+  {
+    case MSG_TYPE_HELLO:
+      return sizeof(struct hello_msg);
+      break;
+    case MSG_TYPE_TASINFO_REQ:
+      return sizeof(struct tasinfo_req_msg);
+      break;
+    case MSG_TYPE_TASINFO_RES:
+      return sizeof(struct tasinfo_res_msg);
+      break;
+    case MSG_TYPE_CONTEXT_REQ:
+      return sizeof(struct context_req_msg);
+      break;
+    case MSG_TYPE_CONTEXT_RES:
+      return sizeof(struct context_res_msg);
+      break;
+    default:
+      fprintf(stderr, "channel_get_type_size: passed invalid message type.\n");
+      return -1;
+  }
 }

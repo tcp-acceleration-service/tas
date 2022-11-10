@@ -27,12 +27,17 @@ static int next_id = 0;
 /* List of VMs */
 static struct v_machine vms[MAX_VMS];
 
+static int ivshmem_notify_guest(int fd);
+
 static int ivshmem_uxsocket_init();
-static int ivshmem_poll_uxsocket();
-static int ivshmem_uxsocket_accept();
+static int ivshmem_uxsocket_poll();
+
+static int ivshmem_uxsocket_handle_newconn();
 static int ivshmem_uxsocket_handle_notif();
 static int ivshmem_uxsocket_handle_error();
 static int ivshmem_uxsocket_handle_msg();
+static int ivshmem_handle_tasinforeq_msg(struct v_machine *vm);
+
 static int ivshmem_uxsocket_send_int(int fd, int64_t i);
 static int ivshmem_uxsocket_sendfd(int uxfd, int fd, int64_t i);
 
@@ -48,7 +53,7 @@ int ivshmem_init()
     }
 
     /* Create epoll used to subscribe to events */
-    if ((epfd = epoll_create1(0)) == -1) 
+    if ((epfd = epoll_create1(0)) < -1) 
     {
         fprintf(stderr, "ivshmem_init: epoll_create1 failed.\n"); 
         goto close_uxfd;
@@ -74,13 +79,28 @@ close_uxfd:
 
 int ivshmem_poll() 
 {
-    if (ivshmem_poll_uxsocket() != 0)
+    if (ivshmem_uxsocket_poll() != 0)
     {
         fprintf(stderr, "ivshmem_poll: failed to poll uxsocket.\n");
         return -1;
     }
 
     return 0;
+}
+
+int ivshmem_notify_guest(int fd)
+{
+  int ret;
+  uint64_t buf = 1;
+  
+  ret = write(fd, &buf, sizeof(uint64_t));
+  if (ret < sizeof(uint64_t))
+  {
+    fprintf(stderr, "ivshmem_notify_guest: failed to notify host.\n");
+    return -1;
+  }
+  
+  return 0;
 }
 
 /*****************************************************************************/
@@ -132,15 +152,16 @@ close_fd:
     return -1;
 }
 
-static int ivshmem_poll_uxsocket()
+static int ivshmem_uxsocket_poll()
 {
     int i, n;
+    struct v_machine *vm;
     struct epoll_event evs[32];
     struct epoll_event ev;
 
     if ((n = epoll_wait(epfd, evs, 32, 0)) < 0)
     {
-        fprintf(stderr, "poll_ivshmem_uxsocket: epoll_wait failed.\n");
+        fprintf(stderr, "ivshmem_uxsocket_poll: epoll_wait failed.\n");
         return -1;
     }
 
@@ -148,10 +169,9 @@ static int ivshmem_poll_uxsocket()
     for (i = 0; i < n; i++)
     {
         ev = evs[i];
-
         if (ev.data.u32 == EP_LISTEN)
         {
-            ivshmem_uxsocket_accept();
+            ivshmem_uxsocket_handle_newconn();
         }
         else if (ev.data.u32 == EP_NOTIFY)
         {
@@ -163,7 +183,8 @@ static int ivshmem_poll_uxsocket()
         }
         else if (evs[i].events & EPOLLIN)
         {
-            ivshmem_uxsocket_handle_msg();
+            vm = ev.data.ptr; 
+            ivshmem_uxsocket_handle_msg(vm);
         }
     }
 
@@ -172,7 +193,7 @@ static int ivshmem_poll_uxsocket()
 
 /* Accepts connection when a qemu vm starts and uses the
    uxsocket to set up the shared memory region */
-static int ivshmem_uxsocket_accept()
+static int ivshmem_uxsocket_handle_newconn()
 {   
     int ret, n_cores;
     int cfd, ifd, nfd;
@@ -186,14 +207,14 @@ static int ivshmem_uxsocket_accept()
     /* Return error if max number of VMs has been reached */
     if (next_id > MAX_VMS)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: max vms reached.\n");
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: max vms reached.\n");
         return -1;
     }
 
     /* Accept connection from qemu ivshmem */
     if ((cfd = accept(uxfd, NULL, NULL)) < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: accept failed.\n");
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: accept failed.\n");
         return -1;
     }
 
@@ -201,24 +222,24 @@ static int ivshmem_uxsocket_accept()
     ret = ivshmem_uxsocket_send_int(cfd, version);
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send "
                 "protocol version.\n");
         goto close_cfd;
     }
 
-    /* Send vm id to the guest proxy */
+    /* Send vm id to qemu */
     ret = ivshmem_uxsocket_send_int(cfd, next_id);
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send vm id.\n");
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send vm id.\n");
         goto close_cfd;
     }
 
-    /* Send shared memory fd to the guest proxy */
+    /* Send shared memory fd to qemu */
     ret = ivshmem_uxsocket_sendfd(cfd, flexnic_shmfd, -1);
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send shm fd.\n");
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send shm fd.\n");
         goto close_cfd;
     }
 
@@ -235,7 +256,7 @@ static int ivshmem_uxsocket_accept()
     ret = ivshmem_uxsocket_sendfd(cfd, nfd, hostid);
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send "
                 "notify fd.\n");
         goto close_ifd;
         
@@ -244,7 +265,7 @@ static int ivshmem_uxsocket_accept()
     /* Create and send fd so that host can interrupt vm */
     if ((ifd = eventfd(0, EFD_NONBLOCK)) < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to create "
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to create "
                 "interrupt fd.\n");
         goto close_nfd;
     }
@@ -252,7 +273,7 @@ static int ivshmem_uxsocket_accept()
     ret = ivshmem_uxsocket_sendfd(cfd, ifd, next_id);
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send "
                 "interrupt fd.\n");
         goto close_ifd;
     }
@@ -260,7 +281,7 @@ static int ivshmem_uxsocket_accept()
     /* Add connection fd to the epoll interest list */
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &ev) < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to add "
                 "cfd to epoll.\n");
         goto close_ifd;
     }
@@ -268,7 +289,7 @@ static int ivshmem_uxsocket_accept()
     /* Add notify fd to the epoll interest list */
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, nfd, &ev) < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to add "
                 "nfd to epoll.\n");
         goto close_ifd;
     }
@@ -280,7 +301,7 @@ static int ivshmem_uxsocket_accept()
     chan = channel_init(tx_addr, rx_addr, CHAN_SIZE);
     if (chan == NULL)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to init chan.\n");
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to init chan.\n");
         goto close_ifd;
     }
 
@@ -289,7 +310,7 @@ static int ivshmem_uxsocket_accept()
     ret = channel_write(chan, &n_cores, sizeof(n_cores));
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send number "
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send number "
                 "of cores to guest.\n");
     }
 
@@ -297,6 +318,16 @@ static int ivshmem_uxsocket_accept()
     vms[next_id].nfd = nfd;
     vms[next_id].id = next_id;
     vms[next_id].chan = chan;
+    
+    ev.events = EPOLLIN;
+    ev.data.ptr = &vms[next_id];
+    if(epoll_ctl(epfd, EPOLL_CTL_ADD, nfd, &ev) != 0) 
+    {
+        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to" 
+                "add nfd to epfd interest list.\n");
+        goto close_ifd;
+    }
+    
     next_id++;
     
     return 0;
@@ -322,13 +353,82 @@ static int ivshmem_uxsocket_handle_error()
     return 0;
 }
 
-static int ivshmem_uxsocket_handle_msg()
+static int ivshmem_uxsocket_handle_msg(struct v_machine *vm)
 {
-    // TODO: Handle the different types of messages
-    //   - TAS_INFO
-    //   - CONTEXT_REQ
-    //   - ACK
+    int ret;
+    void *msg;
+    uint8_t msg_type;
+    size_t msg_size;
+
+    if (vm == NULL)
+    {
+        fprintf(stderr, "ivshmem_uxsocket_handle_msg: vm is NULL.\n");
+        return -1;
+    }
+
+    msg_type = channel_get_msg_type(vm->chan);
+    msg_size = channel_get_type_size(msg_type);
+    msg = malloc(msg_size);
+
+    ret = channel_read(vm->chan, msg, msg_size);
+    if (ret <= 0)
+    {
+        fprintf(stderr, "ivshmem_uxsocket_handle_msg: channel read failed.\n");
+        return -1;
+    }
+
+    switch(msg_type)
+    {
+        case MSG_TYPE_TASINFO_REQ:
+            /* Send tas info struct to guest */
+            ivshmem_handle_tasinforeq_msg(vm);
+            ivshmem_notify_guest(vm->ifd);
+            break;
+        default:
+            fprintf(stderr, "ivshmem_uxsocket_handle_msg: unknown message.\n");
+    }
+
     return 0;
+}
+
+/* Handles tasinfo request */
+static int ivshmem_handle_tasinforeq_msg(struct v_machine *vm)
+{
+    int ret;
+    struct tasinfo_res_msg *msg;
+
+    msg = (struct tasinfo_res_msg *) malloc(sizeof(struct tasinfo_res_msg));
+
+    if (msg == NULL)
+    {
+        fprintf(stderr, "ivshmem_handle_tasinforeq_msg: "
+                "failed to allocate tasinfo_res_msg.\n");
+        return -1;
+    }
+
+    msg->msg_type = MSG_TYPE_TASINFO_RES;
+    if (memcpy(msg->flexnic_info, flexnic_info, FLEXNIC_INFO_BYTES) == NULL)
+    {
+        fprintf(stderr, "ivshmem_handle_tasinforeq_msg: "
+                "failed to cpy flexnic_info to msg.\n");
+        goto free_msg;
+    }
+
+    ret = channel_write(vm->chan, msg, sizeof(struct tasinfo_res_msg));
+    if (ret < sizeof(struct tasinfo_res_msg))
+    {
+        fprintf(stderr, "ivshmem_handle_tasinforeq_msg: "
+                "failed to write to channel.\n");
+        goto free_msg;
+    }
+
+    return 0;
+
+free_msg:
+    free(msg);
+
+    return -1;
+
 }
 
 static int ivshmem_uxsocket_send_int(int fd, int64_t i)

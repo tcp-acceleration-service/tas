@@ -14,7 +14,7 @@
 #include "vfio.h"
 
 int vfio_set_irq(struct guest_proxy *pxy);
-int vfio_subscribe_irqs(struct guest_proxy *pxy);
+int vfio_subscribe_irq(struct guest_proxy *pxy);
 int vfio_map_all_regions(struct guest_proxy *pxy);
 int vfio_map_region(int dev, int idx, void **addr, size_t *len, size_t *off);
 int vfio_get_region_info(int dev, int i, struct vfio_region_info *reg);
@@ -103,7 +103,7 @@ int vfio_init(struct guest_proxy *pxy)
   }
 
   /* Add interrupt request fd to interest list */
-  if (vfio_subscribe_irqs(pxy) < 0)
+  if (vfio_subscribe_irq(pxy) < 0)
   {
     fprintf(stderr, "vfio_init: failed to subscrive to interrupts.\n");
     goto error_dev;
@@ -159,7 +159,7 @@ error_close:
 
 }
 
-int vfio_subscribe_irqs(struct guest_proxy *pxy)
+int vfio_subscribe_irq(struct guest_proxy *pxy)
 {
   struct epoll_event ev;
 

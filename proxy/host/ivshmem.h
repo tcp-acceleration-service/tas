@@ -8,7 +8,6 @@
 /* These variables are all pre-determined by QEMU
    to get ivshmem to work */
 #define IVSHMEM_PROTOCOL_VERSION 0
-#define HOST_PEERID 255
 
 #define MAX_VMS 16
 
