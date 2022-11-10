@@ -5,11 +5,11 @@
 #include "shmring.h"
 
 size_t shmring_get_freesz(struct ring_buffer *ring);
-int shmring_pop_fragmented(struct ring_buffer *rx_ring, 
+size_t shmring_pop_fragmented(struct ring_buffer *rx_ring, 
     void *dst, size_t size);
-int shmring_read_fragmented(struct ring_buffer *rx_ring, 
+size_t shmring_read_fragmented(struct ring_buffer *rx_ring, 
     void *dst, size_t size);
-int shmring_push_fragmented(struct ring_buffer *tx_ring, 
+size_t shmring_push_fragmented(struct ring_buffer *tx_ring, 
     void *src, size_t size);
 
 struct ring_buffer* shmring_init(void *base_addr, size_t size)
@@ -42,9 +42,9 @@ void shmring_reset(struct ring_buffer *ring, size_t size)
 }
 
 /* Reads from ring and updates read pos */
-int shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
+size_t shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
 {
-  int ret, freesz;
+  size_t ret, freesz;
   struct ring_header *hdr;
 
   hdr = (struct ring_header *) rx_ring->hdr_addr;
@@ -52,10 +52,15 @@ int shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
   /* Return error if there is not enough written bytes
      to read in the ring */
   freesz = shmring_get_freesz(rx_ring);
+  printf("shmring_pop: ring_size=%ld.\n", hdr->ring_size);
+  printf("shmring_pop: freesz=%ld.\n", freesz);
+  printf("shmring_pop: size=%ld.\n", size);
+  printf("shmring_pop: ring_size - freesz = %ld.\n", hdr->ring_size - freesz);
+  printf("shmring_pop: bool=%d.\n", (hdr->ring_size - freesz) < size);
   if ((hdr->ring_size - freesz) < size)
   {
     fprintf(stderr, "shmring_pop: not enough written bytes in ring.\n");
-    return -1;
+    return 0;
   }
 
   /* If data loops over do a fragmented read to
@@ -70,7 +75,7 @@ int shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
       == NULL)
   {
     fprintf(stderr, "shmring_pop: memcpy failed.\n");
-    return -1;
+    return 0;
   }
 
   hdr->read_pos += size;
@@ -87,10 +92,10 @@ int shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
 
 /* Reads from regions in beginning and end of ring and updates
    read pos */
-int shmring_pop_fragmented(struct ring_buffer *rx_ring, 
+size_t shmring_pop_fragmented(struct ring_buffer *rx_ring, 
     void *dst, size_t size)
 {
-  int sz1, sz2;
+  size_t sz1, sz2;
   void *ret;
   struct ring_header *hdr = rx_ring->hdr_addr;
   
@@ -100,7 +105,7 @@ int shmring_pop_fragmented(struct ring_buffer *rx_ring,
   if (ret == NULL)
   {
     fprintf(stderr, "shmring_pop_fragmented: first read failed.\n");
-    return -1;
+    return 0;
   }
 
   /* Do second read on the ring */
@@ -109,7 +114,7 @@ int shmring_pop_fragmented(struct ring_buffer *rx_ring,
   if (ret == NULL)
   {
     fprintf(stderr, "shmring_pop_fragmented: second read failed.\n");
-    return -1;
+    return 0;
   }
 
   hdr->read_pos += size;
@@ -125,9 +130,9 @@ int shmring_pop_fragmented(struct ring_buffer *rx_ring,
 }
 
 /* Reads from ring buffer but does not move read pos */
-int shmring_read(struct ring_buffer *rx_ring, void *dst, size_t size)
+size_t shmring_read(struct ring_buffer *rx_ring, void *dst, size_t size)
 {
-  int ret, freesz;
+  size_t ret, freesz;
   struct ring_header *hdr;
 
   hdr = (struct ring_header *) rx_ring->hdr_addr;
@@ -137,8 +142,8 @@ int shmring_read(struct ring_buffer *rx_ring, void *dst, size_t size)
   freesz = shmring_get_freesz(rx_ring);
   if ((hdr->ring_size - freesz) < size)
   {
-    fprintf(stderr, "shmring_pop: not enough written bytes in ring.\n");
-    return -1;
+    fprintf(stderr, "shmring_read: not enough written bytes in ring.\n");
+    return 0;
   }
 
   /* If data loops over do a fragmented read to
@@ -152,8 +157,8 @@ int shmring_read(struct ring_buffer *rx_ring, void *dst, size_t size)
   if (memcpy(dst, rx_ring->buf_addr + hdr->read_pos, size) 
       == NULL)
   {
-    fprintf(stderr, "shmring_pop: memcpy failed.\n");
-    return -1;
+    fprintf(stderr, "shmring_read: memcpy failed.\n");
+    return 0;
   }
 
   return size;
@@ -161,7 +166,7 @@ int shmring_read(struct ring_buffer *rx_ring, void *dst, size_t size)
 
 /* Reads from fragmented ring buffer region but does not move
    read pos */
-int shmring_read_fragmented(struct ring_buffer *rx_ring, 
+size_t shmring_read_fragmented(struct ring_buffer *rx_ring, 
     void *dst, size_t size)
 {
   int sz1, sz2;
@@ -174,7 +179,7 @@ int shmring_read_fragmented(struct ring_buffer *rx_ring,
   if (ret == NULL)
   {
     fprintf(stderr, "shmring_pop_fragmented: first read failed.\n");
-    return -1;
+    return 0;
   }
 
   /* Do second read on the ring */
@@ -183,15 +188,15 @@ int shmring_read_fragmented(struct ring_buffer *rx_ring,
   if (ret == NULL)
   {
     fprintf(stderr, "shmring_pop_fragmented: second read failed.\n");
-    return -1;
+    return 0;
   }
 
   return size;
 }
 
-int shmring_push(struct ring_buffer *tx_ring, void *src, size_t size)
+size_t shmring_push(struct ring_buffer *tx_ring, void *src, size_t size)
 {
-  int ret, freesz;
+  size_t ret, freesz;
   struct ring_header *hdr;
 
   hdr = (struct ring_header *) tx_ring->hdr_addr;
@@ -200,7 +205,7 @@ int shmring_push(struct ring_buffer *tx_ring, void *src, size_t size)
   freesz = shmring_get_freesz(tx_ring);
   if (freesz < size)
   {
-    return -1;
+    return 0;
   }
 
   /* If data loops over do a fragmented write
@@ -215,7 +220,7 @@ int shmring_push(struct ring_buffer *tx_ring, void *src, size_t size)
       == NULL)
   {
     fprintf(stderr, "shmring_push: memcpy failed.\n");
-    return -1;
+    return 0;
   }
 
   hdr->write_pos += size;
@@ -230,7 +235,7 @@ int shmring_push(struct ring_buffer *tx_ring, void *src, size_t size)
   return size;
 }
 
-int shmring_push_fragmented(struct ring_buffer *tx_ring, 
+size_t shmring_push_fragmented(struct ring_buffer *tx_ring, 
     void *src, size_t size)
 {
   int sz1, sz2;
@@ -243,7 +248,7 @@ int shmring_push_fragmented(struct ring_buffer *tx_ring,
   if (ret == NULL)
   {
     fprintf(stderr, "shmring_push_fragmented: first write failed.\n");
-    return -1;
+    return 0;
   }
 
   /* Do the second write from the beginning of the ring */
@@ -252,7 +257,7 @@ int shmring_push_fragmented(struct ring_buffer *tx_ring,
   if (ret == NULL)
   {
     fprintf(stderr, "shmring_push_fragmented: second write failed.\n");
-    return -1;
+    return 0;
   }
 
   hdr->write_pos += size;

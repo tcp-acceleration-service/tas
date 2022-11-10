@@ -51,30 +51,30 @@ free_chan:
 
 }
 
-int channel_write(struct channel *chan, void *buf, size_t size)
+size_t channel_write(struct channel *chan, void *buf, size_t size)
 {
-  int ret;
+  size_t ret;
   ret = shmring_push(chan->tx, buf, size);
 
-  if (ret < 0)
+  if (ret == 0)
   {
     fprintf(stderr, "channel_write: failed to write to shm ring.\n");
-    return -1;
+    return 0;
   }
   
   return ret;
 }
 
-int channel_read(struct channel *chan, void *buf, size_t size)
+size_t channel_read(struct channel *chan, void *buf, size_t size)
 {
-  int ret;
+  size_t ret;
 
   ret = shmring_pop(chan->rx, buf, size);
 
-  if (ret < 0)
+  if (ret == 0)
   {
     fprintf(stderr, "channel_read: failed to read from shm ring.\n");
-    return -1;
+    return 0;
   }
   
   return ret;

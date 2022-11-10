@@ -5,7 +5,7 @@
 #include "../include/tas_memif.h"
 
 #define CHAN_OFFSET 0x1000
-#define CHAN_SIZE 0x1000
+#define CHAN_SIZE 0x2000
 
 #define MSG_TYPE_HELLO 1
 #define MSG_TYPE_TASINFO_REQ 2
@@ -41,8 +41,8 @@ struct channel {
 } __attribute__((packed));
 
 struct channel * channel_init(void* tx_addr, void* rx_addr, uint64_t size);
-int channel_write(struct channel *chan, void *buf, size_t size);
-int channel_read(struct channel *chan, void *buf, size_t size);
+size_t channel_write(struct channel *chan, void *buf, size_t size);
+size_t channel_read(struct channel *chan, void *buf, size_t size);
 uint8_t channel_get_msg_type(struct channel *chan);
 size_t channel_get_type_size(uint8_t type);
 

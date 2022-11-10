@@ -308,7 +308,7 @@ static int ivshmem_uxsocket_handle_newconn()
     /* Write number of cores to channel for guest proxy to receive */
     n_cores = flexnic_info->cores_num;
     ret = channel_write(chan, &n_cores, sizeof(n_cores));
-    if (ret < 0)
+    if (ret == 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send number "
                 "of cores to guest.\n");
@@ -371,7 +371,7 @@ static int ivshmem_uxsocket_handle_msg(struct v_machine *vm)
     msg = malloc(msg_size);
 
     ret = channel_read(vm->chan, msg, msg_size);
-    if (ret <= 0)
+    if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_handle_msg: channel read failed.\n");
         return -1;

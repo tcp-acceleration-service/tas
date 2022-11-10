@@ -60,13 +60,15 @@ int ivshmem_setup(struct guest_proxy *pxy)
 {
   struct epoll_event evs[1];
   int ret;
-  char *tasinfo = NULL;
-  struct hello_msg *h_msg;
+  struct hello_msg h_msg;
   struct tasinfo_req_msg treq_msg;
   struct tasinfo_res_msg tres_msg;
 
   /* Get number of cores from host */
   ret = channel_read(pxy->chan, &h_msg, sizeof(struct hello_msg));
+  printf("ivshmem_setup: ret=%d.\n", ret);
+  printf("ivshmem_setup: hellosz=%ld.\n", sizeof(struct hello_msg));
+  printf("ivshmem_setup: exp=%d.\n", ret < sizeof(struct hello_msg));
   if (ret < sizeof(struct hello_msg))
   {
     fprintf(stderr, "ivshmem_handshake: failed to get number of cores.\n");
@@ -80,7 +82,7 @@ int ivshmem_setup(struct guest_proxy *pxy)
 
   /* Receive tasinfo response */
   ret = epoll_wait(pxy->epfd, evs, 1, -1);
-  if (ret < 0)
+  if (ret == 0)
   {
     fprintf(stderr, "ivshmem_handshake: failed to receive"
         "tasinfo response.\n");
@@ -89,7 +91,7 @@ int ivshmem_setup(struct guest_proxy *pxy)
   ivshmem_drain_evfd(pxy->irq_fd);
   ret = channel_read(pxy->chan, &tres_msg,
       sizeof(struct tasinfo_res_msg));
-  if (ret < sizeof(*tasinfo))
+  if (ret < sizeof(struct tasinfo_res_msg))
   {
     fprintf(stderr, "ivshmem_handshake: failed to read tasinfo.\n");
   }
@@ -101,7 +103,7 @@ int ivshmem_setup(struct guest_proxy *pxy)
     return -1;
   }
 
-  memcpy(pxy->flexnic_info, tasinfo, FLEXNIC_INFO_BYTES);
+  memcpy(pxy->flexnic_info, tres_msg.flexnic_info, FLEXNIC_INFO_BYTES);
 
   /* Set proper offset and size of memory region */
   pxy->flexnic_info->dma_mem_off = pxy->shm_off;
@@ -147,7 +149,7 @@ int ivshmem_handle_msg(struct guest_proxy * pxy) {
   msg = malloc(msg_size);
 
   ret = channel_read(pxy->chan, msg, msg_size);
-  if (ret <= 0)
+  if (ret == 0)
   {
     fprintf(stderr, "ivshmem_handle_msg: channel read failed.\n");
     return -1;
