@@ -73,7 +73,7 @@ int ivshmem_setup(struct guest_proxy *pxy)
 
   /* Get number of cores from host */
   ret = channel_read(pxy->chan, &n_cores, sizeof(n_cores));
-  if (ret <= 0)
+  if (ret < sizeof(n_cores))
   {
     fprintf(stderr, "ivshmem_handshake: failed to get number of cores.\n");
     return -1;
@@ -92,7 +92,7 @@ int ivshmem_setup(struct guest_proxy *pxy)
   }
 
   ret = channel_read(pxy->chan, tasinfo, sizeof(*tasinfo));
-  if (ret < 0)
+  if (ret < sizeof(*tasinfo))
   {
     fprintf(stderr, "ivshmem_handshake: failed to read tasinfo.\n");
   }

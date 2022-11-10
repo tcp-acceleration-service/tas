@@ -68,7 +68,7 @@ int channel_write(struct channel *chan, void *buf, size_t size)
 int channel_read(struct channel *chan, void *buf, size_t size)
 {
   int ret;
-  ret = shmring_pop(chan->tx, buf, size);
+  ret = shmring_pop(chan->rx, buf, size);
 
   if (ret < 0)
   {

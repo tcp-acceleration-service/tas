@@ -79,7 +79,7 @@ int shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
     hdr->full = 0;
   }
 
-  return 0;
+  return size;
 }
 
 int shmring_read_fragmented(struct ring_buffer *rx_ring, 
@@ -116,7 +116,7 @@ int shmring_read_fragmented(struct ring_buffer *rx_ring,
     hdr->full = 0;
   }
 
-  return 0;
+  return size;
 }
 
 int shmring_push(struct ring_buffer *tx_ring, void *src, size_t size)
@@ -157,7 +157,7 @@ int shmring_push(struct ring_buffer *tx_ring, void *src, size_t size)
     hdr->full = 1;
   }
 
-  return 0;
+  return size;
 }
 
 int shmring_write_fragmented(struct ring_buffer *tx_ring, 
@@ -193,7 +193,7 @@ int shmring_write_fragmented(struct ring_buffer *tx_ring,
     hdr->full = 1;
   }
 
-  return 0;
+  return size;
 }
 
 size_t shmring_get_freesz(struct ring_buffer *ring)
