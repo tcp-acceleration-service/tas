@@ -195,9 +195,10 @@ static int ivshmem_uxsocket_poll()
    uxsocket to set up the shared memory region */
 static int ivshmem_uxsocket_handle_newconn()
 {   
-    int ret, n_cores;
+    int ret;
     int cfd, ifd, nfd;
     void *tx_addr, *rx_addr;
+    struct hello_msg h_msg;
     struct epoll_event ev;
     struct channel *chan;
 
@@ -282,15 +283,17 @@ static int ivshmem_uxsocket_handle_newconn()
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &ev) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to add "
-                "cfd to epoll.\n");
+                "cfd to epfd.\n");
         goto close_ifd;
     }
 
     /* Add notify fd to the epoll interest list */
+    ev.events = EPOLLIN;
+    ev.data.ptr = &vms[next_id];
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, nfd, &ev) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to add "
-                "nfd to epoll.\n");
+                "nfd to epfd.\n");
         goto close_ifd;
     }
 
@@ -306,30 +309,25 @@ static int ivshmem_uxsocket_handle_newconn()
     }
 
     /* Write number of cores to channel for guest proxy to receive */
-    n_cores = flexnic_info->cores_num;
-    ret = channel_write(chan, &n_cores, sizeof(n_cores));
-    if (ret == 0)
+    h_msg.msg_type = MSG_TYPE_HELLO;
+    h_msg.n_cores = flexnic_info->cores_num;
+
+    ret = channel_write(chan, &h_msg, sizeof(struct hello_msg));
+    if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send number "
                 "of cores to guest.\n");
+        goto close_ifd;
     }
 
     vms[next_id].ifd = ifd;
     vms[next_id].nfd = nfd;
     vms[next_id].id = next_id;
     vms[next_id].chan = chan;
-    
-    ev.events = EPOLLIN;
-    ev.data.ptr = &vms[next_id];
-    if(epoll_ctl(epfd, EPOLL_CTL_ADD, nfd, &ev) != 0) 
-    {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to" 
-                "add nfd to epfd interest list.\n");
-        goto close_ifd;
-    }
+    fprintf(stdout, "Connected VM=%d", next_id);
     
     next_id++;
-    
+
     return 0;
 
 close_ifd:
