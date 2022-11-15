@@ -52,11 +52,6 @@ size_t shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
   /* Return error if there is not enough written bytes
      to read in the ring */
   freesz = shmring_get_freesz(rx_ring);
-  printf("shmring_pop: ring_size=%ld.\n", hdr->ring_size);
-  printf("shmring_pop: freesz=%ld.\n", freesz);
-  printf("shmring_pop: size=%ld.\n", size);
-  printf("shmring_pop: ring_size - freesz = %ld.\n", hdr->ring_size - freesz);
-  printf("shmring_pop: bool=%d.\n", (hdr->ring_size - freesz) < size);
   if ((hdr->ring_size - freesz) < size)
   {
     fprintf(stderr, "shmring_pop: not enough written bytes in ring.\n");
