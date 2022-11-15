@@ -170,6 +170,8 @@ void ivshmem_notify_host(struct guest_proxy *pxy)
   *doorbell = (uint16_t) 0 | (uint16_t) HOST_PEERID << 16;
 }
 
+/* Clears the interrupt status register. If register is not cleared
+   we keep receiving interrupt events from epoll. */
 void ivshmem_drain_evfd(int fd)
 {
   uint8_t buf[8];

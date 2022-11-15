@@ -103,6 +103,15 @@ int ivshmem_notify_guest(int fd)
   return 0;
 }
 
+/* Clears the interrupt status register. If register is not cleared
+   we keep receiving interrupt events from epoll. */
+int ivshmem_drain_evfd(int fd) 
+{
+  uint8_t buf[8];
+  read(fd, buf, 8);
+  return 0;
+}
+
 /*****************************************************************************/
 /* Unix Socket */
 
@@ -184,6 +193,7 @@ static int ivshmem_uxsocket_poll()
         else if (evs[i].events & EPOLLIN)
         {
             vm = ev.data.ptr; 
+            ivshmem_drain_evfd(vm->nfd);
             ivshmem_uxsocket_handle_msg(vm);
         }
     }
@@ -203,7 +213,7 @@ static int ivshmem_uxsocket_handle_newconn()
     struct channel *chan;
 
     int64_t version = IVSHMEM_PROTOCOL_VERSION;
-    int64_t hostid = HOST_PEERID;
+    uint64_t hostid = HOST_PEERID;
 
     /* Return error if max number of VMs has been reached */
     if (next_id > MAX_VMS)
@@ -324,7 +334,7 @@ static int ivshmem_uxsocket_handle_newconn()
     vms[next_id].nfd = nfd;
     vms[next_id].id = next_id;
     vms[next_id].chan = chan;
-    fprintf(stdout, "Connected VM=%d", next_id);
+    fprintf(stdout, "Connected VM=%d\n", next_id);
     
     next_id++;
 
