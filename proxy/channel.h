@@ -2,6 +2,10 @@
 #define CHANNEL_H_
 
 #include "shmring.h"
+#include <stdint.h>
+
+#include <tas_ll.h>
+#include "proxy.h"
 #include "../include/tas_memif.h"
 
 #define CHAN_OFFSET 0x1000
@@ -12,6 +16,13 @@
 #define MSG_TYPE_TASINFO_RES 3
 #define MSG_TYPE_CONTEXT_REQ 4
 #define MSG_TYPE_CONTEXT_RES 5
+#define MSG_TYPE_VPOKE 6
+
+/* Used to get CTX_RESP_MAX_SIZE... kinda ugly */
+struct kernel_uxsock_response *placeholder_resp;
+
+#define PLACEHOLDER_SIZE sizeof(placeholder_resp->flexnic_qs[0])
+#define CTX_RESP_MAX_SIZE sizeof(struct kernel_uxsock_response) + FLEXTCP_MAX_FTCPCORES * PLACEHOLDER_SIZE
 
 struct hello_msg {
   uint8_t msg_type;
@@ -29,10 +40,23 @@ struct tasinfo_res_msg {
 
 struct context_req_msg {
   uint8_t msg_type;
+  uint32_t cfd;
+  uint32_t vfd;
+  uint32_t app_id;
+  struct proxy_context_req context_req;
 } __attribute__((packed));
 
 struct context_res_msg {
   uint8_t msg_type;
+  uint32_t vfd;
+  uint32_t app_id;
+  ssize_t resp_size;
+  uint8_t resp[CTX_RESP_MAX_SIZE];
+} __attribute__((packed));
+
+struct vpoke_msg {
+  uint8_t msg_type;
+  uint32_t vfd;
 } __attribute__((packed));
 
 struct channel {

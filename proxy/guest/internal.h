@@ -3,35 +3,57 @@
 
 #include <stdint.h>
 #include <unistd.h>
+#include <sys/epoll.h>
 
 #include "../../include/tas_memif.h"
+#include "../../include/kernel_appif.h"
 #include "../channel.h"
+
+#define MAX_CONTEXT_REQ 100
+
+struct proxy_application {
+  int fd;
+  size_t req_rx;
+  struct proxy_context_req proxy_req;
+  struct proxy_application *next;
+
+  uint16_t id;
+  uint8_t closed;
+};
 
 struct guest_proxy {
     /* Epoll fd for all guest to host comm */
     int epfd;
-
-    /* IN IVM_EPFD INTEREST LIST */
     /* Fd for vfio interrupt requests */
     int irq_fd;
-
-    /* Vfio fds */
+    /* VFIO fds */
     int dev;
     int group;
     int cont;
-
     /* Shared memory region between guest and TAS */
     void *shm;
     size_t shm_size;
     size_t shm_off;
-
     /* Inter-vm signal memory used for interrupts */
     void *sgm;
     size_t sgm_size;
     size_t sgm_off;
-
     /* Channel used for vm communication */
     struct channel *chan;
+    /* Flextcp */
+    int flextcp_nfd;
+    int flextcp_epfd;
+    int flextcp_uxfd;
+    /* List of virtual file descriptors and epoll */
+    int *vfds;
+    int vepfd;
+    int vevfd_next;
+    /* Notify fd for kernel slowpath */
+    int kernel_notifyfd;
+    /* Applications */
+    uint16_t next_app_id;
+    struct proxy_application *apps;
+    struct proxy_context_req *context_reqs[MAX_CONTEXT_REQ];
 
     struct flexnic_info *flexnic_info;
 };

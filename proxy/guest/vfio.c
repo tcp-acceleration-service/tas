@@ -164,7 +164,7 @@ int vfio_subscribe_irq(struct guest_proxy *pxy)
   struct epoll_event ev;
 
   ev.events = EPOLLIN;
-  ev.data.u32 = EP_NOTIFY;
+  ev.data.ptr = EP_NOTIFY;
   ev.data.fd = pxy->irq_fd;
   
   if (epoll_ctl(pxy->epfd, EPOLL_CTL_ADD, pxy->irq_fd, &ev) != 0)

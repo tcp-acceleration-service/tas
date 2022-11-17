@@ -21,7 +21,18 @@ struct v_machine {
     int nfd;
     /* Shared memory channel used for tx and rx */
     struct channel *chan;
+    /* List of context requests for VM */
+    struct vmcontext_req *ctxs;
 
+};
+
+struct vmcontext_req {
+    int app_id;
+    uint32_t vfd;
+    int cfd; 
+    struct v_machine *vm;
+    struct flextcp_context *ctx;
+    struct vmcontext_req *next;
 };
 
 int ivshmem_init();

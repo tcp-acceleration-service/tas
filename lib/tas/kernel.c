@@ -157,7 +157,8 @@ int flextcp_kernel_connect(int *shmfd)
   return 0;
 }
 
-int flextcp_kernel_newctx(struct flextcp_context *ctx)
+int flextcp_kernel_newctx(struct flextcp_context *ctx,
+    uint8_t *presp, ssize_t *presp_sz)
 {
   ssize_t sz, off, total_sz;
   struct kernel_uxsock_response *resp;
@@ -197,7 +198,9 @@ int flextcp_kernel_newctx(struct flextcp_context *ctx)
   assert(sz == sizeof(req));
 
   /* receive response on kernel socket */
-  resp = (struct kernel_uxsock_response *) resp_buf;
+  resp = (presp == NULL) ? 
+    (struct kernel_uxsock_response *) resp_buf : 
+    (struct kernel_uxsock_response *) presp;
   off = 0;
   while (off < sizeof(*resp)) {
     sz = read(ksock_fd, (uint8_t *) resp + off, sizeof(*resp) - off);
@@ -227,6 +230,12 @@ int flextcp_kernel_newctx(struct flextcp_context *ctx)
   if (resp->status != 0) {
     fprintf(stderr, "flextcp_kernel_newctx: request failed\n");
     return -1;
+  }
+
+  if (presp != NULL) {
+    assert(presp_sz != NULL);
+    *presp_sz = total_sz;
+    return 0;
   }
 
   /* fill in ctx struct */

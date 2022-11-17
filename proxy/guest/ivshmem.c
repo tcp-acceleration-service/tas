@@ -5,16 +5,19 @@
 #include <sys/epoll.h>
 
 // #include "../../tas/lib/tas/internal.h"
-#include "../proxy.h"
-#include "../channel.h"
 #include "internal.h"
 #include "vfio.h"
+#include "ivshmem.h"
+#include "flextcp.h"
+#include "../proxy.h"
+#include "../channel.h"
 
 int ivshmem_setup(struct guest_proxy *pxy);
 int ivshmem_handle_msg(struct guest_proxy * pxy);
 
-void ivshmem_notify_host(struct guest_proxy *pxy);
-void ivshmem_drain_evfd(int fd);
+int ivshmem_handle_ctx_res(struct guest_proxy *pxy);
+
+int ivshmem_handle_vpoke(struct guest_proxy *pxy);
 
 int ivshmem_init(struct guest_proxy *pxy)
 {
@@ -54,6 +57,40 @@ int ivshmem_init(struct guest_proxy *pxy)
   // TODO: Add error handling here and close everything
 
   return 0;
+}
+
+int ivshmem_poll(struct guest_proxy *pxy)
+{
+  int n, i;
+  struct epoll_event events[2];
+  n = epoll_wait(pxy->epfd, events, 2, 1000); 
+  
+  if (n > 0) 
+  {
+    for (i = 0; i < n; i++) 
+    {
+        ivshmem_drain_evfd(pxy->irq_fd);
+        ivshmem_handle_msg(pxy);
+    }
+  }
+  
+  return n;
+}
+
+void ivshmem_notify_host(struct guest_proxy *pxy)
+{
+  /* Signal memory at offset 12 is the doorbell
+     according to the ivshmem spec */
+  volatile uint32_t *doorbell = (uint32_t *) (pxy->sgm + 12);
+  *doorbell = (uint16_t) 0 | (uint16_t) HOST_PEERID << 16;
+}
+
+/* Clears the interrupt status register. If register is not cleared
+   we keep receiving interrupt events from epoll. */
+void ivshmem_drain_evfd(int fd)
+{
+  uint8_t buf[8];
+  read(fd, buf, 8);
 }
 
 int ivshmem_setup(struct guest_proxy *pxy)
@@ -110,30 +147,6 @@ int ivshmem_setup(struct guest_proxy *pxy)
   return 0;
 }
 
-int ivshmem_poll(struct guest_proxy *pxy)
-{
-  int n, i;
-  struct epoll_event events[2];
-  n = epoll_wait(pxy->epfd, events, 2, 1000); 
-  
-  if (n > 0) 
-  {
-    for (i = 0; i < n; i++) 
-    {
-        ivshmem_drain_evfd(pxy->irq_fd);
-        ivshmem_handle_msg(pxy);
-    }
-  }
-  
-  return n;
-}
-
-int flextcp_poll(struct guest_proxy *pxy)
-{
-  // TODO: Do poll for flextcp
-  return 0;
-}
-
 int ivshmem_handle_msg(struct guest_proxy * pxy) {
   int ret;
   void *msg;
@@ -154,6 +167,10 @@ int ivshmem_handle_msg(struct guest_proxy * pxy) {
   switch(msg_type)
   {
     case MSG_TYPE_CONTEXT_RES:
+      ivshmem_handle_ctx_res(pxy);
+      break;
+    case MSG_TYPE_VPOKE:
+      ivshmem_handle_vpoke(pxy);
       break;
     default:
       fprintf(stderr, "ivshmem_handle_msg: unknown message.\n");
@@ -162,18 +179,39 @@ int ivshmem_handle_msg(struct guest_proxy * pxy) {
   return 0;
 }
 
-void ivshmem_notify_host(struct guest_proxy *pxy)
+int ivshmem_handle_ctx_res(struct guest_proxy *pxy)
 {
-  /* Signal memory at offset 12 is the doorbell
-     according to the ivshmem spec */
-  volatile uint32_t *doorbell = (uint32_t *) (pxy->sgm + 12);
-  *doorbell = (uint16_t) 0 | (uint16_t) HOST_PEERID << 16;
+  int ret;
+  uint32_t app_id;
+
+  struct context_res_msg msg;
+
+  ret = channel_read(pxy->chan, &msg, sizeof(struct context_res_msg));
+  if (ret < sizeof(struct context_res_msg))
+  {
+    fprintf(stderr, "ivshmem_handle_context_res: failed to read msg.\n");
+    return -1;
+  }
+
+  app_id = msg.app_id;
+  vflextcp_write_context_res(pxy, app_id, msg.resp, msg.resp_size);
+
+  return 0;
 }
 
-/* Clears the interrupt status register. If register is not cleared
-   we keep receiving interrupt events from epoll. */
-void ivshmem_drain_evfd(int fd)
+int ivshmem_handle_vpoke(struct guest_proxy *pxy)
 {
-  uint8_t buf[8];
-  read(fd, buf, 8);
+  int ret;
+  struct vpoke_msg msg;
+
+  ret = channel_read(pxy->chan, &msg, sizeof(struct vpoke_msg));
+  if (ret < sizeof(struct vpoke_msg))
+  {
+    fprintf(stderr, "ivshmem_handle_vpoke: failed to read channel.\n");
+    return -1;
+  }
+
+  vflextcp_poke(pxy, msg.vfd);
+
+  return 0;
 }

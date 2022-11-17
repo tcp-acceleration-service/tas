@@ -91,7 +91,8 @@ int flextcp_init(void)
   return 0;
 }
 
-int flextcp_context_create(struct flextcp_context *ctx)
+int flextcp_context_create(struct flextcp_context *ctx,
+    uint8_t *presp, ssize_t *presp_sz)
 {
   static uint16_t ctx_id = 0;
 
@@ -110,7 +111,7 @@ int flextcp_context_create(struct flextcp_context *ctx)
     return -1;
   }
 
-  return flextcp_kernel_newctx(ctx);
+  return flextcp_kernel_newctx(ctx, presp, presp_sz);
 }
 
 #include <pthread.h>

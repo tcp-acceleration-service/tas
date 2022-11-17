@@ -72,7 +72,7 @@ struct sockets_context *flextcp_sockctx_getfull(void)
     }
 
     pthread_mutex_lock(&context_init_mutex);
-    ret = flextcp_context_create(&ctx->ctx);
+    ret = flextcp_context_create(&ctx->ctx, NULL, NULL);
     pthread_mutex_unlock(&context_init_mutex);
     if (ret != 0) {
       fprintf(stderr, "flextcp socket flextcp_sockctx_get: flextcp_context_create "

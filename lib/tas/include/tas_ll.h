@@ -234,7 +234,8 @@ int flextcp_init(void);
 /**
  * Create a flextcp context.
  */
-int flextcp_context_create(struct flextcp_context *ctx);
+int flextcp_context_create(struct flextcp_context *ctx,
+    uint8_t *presp, ssize_t *presp_sz);
 
 /**
  * Poll events from a flextcp socket.

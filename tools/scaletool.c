@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    if (flextcp_context_create(&ctx) != 0) {
+    if (flextcp_context_create(&ctx, NULL, NULL) != 0) {
         fprintf(stderr, "flextcp_context_create failed\n");
         return EXIT_FAILURE;
     }
