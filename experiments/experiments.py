@@ -3,10 +3,12 @@ import time
 
 class Host(object):
 
-    def __init__(self, wmanager, config, nconfig, htype, hstack, hnum):
+    def __init__(self, wmanager, gen_config, config, nconfig,
+            htype, hstack, hnum):
         self.htype = htype
         self.hstack = hstack
         self.wmanager = wmanager
+        self.gen_config = gen_config
         self.config = config
         self.node_config = nconfig
         self.node_num = hnum
@@ -61,9 +63,9 @@ class Host(object):
                 self.config.is_remote)
 
         if self.node_config.is_server:
-            benchmark_args = self.config.benchmark_server_args
+            benchmark_args = self.gen_config.benchmark_server_args
         else:
-            benchmark_args = self.config.benchmark_client_args
+            benchmark_args = self.gen_config.benchmark_client_args
         self.run_benchmark_rpc(
                 pane = pane,
                 stack = self.hstack,
@@ -84,7 +86,7 @@ class Host(object):
         cmd = 'sudo ' + exec_file + ' ' + args
         if bg : 
             cmd += ' &  '
-        cmd += ' # | tee ' + out_file
+        # cmd += ' # | tee ' + out_file
         print("Starting Server TAS: " + cmd)
         pane.send_keys(cmd)
         print("Server TAS started.")
@@ -100,6 +102,8 @@ class Host(object):
         for i in range(self.node_num):
             if self.htype == 'virt':
                 self.run_vms(i, exp=exp)
+                self.run_guest_proxy()
+                self.run_guest_benchmark(exp, i)
             else :
                 self.run_benchmark(num=i, exp=exp)
 
@@ -107,10 +111,10 @@ class Host(object):
         print("logging in. ("+ window_name + ")")
         pane.enter()
         pane.send_keys(suppress_history=False, cmd='tas')
-        time.sleep(2)
+        time.sleep(3)
         pane.send_keys(suppress_history=False, cmd='tas')
         pane.enter()
-        time.sleep(2)
+        time.sleep(3)
         pane.send_keys('tmux')
         time.sleep(5)
 
@@ -132,6 +136,7 @@ class Host(object):
         print("CMD : " + cmd)
         print("Server VM"+ window_name + " started.")
         time.sleep(20)
+
         self.login_vm(pane, window_name)
         pane.send_keys('tmux set-option remain-on-exit on')
        
@@ -145,37 +150,35 @@ class Host(object):
             pane.send_keys(cmd)
             time.sleep(2)
 
-        import pdb
-        pdb.set_trace()
-        """ Run TAS proxy """
-        if self.hstack == 'tas':
-            time.sleep(3)
-            Host.compile_and_run(
-                    pane=pane,
-                    comp_dir=self.node_config.guest_proxy_comp_dir,
-                    comp_cmd=self.node_config.guest_proxy_comp_cmd,
-                    exec_file=self.node_config.guest_proxy_exec_file,
-                    out_file=self.node_config.guest_proxy_out_file,
-                    args=' ',
-                    bg=True)
-            time.sleep(3)
-            print("  * VM TAS proxy : " + cmd)
-            time.sleep(10)
+        # """ Run TAS proxy """
+        # if self.hstack == 'tas':
+        #     time.sleep(3)
+        #     Host.compile_and_run(
+        #             pane=pane,
+        #             comp_dir=self.node_config.guest_proxy_comp_dir,
+        #             comp_cmd=self.node_config.guest_proxy_comp_cmd,
+        #             exec_file=self.node_config.guest_proxy_exec_file,
+        #             out_file=self.node_config.guest_proxy_out_file,
+        #             args=' ',
+        #             bg=True)
+        #     time.sleep(3)
+        #     print("  * VM TAS proxy : " + cmd)
+        #     time.sleep(10)
             
-            pane.send_keys('tmux new-window')
-
-
+            # print("")
+            # pane.send_keys('tmux new-window')
+ 
         # """ Run Benchmark """
         # if self.node_config.is_server:
-        #     benchmark_args = self.config.benchmark_server_args
+        #     benchmark_args = self.gen_config.benchmark_server_args
         # else:
-        #     benchmark_args = self.config.benchmark_client_args
+        #     benchmark_args = self.gen_config.benchmark_client_args
 
         # self.run_benchmark_rpc(
         #         pane = pane,
         #         stack = self.hstack,
         #         comp_dir = self.node_config.benchmark_comp_dir,
-        #         comp_cmd = ' ',
+        #         comp_cmd = self.node_config.benchmark_comp_cmd,
         #         lib_so = self.node_config.tas_lib_so,
         #         exec_file = self.node_config.benchmark_exec_file,
         #         out = self.node_config.benchmark_out + '_' + exp + '_' + str(num),
@@ -189,21 +192,72 @@ class Host(object):
         cmd = 'sudo '
         if stack == 'tas':
             cmd += 'LD_PRELOAD=' + lib_so + ' '
-        cmd += exec_file + ' ' +  args + ' | tee ' + out
+        cmd += exec_file + ' ' +  args # + ' | tee ' + out
         print(cmd) 
         pane.send_keys(cmd)
+
+    def run_guest_proxy(self):
+        pane = self.wmanager.add_new_pane(self.config.proxy_guest_pane,
+                self.config.is_remote)
+
+        pane.send_keys("ssh -p 2222 tas@localhost")
+        time.sleep(2)
+        pane.send_keys("tas")
+
+        """ Run TAS proxy """
+        if self.hstack == 'tas':
+            time.sleep(3)
+            Host.compile_and_run(
+                    pane=pane,
+                    comp_dir=self.node_config.guest_proxy_comp_dir,
+                    comp_cmd=self.node_config.guest_proxy_comp_cmd,
+                    exec_file=self.node_config.guest_proxy_exec_file,
+                    out_file=self.node_config.guest_proxy_out_file,
+                    args=' ',
+                    bg=False)
+            time.sleep(10)
+            
+    
+    def run_guest_benchmark(self, exp, num):
+        pane = self.wmanager.add_new_pane(self.config.benchmark_pane,
+                self.config.is_remote)
+
+        pane.send_keys("ssh -p 2222 tas@localhost")
+        time.sleep(2)
+        pane.send_keys("tas")
+        
+        """ Run Benchmark """
+        if self.node_config.is_server:
+            benchmark_args = self.gen_config.benchmark_server_args
+        else:
+            benchmark_args = self.gen_config.benchmark_client_args
+
+        self.run_benchmark_rpc(
+                pane = pane,
+                stack = self.hstack,
+                comp_dir = self.node_config.benchmark_comp_dir,
+                comp_cmd = self.node_config.benchmark_comp_cmd,
+                lib_so = self.node_config.tas_bench_lib_so,
+                exec_file = self.node_config.benchmark_exec_file,
+                out = self.node_config.benchmark_out + '_' + exp + '_' + str(num),
+                args=benchmark_args)
+
+        
+        import pdb
+        pdb.set_trace()
+
 
 
 class Server(Host):
 
     def __init__(self, wmanager, config):
-        Host.__init__(self, wmanager, config.server, config.snode, 
+        Host.__init__(self, wmanager, config, config.server, config.snode, 
             config.stype, config.sstack, config.snum)
 
 
 class Client(Host):
     def __init__(self, wmanager, config):
-        Host.__init__(self, wmanager, config.client, config.cnode, 
+        Host.__init__(self, wmanager, config, config.client, config.cnode, 
                 config.ctype, config.cstack, config.cnum)
         self.message_size = config.msize
         self.client_num = config.cnum
@@ -226,12 +280,14 @@ class WindowManager:
         self.window_names.append(config.client.proxy_pane)
         self.window_names.append(config.client.benchmark_pane)
         self.window_names.append(config.client.node_pane)
+        self.window_names.append(config.client.proxy_guest_pane)
 
         self.window_names.append(config.server.setup_pane)
         self.window_names.append(config.server.tas_pane)
         self.window_names.append(config.server.proxy_pane)
         self.window_names.append(config.server.benchmark_pane)
         self.window_names.append(config.server.node_pane)
+        self.window_names.append(config.server.proxy_guest_pane)
     
     def close_pane(self, name):
         wname  = self.config.pane_prefix + name

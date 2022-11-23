@@ -1,5 +1,5 @@
 class HostConfig:
-    def __init__(self, name, is_server, is_remote):
+    def __init__(self, name, is_server, is_remote, is_virt):
         # general configurations
         self.is_server = is_server
         self.is_remote = is_remote
@@ -21,20 +21,21 @@ class HostConfig:
         self.tas_server_out_file = self.output_dir + 'tas_s'
         self.tas_client_out_file = self.output_dir + 'tas_c'
         self.tas_out_file = ''
-        self.tas_lib_so = self.tas_comp_dir + 'tas/lib/libtas_interpose.so'
+        self.tas_lib_so = self.tas_comp_dir + 'lib/libtas_interpose.so'
         self.tas_args = ' --fp-cores-max=1' + \
             ' --cc=const-rate --cc-const-rate=0 --fp-no-ints' + \
             ' --fp-no-autoscale --dpdk-extra="-w3b:00.0" --fp-no-hugepages'
         if is_server:
-            self.tas_args = ' --ip-addr=192.168.10.13/24' + self.tas_args
+            self.tas_args = ' --ip-addr=192.168.10.14/24' + self.tas_args
             self.tas_out_file = self.tas_server_out_file
         else:
-            self.tas_args = ' --ip-addr=192.168.10.14/24' + self.tas_args
+            self.tas_args = ' --ip-addr=192.168.10.13/24' + self.tas_args
             self.tas_out_file = self.tas_client_out_file
 
         # general proxy configurations
         self.proxy_ivshm_socket_path = '/run/tasproxy'
         self.proxy_pane = name + '_proxy'
+        self.proxy_guest_pane = name + '_proxy_guest'
 
         # host proxy configurations
         self.host_proxy_comp_dir = self.project_dir
@@ -64,14 +65,27 @@ class HostConfig:
 
         # benchmark configurations
         self.benchmark_pane = 'benchmark_' + name
-        self.benchmark_comp_dir = self.project_dir + 'build/'
-        self.benchmark_comp_cmd = 'make echoserver_linux & make client_linux'
+        if (is_virt):
+            self.benchmark_comp_dir = '/home/tas/projects/benchmarks/micro_rpc/'
+        else:
+            self.benchmark_comp_dir = '/local/mstolet/projects/benchmarks/micro_rpc/'
+        self.benchmark_comp_cmd = 'make'
         self.benchmark_server_exec_file = self.benchmark_comp_dir + \
-            'benchmarks/micro_rpc/echoserver_linux'
-        self.benchmark_server_out = self.output_dir + 'rpc_s'
+            'echoserver_linux'
+        if (is_virt):
+            self.benchmark_server_out = self.vm_output_dir + 'rpc_s'
+        else:
+            self.benchmark_server_out = self.output_dir + 'rpc_s'
         self.benchmark_client_exec_file = self.benchmark_comp_dir + \
-            'benchmarks/micro_rpc/client_linux'
-        self.benchmark_client_out = self.output_dir + 'rpc_c'
+            'testclient_linux'
+        if (is_virt):
+            self.benchmark_client_out = self.vm_output_dir + 'rpc_c'
+        else:
+            self.benchmark_client_out = self.output_dir + 'rpc_c'
+        if (is_virt):
+            self.tas_bench_lib_so = self.vm_project_dir + 'lib/libtas_interpose.so'
+        else:
+            self.tas_bench_lib_so = self.tas_comp_dir + 'lib/libtas_interpose.so'
 
         self.benchmark_exec_file = ''
         self.benchmark_out = ''

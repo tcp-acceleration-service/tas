@@ -8,22 +8,26 @@ class Config:
         self.server = HostConfig(
             name='server',
             is_server=True,
-            is_remote=True)
+            is_remote=True,
+            is_virt=True)
 
         self.client = HostConfig(
             name='client',
             is_server=False,
-            is_remote=False)
+            is_remote=False,
+            is_virt=True)
 
         self.snode = HostConfig(
             name='node',
             is_server=True,
-            is_remote=False)
+            is_remote=False,
+            is_virt=True)
 
         self.cnode = HostConfig(
             name='node',
             is_server=False,
-            is_remote=False)
+            is_remote=False,
+            is_virt=True)
 
         self.stype = 'virt'
         self.sstack = 'linux'

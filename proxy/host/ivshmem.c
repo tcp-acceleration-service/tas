@@ -416,6 +416,7 @@ static int ivshmem_uxsocket_handle_msg(struct v_machine *vm)
         case MSG_TYPE_CONTEXT_REQ:
             ivshmem_handle_ctx_req(vm, msg);
             ivshmem_notify_guest(vm->ifd);
+            break;
         default:
             fprintf(stderr, "ivshmem_uxsocket_handle_msg: unknown message.\n");
     }
