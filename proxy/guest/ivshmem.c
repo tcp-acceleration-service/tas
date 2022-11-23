@@ -88,10 +88,18 @@ void ivshmem_notify_host(struct guest_proxy *pxy)
 
 /* Clears the interrupt status register. If register is not cleared
    we keep receiving interrupt events from epoll. */
-void ivshmem_drain_evfd(int fd)
+int ivshmem_drain_evfd(int fd) 
 {
+  int ret;
   uint8_t buf[8];
-  read(fd, buf, 8);
+  ret = read(fd, buf, 8);
+  if (ret < 8)
+  {
+    fprintf(stderr, "ivshmem_drain_evfd: failed to drain evfd.\n");
+    return -1;
+  }
+
+  return 0;
 }
 
 int ivshmem_setup(struct guest_proxy *pxy)
