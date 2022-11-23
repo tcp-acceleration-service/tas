@@ -39,6 +39,9 @@
 static int ksock_fd = -1;
 static int kernel_evfd = 0;
 
+static int flextcp_kernel_get_notifyfd(int cfd, uint32_t *num_fds);
+static int flextcp_kernel_get_shmfd(int cfd, int *shmfd);
+
 void flextcp_kernel_kick(void)
 {
   static uint64_t __thread last_ts = 0;
@@ -71,7 +74,6 @@ int flextcp_kernel_connect(int *shmfd)
   memset(&saun, 0, sizeof(saun));
   saun.sun_family = AF_UNIX;
   memcpy(saun.sun_path, KERNEL_SOCKET_PATH, sizeof(KERNEL_SOCKET_PATH));
-
   if ((fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) == -1) {
     perror("flextcp_kernel_connect: socket failed");
     return -1;
@@ -100,24 +102,17 @@ int flextcp_kernel_connect(int *shmfd)
     .msg_flags = 0,
   };
 
-  /* receive welcome message:
-   *   contains the fd for the kernel, the shared memory fd,
-       and the count of flexnic fds */
-  if ((r = recvmsg(fd, &msg, 0)) != sizeof(uint32_t)) {
-    fprintf(stderr, "flextcp_kernel_connect: recvmsg failed (%zd)\n", r);
-    abort();
+  if (flextcp_kernel_get_notifyfd(fd, &num_fds) != 0)
+  {
+    fprintf(stderr, "flextcp_kernel_connect: failed to receive notify fd.\n");
+    return -1;
   }
-
-  /* get kernel fd from welcome message */
-  cmsg = CMSG_FIRSTHDR(&msg);
-  pfd = (int *) CMSG_DATA(cmsg);
-  if (msg.msg_controllen <= 0 || cmsg->cmsg_len != CMSG_LEN(sizeof(int) * 2)) {
-    fprintf(stderr, "flextcp_kernel_connect: accessing ancillary data "
-        "failed\n");
-    abort();
+  
+  if (flextcp_kernel_get_shmfd(fd, shmfd) != 0)
+  {
+    fprintf(stderr, "flextcp_kernel_connect: failed to receive shm fd.\n");
+    return -1;
   }
-  kernel_evfd = pfd[0];
-  *shmfd = pfd[1];
 
   /* receive fast path fds in batches of 4 */
   off = 0;
@@ -152,7 +147,7 @@ int flextcp_kernel_connect(int *shmfd)
       flexnic_evfd[off++] = pfd[i];
     }
   }
-
+  
   ksock_fd = fd;
   return 0;
 }
@@ -291,6 +286,97 @@ int flextcp_kernel_reqscale(struct flextcp_context *ctx, uint32_t cores)
     pos = 0;
   }
   ctx->kin_head = pos;
+
+  return 0;
+}
+
+static int flextcp_kernel_get_notifyfd(int cfd, uint32_t *num_fds)
+{
+  ssize_t r;
+  struct cmsghdr *cmsg;
+  int *pfd;
+
+  struct iovec iov = {
+    .iov_base = num_fds,
+    .iov_len = sizeof(*num_fds),
+  };
+
+  union {
+    char buf[CMSG_SPACE(sizeof(int) * 1)];
+    struct cmsghdr align;
+  } u;
+
+  struct msghdr msg = {
+    .msg_name = NULL,
+    .msg_namelen = 0,
+    .msg_iov = &iov,
+    .msg_iovlen = 1,
+    .msg_control = u.buf,
+    .msg_controllen = sizeof(u.buf),
+    .msg_flags = 0,
+  };
+
+  if ((r = recvmsg(cfd, &msg, 0)) != sizeof(*num_fds))
+  {
+    fprintf(stderr, "flextcp_kernel_get_notifyfd: recvmsg failed.\n");
+    abort();
+  }
+
+  cmsg = CMSG_FIRSTHDR(&msg);
+  pfd = (int *) CMSG_DATA(cmsg);
+  if (msg.msg_controllen <= 0 || cmsg->cmsg_len != CMSG_LEN(sizeof(int) * 1))
+  {
+    fprintf(stderr, "flextcp_kernel_get_notifyfd: "
+         "accessing ancillary data failed.\n");
+    abort();
+  }
+  kernel_evfd = *pfd;
+
+  return 0;
+}
+
+static int flextcp_kernel_get_shmfd(int cfd, int *shmfd)
+{
+  uint8_t b;
+  ssize_t r;
+  struct cmsghdr *cmsg;
+  int *pfd;
+
+  struct iovec iov = {
+    .iov_base = &b,
+    .iov_len = sizeof(b),
+  };
+  
+  union {
+    char buf[CMSG_SPACE(sizeof(int) * 1)];
+    struct cmsghdr align;
+  } u;
+
+  struct msghdr msg = {
+    .msg_name = NULL,
+    .msg_namelen = 0,
+    .msg_iov = &iov,
+    .msg_iovlen = 1,
+    .msg_control = u.buf,
+    .msg_controllen = sizeof(u.buf),
+    .msg_flags = 0,
+  };
+
+  if ((r = recvmsg(cfd, &msg, 0)) != sizeof(b))
+  {
+    fprintf(stderr, "flextcp_kernel_get_shmfd: recvmsg failed.\n");
+    abort();
+  }
+
+  cmsg = CMSG_FIRSTHDR(&msg);
+  pfd = (int *) CMSG_DATA(cmsg);
+  if (msg.msg_controllen <= 0 || cmsg->cmsg_len != CMSG_LEN(sizeof(int) * 1))
+  {
+    fprintf(stderr, "flextcp_ketnel_get_shmfd: accessing ancillary data failed.\n");
+    abort();
+  }
+
+  *shmfd = *pfd;
 
   return 0;
 }

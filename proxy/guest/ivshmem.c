@@ -15,9 +15,10 @@
 int ivshmem_setup(struct guest_proxy *pxy);
 int ivshmem_handle_msg(struct guest_proxy * pxy);
 
-int ivshmem_handle_ctx_res(struct guest_proxy *pxy);
+int ivshmem_handle_ctx_res(struct guest_proxy *pxy, 
+    struct context_res_msg *msg);
 
-int ivshmem_handle_vpoke(struct guest_proxy *pxy);
+int ivshmem_handle_vpoke(struct guest_proxy *pxy, struct vpoke_msg *msg);
 
 int ivshmem_init(struct guest_proxy *pxy)
 {
@@ -105,7 +106,7 @@ int ivshmem_setup(struct guest_proxy *pxy)
   ret = channel_read(pxy->chan, &h_msg, sizeof(struct hello_msg));
   if (ret < sizeof(struct hello_msg))
   {
-    fprintf(stderr, "ivshmem_handshake: failed to get number of cores.\n");
+    fprintf(stderr, "ivshmem_setup: failed to get number of cores.\n");
     return -1;
   }
 
@@ -119,7 +120,7 @@ int ivshmem_setup(struct guest_proxy *pxy)
   ret = epoll_wait(pxy->epfd, evs, 1, -1);
   if (ret == 0)
   {
-    fprintf(stderr, "ivshmem_handshake: failed to receive"
+    fprintf(stderr, "ivshmem_setup: failed to receive "
         "tasinfo response.\n");
   }
   
@@ -128,13 +129,13 @@ int ivshmem_setup(struct guest_proxy *pxy)
       sizeof(struct tasinfo_res_msg));
   if (ret < sizeof(struct tasinfo_res_msg))
   {
-    fprintf(stderr, "ivshmem_handshake: failed to read tasinfo.\n");
+    fprintf(stderr, "ivshmem_setup: failed to read tasinfo.\n");
   }
   
   pxy->flexnic_info = malloc(FLEXNIC_INFO_BYTES);
   if (pxy->flexnic_info == NULL)
   {
-    fprintf(stderr, "ivshmem_handshake: failed to allocate flexnic_info.\n");
+    fprintf(stderr, "ivshmem_setup: failed to allocate flexnic_info.\n");
     return -1;
   }
 
@@ -143,6 +144,15 @@ int ivshmem_setup(struct guest_proxy *pxy)
   /* Set proper offset and size of memory region */
   pxy->flexnic_info->dma_mem_off = pxy->shm_off;
   pxy->flexnic_info->dma_mem_size = pxy->shm_size;
+  
+  /* Create shm region */
+  ret = vflextcp_serve_tasinfo((uint8_t *) pxy->flexnic_info, 
+      FLEXNIC_INFO_BYTES);
+  if (ret < 0)
+  {
+    fprintf(stderr, "ivshmem_setup: failed to create tas_info shm region.\n");
+    return -1; 
+  }
 
   return 0;
 }
@@ -167,10 +177,10 @@ int ivshmem_handle_msg(struct guest_proxy * pxy) {
   switch(msg_type)
   {
     case MSG_TYPE_CONTEXT_RES:
-      ivshmem_handle_ctx_res(pxy);
+      ivshmem_handle_ctx_res(pxy, (struct context_res_msg *) msg);
       break;
     case MSG_TYPE_VPOKE:
-      ivshmem_handle_vpoke(pxy);
+      ivshmem_handle_vpoke(pxy, (struct vpoke_msg *) msg);
       break;
     default:
       fprintf(stderr, "ivshmem_handle_msg: unknown message.\n");
@@ -179,39 +189,19 @@ int ivshmem_handle_msg(struct guest_proxy * pxy) {
   return 0;
 }
 
-int ivshmem_handle_ctx_res(struct guest_proxy *pxy)
+int ivshmem_handle_ctx_res(struct guest_proxy *pxy, struct context_res_msg *msg)
 {
-  int ret;
   uint32_t app_id;
 
-  struct context_res_msg msg;
-
-  ret = channel_read(pxy->chan, &msg, sizeof(struct context_res_msg));
-  if (ret < sizeof(struct context_res_msg))
-  {
-    fprintf(stderr, "ivshmem_handle_context_res: failed to read msg.\n");
-    return -1;
-  }
-
-  app_id = msg.app_id;
-  vflextcp_write_context_res(pxy, app_id, msg.resp, msg.resp_size);
+  app_id = msg->app_id;
+  vflextcp_write_context_res(pxy, app_id, msg->resp, msg->resp_size);
 
   return 0;
 }
 
-int ivshmem_handle_vpoke(struct guest_proxy *pxy)
+int ivshmem_handle_vpoke(struct guest_proxy *pxy, struct vpoke_msg *msg)
 {
-  int ret;
-  struct vpoke_msg msg;
-
-  ret = channel_read(pxy->chan, &msg, sizeof(struct vpoke_msg));
-  if (ret < sizeof(struct vpoke_msg))
-  {
-    fprintf(stderr, "ivshmem_handle_vpoke: failed to read channel.\n");
-    return -1;
-  }
-
-  vflextcp_poke(pxy, msg.vfd);
+  vflextcp_poke(pxy, msg->vfd);
 
   return 0;
 }

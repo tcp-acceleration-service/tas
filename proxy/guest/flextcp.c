@@ -3,10 +3,13 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/epoll.h>
+#include <sys/stat.h>
 #include <sys/eventfd.h>
 #include <assert.h>
 
 #include <tas_memif.h>
+#include <utils.h>
+#include <utils_shm.h>
 #include "internal.h"
 #include "ivshmem.h"
 #include "../proxy.h"
@@ -78,6 +81,28 @@ error_close_nfd:
   return -1;
 }
 
+int vflextcp_serve_tasinfo(uint8_t *info, ssize_t size)
+{
+  struct flexnic_info *pxy_tas_info = NULL;
+  umask(0);
+
+  /* create shm for tas_info */
+  pxy_tas_info = util_create_shmsiszed(FLEXNIC_NAME_INFO, FLEXNIC_INFO_BYTES,
+      NULL, NULL);
+
+  if (pxy_tas_info == NULL)
+  {
+    fprintf(stderr, "vflextcp_serve_tasinfo: "
+        "mapping tas_info in proxy failed.\n");
+    util_destroy_shm(FLEXNIC_NAME_INFO, FLEXNIC_INFO_BYTES, pxy_tas_info);
+    return -1;
+  }
+
+  memcpy(pxy_tas_info, info, size);
+
+  return 0;
+}
+
 int vflextcp_poll(struct guest_proxy *pxy) 
 {
   if (vflextcp_uxsocket_poll(pxy) != 0) 
@@ -110,9 +135,6 @@ static int vflextcp_uxsocket_init(struct guest_proxy *pxy)
   memset(&saun, 0, sizeof(saun));
   saun.sun_family = AF_UNIX;
   memcpy(saun.sun_path, KERNEL_SOCKET_PATH, sizeof(KERNEL_SOCKET_PATH));
-
-  /* Unlink deletes socket when program exits */
-  unlink(KERNEL_SOCKET_PATH);
 
   if (bind(fd, (struct sockaddr *) &saun, sizeof(saun))) 
   {
@@ -195,8 +217,8 @@ static int vflextcp_uxsocket_poll(struct guest_proxy *pxy)
   struct epoll_event evs[32];
   struct proxy_application *app;
 
-  n = epoll_wait(pxy->epfd, evs, 32, 0);
-
+  n = epoll_wait(pxy->flextcp_epfd, evs, 32, 0);
+  
   for (i = 0; i < n; i++) 
   {
     app = evs[i].data.ptr;
@@ -212,6 +234,7 @@ static int vflextcp_uxsocket_poll(struct guest_proxy *pxy)
       vflextcp_uxsocket_handle_msg(pxy, app);
     } 
   }
+  
   return 0;
 }
 
@@ -220,7 +243,7 @@ static int vflextcp_uxsocket_accept(struct guest_proxy *pxy)
   int cfd, n_cores;
   struct epoll_event ev;
   struct proxy_application *app;
-
+  
   if ((cfd  = accept(pxy->flextcp_uxfd, NULL, NULL)) < 0) 
   {
     fprintf(stderr, "vflextcp_uxsocket_accept: accept failed\n");

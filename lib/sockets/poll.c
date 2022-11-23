@@ -267,7 +267,7 @@ again:
       j++;
     }
   }
-
+ 
   return active_fds + mixed_events;
 }
 

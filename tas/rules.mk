@@ -21,7 +21,7 @@ $(TAS_OBJS): CFLAGS += $(TAS_CFLAGS)
 
 $(exec): LDFLAGS += $(DPDK_LDFLAGS)
 $(exec): LDLIBS += $(DPDK_LDLIBS) 
-$(exec): $(TAS_OBJS) $(LIB_UTILS_OBJS)
+$(exec): $(TAS_OBJS) $(LIB_UTILS_OBJS) $(LIB_TAS_OBJS)
 
 DEPS += $(TAS_OBJS:.o=.d)
 CLEAN += $(TAS_OBJS) $(exec)
