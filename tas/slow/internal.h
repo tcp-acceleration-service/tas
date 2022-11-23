@@ -809,3 +809,19 @@ unsigned kni_poll(void);
 /** @} */
 
 #endif // ndef INTERNAL_H_SLOW
+
+/** @} */
+
+/*****************************************************************************/
+/**
+ * @addtogroup tas-sp-appif_connect
+ * @brief App Interface Connect
+ * @ingroup tas-sp
+ *
+ * This is implemented in appif_connect.c
+ * @{ */
+
+
+/* Accept connection to app interface */
+int appif_connect_accept(int cfd, int cores_num, int kernel_notifyfd,
+    int *core_evfds, int shm_fd);

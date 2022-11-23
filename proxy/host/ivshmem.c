@@ -290,7 +290,7 @@ static int ivshmem_uxsocket_handle_newconn()
     {
         fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send "
                 "notify fd.\n");
-        goto close_ifd;
+        goto close_nfd;
         
     }
 

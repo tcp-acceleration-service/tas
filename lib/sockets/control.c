@@ -267,7 +267,6 @@ out:
 
 int tas_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
-  printf("tas_connect");
   struct socket *s;
   int ret = 0, block;
   struct sockaddr_in *sin = (struct sockaddr_in *) addr;

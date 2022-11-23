@@ -80,6 +80,8 @@ static int uxfd = -1;
 static int epfd = -1;
 /** eventfd for notifying UX thread about completion on poll_to_ux */
 static int notifyfd = -1;
+/** eventfd for different cores */
+static int *core_evfds = NULL;
 /** Completions of asynchronous NIC operations for UX socket thread */
 static struct nbqueue poll_to_ux;
 /** Queue to pass structs for new applications from UX to poll thread */
@@ -104,6 +106,17 @@ int appif_init(void)
 
   if (uxsocket_init()) {
     return -1;
+  }
+
+  if ((core_evfds = malloc(sizeof(int) * tas_info->cores_num)) == NULL) 
+  {
+    fprintf(stderr, "appif_init: failed to allocate memory for core evfds.\n");
+    return -1;
+  }
+
+  for (i = 0; i < tas_info->cores_num; i++) 
+  {
+    core_evfds[i] = ctxs[i]->evfd;
   }
 
   /* create freelist of doorbells (0 is used by kernel) */
@@ -285,13 +298,10 @@ static void *uxsocket_thread(void *arg)
 
 static void uxsocket_accept(void)
 {
-  int cfd, *pfd;
+  int cfd;
   struct application *app;
   struct epoll_event ev;
   size_t sz;
-  ssize_t tx;
-  uint32_t off, j, n;
-  uint8_t b = 0;
 
   /* new connection on unix socket */
   if ((cfd = accept(uxfd, NULL, NULL)) < 0) {
@@ -299,73 +309,79 @@ static void uxsocket_accept(void)
     return;
   }
 
-  struct iovec iov = {
-    .iov_base = &tas_info->cores_num,
-    .iov_len = sizeof(uint32_t),
-  };
-  union {
-    char buf[CMSG_SPACE(sizeof(int) * 4)];
-    struct cmsghdr align;
-  } u;
-  struct msghdr msg = {
-    .msg_name = NULL,
-    .msg_namelen = 0,
-    .msg_iov = &iov,
-    .msg_iovlen = 1,
-    .msg_control = u.buf,
-    .msg_controllen = sizeof(u.buf),
-    .msg_flags = 0,
-  };
-
-  struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
-  cmsg->cmsg_level = SOL_SOCKET;
-  cmsg->cmsg_type = SCM_RIGHTS;
-  cmsg->cmsg_len = CMSG_LEN(sizeof(int) * 2);
-
-  pfd = (int *) CMSG_DATA(cmsg);
-  pfd[0] = kernel_notifyfd;
-  pfd[1] = tas_shm_fd;
-
-  /* send out kernel notify fd */
-  if((tx = sendmsg(cfd, &msg, 0)) != sizeof(uint32_t)) {
-    fprintf(stderr, "tx == %zd\n", tx);
-    if(tx == -1) {
-      fprintf(stderr, "errno == %d\n", errno);
-    }
+  if (appif_connect_accept(cfd, tas_info->cores_num,
+      kernel_notifyfd, core_evfds, tas_shm_fd) != 0) {
+    fprintf(stderr, "uxsocket_accept: appif_connect_accept failed.\n");
+    return;
   }
 
-  /* send out fast path fds */
-  off = 0;
-  for (; off < tas_info->cores_num;) {
-    iov.iov_base = &b;
-    iov.iov_len = 1;
+  // struct iovec iov = {
+  //   .iov_base = &tas_info->cores_num,
+  //   .iov_len = sizeof(uint32_t),
+  // };
+  // union {
+  //   char buf[CMSG_SPACE(sizeof(int) * 4)];
+  //   struct cmsghdr align;
+  // } u;
+  // struct msghdr msg = {
+  //   .msg_name = NULL,
+  //   .msg_namelen = 0,
+  //   .msg_iov = &iov,
+  //   .msg_iovlen = 1,
+  //   .msg_control = u.buf,
+  //   .msg_controllen = sizeof(u.buf),
+  //   .msg_flags = 0,
+  // };
 
-    memset(&msg, 0, sizeof(msg));
-    msg.msg_iov = &iov;
-    msg.msg_iovlen = 1;
-    msg.msg_control = u.buf;
-    msg.msg_controllen = sizeof(u.buf);
+  // struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+  // cmsg->cmsg_level = SOL_SOCKET;
+  // cmsg->cmsg_type = SCM_RIGHTS;
+  // cmsg->cmsg_len = CMSG_LEN(sizeof(int) * 2);
 
-    n = (tas_info->cores_num - off >= 4 ? 4 : tas_info->cores_num - off);
+  // pfd = (int *) CMSG_DATA(cmsg);
+  // pfd[0] = kernel_notifyfd;
+  // pfd[1] = tas_shm_fd;
 
-    cmsg->cmsg_level = SOL_SOCKET;
-    cmsg->cmsg_type = SCM_RIGHTS;
-    cmsg->cmsg_len = CMSG_LEN(sizeof(int) * n);
+  // /* send out kernel notify fd */
+  // if((tx = sendmsg(cfd, &msg, 0)) != sizeof(uint32_t)) {
+  //   fprintf(stderr, "tx == %zd\n", tx);
+  //   if(tx == -1) {
+  //     fprintf(stderr, "errno == %d\n", errno);
+  //   }
+  // }
 
-    pfd = (int *) CMSG_DATA(cmsg);
-    for (j = 0; j < n; j++) {
-      pfd[j] = ctxs[off++]->evfd;
-    }
+  // /* send out fast path fds */
+  // off = 0;
+  // for (; off < tas_info->cores_num;) {
+  //   iov.iov_base = &b;
+  //   iov.iov_len = 1;
 
-    /* send out kernel notify fd */
-    if((tx = sendmsg(cfd, &msg, 0)) != 1) {
-      fprintf(stderr, "tx fd == %zd\n", tx);
-      if(tx == -1) {
-        fprintf(stderr, "errno fd == %d\n", errno);
-      }
-      abort();
-    }
-  }
+  //   memset(&msg, 0, sizeof(msg));
+  //   msg.msg_iov = &iov;
+  //   msg.msg_iovlen = 1;
+  //   msg.msg_control = u.buf;
+  //   msg.msg_controllen = sizeof(u.buf);
+
+  //   n = (tas_info->cores_num - off >= 4 ? 4 : tas_info->cores_num - off);
+
+  //   cmsg->cmsg_level = SOL_SOCKET;
+  //   cmsg->cmsg_type = SCM_RIGHTS;
+  //   cmsg->cmsg_len = CMSG_LEN(sizeof(int) * n);
+
+  //   pfd = (int *) CMSG_DATA(cmsg);
+  //   for (j = 0; j < n; j++) {
+  //     pfd[j] = ctxs[off++]->evfd;
+  //   }
+
+  //   /* send out kernel notify fd */
+  //   if((tx = sendmsg(cfd, &msg, 0)) != 1) {
+  //     fprintf(stderr, "tx fd == %zd\n", tx);
+  //     if(tx == -1) {
+  //       fprintf(stderr, "errno fd == %d\n", errno);
+  //     }
+  //     abort();
+  //   }
+  // }
 
   /* allocate application struct */
   if ((app = malloc(sizeof(*app))) == NULL) {
