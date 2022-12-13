@@ -18,6 +18,8 @@ struct channel * channel_init(void* tx_addr, void* rx_addr, uint64_t size)
     goto free_chan;
   }
 
+  /* Only init the tx channel, since the other side will
+     already have initialized the rx channel */
   tx_buf = shmring_init(tx_addr, CHAN_SIZE);
   if (tx_buf == NULL)
   {
@@ -32,8 +34,9 @@ struct channel * channel_init(void* tx_addr, void* rx_addr, uint64_t size)
     goto free_tx_buf;
   }
 
+  /* Only reset tx_ring since other side will have already
+     reset the rx_ring */
   shmring_reset(tx_buf, CHAN_SIZE);
-  shmring_reset(rx_buf, CHAN_SIZE);
 
   chan->tx = tx_buf;
   chan->rx = rx_buf; 

@@ -23,7 +23,9 @@ struct ring_buffer* shmring_init(void *base_addr, size_t size)
       return NULL;
     }
 
-    ring->buf_addr = base_addr;
+    ring->hdr_addr = base_addr;
+    ring->buf_addr = base_addr + sizeof(struct ring_header);
+    ring->size = size;
 
     return ring;
 }
@@ -31,10 +33,12 @@ struct ring_buffer* shmring_init(void *base_addr, size_t size)
 /* Resets read and write pos to zero and sets ring size to full */
 void shmring_reset(struct ring_buffer *ring, size_t size)
 {
-    ring->hdr.read_pos = 0;
-    ring->hdr.write_pos = 0;
-    ring->hdr.full = 0;
-    ring->hdr.ring_size = size;
+    struct ring_header *hdr = ring->hdr_addr;
+
+    hdr->read_pos = 0;
+    hdr->write_pos = 0;
+    hdr->full = 0;
+    hdr->ring_size = size - sizeof(struct ring_header);
 }
 
 /* Reads from ring and updates read pos */
@@ -43,7 +47,7 @@ size_t shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
   size_t ret, freesz;
   struct ring_header *hdr;
 
-  hdr = &rx_ring->hdr;
+  hdr = rx_ring->hdr_addr;
 
   /* Return error if there is not enough written bytes
      to read in the ring */
@@ -96,7 +100,7 @@ size_t shmring_pop_fragmented(struct ring_buffer *rx_ring,
 {
   size_t sz1, sz2;
   void *ret;
-  struct ring_header *hdr = &rx_ring->hdr;
+  struct ring_header *hdr = rx_ring->hdr_addr;
   
   /* Do first read on the ring */
   sz1 = hdr->ring_size - hdr->read_pos;
@@ -134,7 +138,7 @@ size_t shmring_read(struct ring_buffer *rx_ring, void *dst, size_t size)
   size_t ret, freesz;
   struct ring_header *hdr;
 
-  hdr = &rx_ring->hdr;
+  hdr = rx_ring->hdr_addr;
 
   /* Return error if there is not enough written bytes
      to read in the ring */
@@ -170,7 +174,7 @@ size_t shmring_read_fragmented(struct ring_buffer *rx_ring,
 {
   int sz1, sz2;
   void *ret;
-  struct ring_header *hdr = &rx_ring->hdr;
+  struct ring_header *hdr = rx_ring->hdr_addr;
   
   /* Do first read on the ring */
   sz1 = hdr->ring_size - hdr->read_pos;
@@ -199,7 +203,7 @@ size_t shmring_push(struct ring_buffer *tx_ring, void *src, size_t size)
   size_t ret, freesz;
   struct ring_header *hdr;
 
-  hdr = &tx_ring->hdr;
+  hdr = tx_ring->hdr_addr;
 
   /* Return error if there is not enough space in ring */
   freesz = shmring_get_freesz(tx_ring);
@@ -249,7 +253,7 @@ size_t shmring_push_fragmented(struct ring_buffer *tx_ring,
 {
   int sz1, sz2;
   void *ret;
-  struct ring_header *hdr = &tx_ring->hdr;
+  struct ring_header *hdr = tx_ring->hdr_addr;
 
   /* Do first write to the end of the ring */
   sz1 = hdr->ring_size - hdr->write_pos;
@@ -282,7 +286,7 @@ size_t shmring_push_fragmented(struct ring_buffer *tx_ring,
 
 size_t shmring_get_freesz(struct ring_buffer *ring)
 {
-  struct ring_header* hdr = &ring->hdr;
+  struct ring_header* hdr = ring->hdr_addr;
   int w_pos = hdr->write_pos;
   int r_pos = hdr->read_pos;
 

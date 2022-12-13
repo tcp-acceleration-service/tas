@@ -11,8 +11,9 @@ struct ring_header {
 };
 
 struct ring_buffer {
-  struct ring_header hdr;
+  struct ring_header *hdr_addr;
   void *buf_addr;
+  size_t size;
 };
 
 struct ring_buffer* shmring_init(void *base_addr, size_t size);
