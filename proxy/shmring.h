@@ -8,7 +8,7 @@ struct ring_header {
   int read_pos;
   int full;
   size_t ring_size;
-} __atribute__((packed));
+} __attribute__((packed));
 
 struct ring_buffer {
   struct ring_header *hdr_addr;
