@@ -37,11 +37,12 @@
 void dma_dump_stats(void);
 #endif
 
-static inline void dma_read(uintptr_t addr, size_t len, void *buf)
+static inline void dma_read(uintptr_t addr, size_t len, void *buf,
+    int vm_id)
 {
-  assert(addr + len >= addr && addr + len <= config.shm_len);
+  assert(addr + len >= addr && addr + len <= config.internal_shm_len);
 
-  rte_memcpy(buf, (uint8_t *) tas_shm + addr, len);
+  rte_memcpy(buf, (uint8_t *) vm_shm[vm_id] + addr, len);
 
 #ifdef FLEXNIC_TRACE_DMA
   struct flexnic_trace_entry_dma evt = {
@@ -53,11 +54,12 @@ static inline void dma_read(uintptr_t addr, size_t len, void *buf)
 #endif
 }
 
-static inline void dma_write(uintptr_t addr, size_t len, const void *buf)
+static inline void dma_write(uintptr_t addr, size_t len, const void *buf,
+    int vm_id)
 {
-  assert(addr + len >= addr && addr + len <= config.shm_len);
+  assert(addr + len >= addr && addr + len <= config.internal_shm_len);
 
-  rte_memcpy((uint8_t *) tas_shm + addr, buf, len);
+  rte_memcpy((uint8_t *) vm_shm[vm_id] + addr, buf, len);
 
 #ifdef FLEXNIC_TRACE_DMA
   struct flexnic_trace_entry_dma evt = {
@@ -69,12 +71,13 @@ static inline void dma_write(uintptr_t addr, size_t len, const void *buf)
 #endif
 }
 
-static inline void *dma_pointer(uintptr_t addr, size_t len)
+static inline void *dma_pointer(uintptr_t addr, size_t len,
+    int vm_id)
 {
   /* validate address */
-  assert(addr + len >= addr && addr + len <= config.shm_len);
+  assert(addr + len >= addr && addr + len <= config.internal_shm_len);
 
-  return (uint8_t *) tas_shm + addr;
+  return (uint8_t *) vm_shm[vm_id] + addr;
 }
 
 #endif /* ndef DMA_H_ */

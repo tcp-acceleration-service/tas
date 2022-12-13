@@ -35,8 +35,8 @@
 
 extern struct configuration config;
 
-extern void *tas_shm;
-extern int tas_shm_fd;
+extern void **vm_shm;
+extern int *vm_shm_fd;
 extern struct flextcp_pl_mem *fp_state;
 extern struct flexnic_info *tas_info;
 #if RTE_VER_YEAR < 19

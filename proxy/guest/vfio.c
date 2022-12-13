@@ -40,7 +40,7 @@ int vfio_init(struct guest_proxy *pxy)
 
   if (!ioctl(pxy->cont, VFIO_CHECK_EXTENSION, VFIO_NOIOMMU_IOMMU))
   {
-    fprintf(stderr, "vfio_init: noiommu driver not suppoer.\n");
+    fprintf(stderr, "vfio_init: noiommu driver not supported.\n");
     goto error_cont;
   }
 

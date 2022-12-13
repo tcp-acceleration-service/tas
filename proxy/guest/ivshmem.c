@@ -4,7 +4,6 @@
 #include <string.h>
 #include <sys/epoll.h>
 
-// #include "../../tas/lib/tas/internal.h"
 #include "internal.h"
 #include "vfio.h"
 #include "ivshmem.h"

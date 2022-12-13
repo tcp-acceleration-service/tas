@@ -48,6 +48,9 @@
 #define CONN_FLAG_TXEOS_ACK 4
 #define CONN_FLAG_RXEOS 8
 
+#define NIC_RXQ_LEN (64 * 32 * 1024)
+#define NIC_TXQ_LEN (64 * 8192)
+
 enum conn_state {
   CONN_CLOSED,
   CONN_OPEN_REQUESTED,
@@ -62,9 +65,15 @@ extern struct flexnic_info *flexnic_info;
 extern int flexnic_evfd[FLEXTCP_MAX_FTCPCORES];
 
 int flextcp_kernel_connect(int *shmfd);
+int flextcp_proxy_kernel_connect(int *shmfds, int *flexnic_evfd);
 int flextcp_kernel_newctx(struct flextcp_context *ctx,
     uint8_t *presp, ssize_t *presp_sz);
+int flextcp_proxy_kernel_newctx(struct flextcp_context *ctx,
+    uint8_t *presp, ssize_t *presp_sz, int vmid);
 void flextcp_kernel_kick(void);
+int flextcp_kernel_get_notifyfd(int cfd, uint32_t *num_fds,
+    int *k_evfd);
+int flextcp_kernel_get_shmfd(int cfd, int *shmfd);
 
 int flextcp_context_tx_alloc(struct flextcp_context *ctx,
     struct flextcp_pl_atx **atx, uint16_t core);

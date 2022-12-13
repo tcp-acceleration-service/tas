@@ -73,7 +73,7 @@ static int fastpath_poll_vec(struct flextcp_context *ctx, int num,
 static void conns_bump(struct flextcp_context *ctx) __attribute__((noinline));
 static void txq_probe(struct flextcp_context *ctx, unsigned n) __attribute__((noinline));
 
-int flextcp_init(void)
+int flextcp_init()
 {
   if ((flextcp_kernel_connect(&flexnic_shmfd)) < 0) 
   {
@@ -90,6 +90,7 @@ int flextcp_init(void)
 
   return 0;
 }
+
 
 int flextcp_context_create(struct flextcp_context *ctx,
     uint8_t *presp, ssize_t *presp_sz)

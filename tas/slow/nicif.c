@@ -50,8 +50,8 @@ struct flow_id_item {
   struct flow_id_item *next;
 };
 
-static int adminq_init(void);
-static int adminq_init_core(uint16_t core);
+static int adminq_init(uint16_t vmid);
+static int adminq_init_core(uint16_t core, uint16_t vmid);
 static inline int rxq_poll(void);
 static inline void process_packet(const void *buf, uint16_t len,
     uint32_t fn_core, uint16_t flow_group);
@@ -84,6 +84,7 @@ static uint32_t *txq_tail;
 
 int nicif_init(void)
 {
+  uint16_t i;
   rte_hash_crc_init_alg();
 
   /* wait for fastpath to be ready */
@@ -100,9 +101,11 @@ int nicif_init(void)
   /* prepare flow_id allocator */
   flow_id_alloc_init();
 
-  if (adminq_init()) {
-    fprintf(stderr, "nicif_init: initializing admin queue failed\n");
-    return -1;
+  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++) {
+    if (adminq_init(i)) {
+      fprintf(stderr, "nicif_init: initializing admin queue failed\n");
+      return -1;
+    }
   }
 
   return 0;
@@ -127,8 +130,9 @@ unsigned nicif_poll(void)
 }
 
 /** Register application context */
-int nicif_appctx_add(uint16_t appid, uint32_t db, uint64_t *rxq_base,
-    uint32_t rxq_len, uint64_t *txq_base, uint32_t txq_len, int evfd)
+int nicif_appctx_add(uint16_t appid, uint32_t db,
+    uint64_t *rxq_base,  uint32_t rxq_len, 
+    uint64_t *txq_base, uint32_t txq_len, int evfd)
 {
   struct flextcp_pl_appctx *actx;
   struct flextcp_pl_appst *ast = &fp_state->appst[appid];
@@ -179,6 +183,7 @@ int nicif_connection_add(uint32_t db, uint16_t app_id, uint64_t mac_remote,
     uint64_t app_opaque, uint32_t flags, uint32_t rate, uint32_t fn_core, 
     uint16_t flow_group, uint32_t *pf_id)
 {
+  printf("registering flow to TAS\n");
   struct flextcp_pl_flowst *fs;
   beui32_t lip = t_beui32(ip_local), rip = t_beui32(ip_remote);
   beui16_t lp = t_beui16(port_local), rp = t_beui16(port_remote);
@@ -245,6 +250,7 @@ int nicif_connection_add(uint32_t db, uint16_t app_id, uint64_t mac_remote,
       (d << FLEXNIC_PL_FLOWHTE_POSSHIFT) | f_id;
 
   *pf_id = f_id;
+  printf("registered flow to TAS\n");
   return 0;
 }
 
@@ -378,7 +384,7 @@ void nicif_tx_send(uint32_t opaque, int no_ts)
   notify_fastpath_core(0);
 }
 
-static int adminq_init(void)
+static int adminq_init(uint16_t vmid)
 {
   uint32_t i;
 
@@ -401,14 +407,14 @@ static int adminq_init(void)
   rxq_next = 0;
 
   for (i = 0; i < fn_cores; i++) {
-    if (adminq_init_core(i) != 0)
+    if (adminq_init_core(i, vmid) != 0)
       return -1;
   }
 
   return 0;
 }
 
-static int adminq_init_core(uint16_t core)
+static int adminq_init_core(uint16_t core, uint16_t vmid)
 {
   struct packetmem_handle *pm_bufs, *pm_rx, *pm_tx;
   uintptr_t off_bufs, off_rx, off_tx;
@@ -456,30 +462,31 @@ static int adminq_init_core(uint16_t core)
   }
 
   rxq_base[core] = (volatile struct flextcp_pl_krx *)
-      ((uint8_t *) tas_shm + off_rx);
+      ((uint8_t *) vm_shm[vmid] + off_rx);
   txq_base[core] = (volatile struct flextcp_pl_ktx *)
-      ((uint8_t *) tas_shm + off_tx);
+      ((uint8_t *) vm_shm[vmid] + off_tx);
 
   memset((void *) rxq_base[core], 0, sz_rx);
   memset((void *) txq_base[core], 0, sz_tx);
 
   for (i = 0; i < rxq_len; i++) {
     rxq_bufs[core][i].addr = off_bufs;
-    rxq_bufs[core][i].buf = (uint8_t *) tas_shm + off_bufs;
+    rxq_bufs[core][i].buf = (uint8_t *) vm_shm[vmid] + off_bufs;
     rxq_base[core][i].addr = off_bufs;
     off_bufs += PKTBUF_SIZE;
   }
   for (i = 0; i < txq_len; i++) {
     txq_bufs[core][i].addr = off_bufs;
-    txq_bufs[core][i].buf = (uint8_t *) tas_shm + off_bufs;
+    txq_bufs[core][i].buf = (uint8_t *) vm_shm[vmid] + off_bufs;
     off_bufs += PKTBUF_SIZE;
   }
 
-  fp_state->kctx[core].rx_base = off_rx;
-  fp_state->kctx[core].tx_base = off_tx;
+  printf("inside init core for core = %d and vm = %d\n", core, vmid);
+  fp_state->kctx[vmid][core].rx_base = off_rx;
+  fp_state->kctx[vmid][core].tx_base = off_tx;
   MEM_BARRIER();
-  fp_state->kctx[core].tx_len = sz_tx;
-  fp_state->kctx[core].rx_len = sz_rx;
+  fp_state->kctx[vmid][core].tx_len = sz_tx;
+  fp_state->kctx[vmid][core].rx_len = sz_rx;
   return 0;
 }
 
@@ -503,6 +510,7 @@ static inline int rxq_poll(void)
     return -1;
   }
 
+  printf("there is a rxq_poll entry\n");
   /* update tail */
   tail = tail + 1;
   if (tail == rxq_len) {
@@ -531,12 +539,14 @@ static inline int rxq_poll(void)
 static inline void process_packet(const void *buf, uint16_t len,
     uint32_t fn_core, uint16_t flow_group)
 {
+  printf("processing packet\n");
   const struct eth_hdr *eth = buf;
   const struct ip_hdr *ip = (struct ip_hdr *) (eth + 1);
   const struct tcp_hdr *tcp = (struct tcp_hdr *) (ip + 1);
   int to_kni = 1;
 
   if (f_beui16(eth->type) == ETH_TYPE_ARP) {
+    printf("arp packet\n");
     if (len < sizeof(struct pkt_arp)) {
       fprintf(stderr, "process_packet: short arp packet\n");
       return;
@@ -544,6 +554,7 @@ static inline void process_packet(const void *buf, uint16_t len,
 
     arp_packet(buf, len);
   } else if (f_beui16(eth->type) == ETH_TYPE_IP) {
+    printf("tcp packet\n");
     if (len < sizeof(*eth) + sizeof(*ip)) {
       fprintf(stderr, "process_packet: short ip packet\n");
       return;
@@ -561,6 +572,8 @@ static inline void process_packet(const void *buf, uint16_t len,
 
   if (to_kni)
     kni_packet(buf, len);
+
+  printf("finished processing packet\n");
 }
 
 static inline volatile struct flextcp_pl_ktx *ktx_try_alloc(uint32_t core,

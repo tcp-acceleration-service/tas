@@ -50,7 +50,11 @@ enum config_cc_algorithm {
 /** Struct containing the parsed configuration parameters */
 struct configuration {
   /* shared memory size */
-  uint64_t shm_len;
+  uint64_t internal_shm_len;
+  /** memory region size of vms */
+  uint64_t vm_shm_len;
+  /** data memory reserved offset for vms */
+  uint64_t vm_shm_off;
   /** Kernel nic receive queue length. */
   uint64_t nic_rx_len;
   /** Kernel nic transmit queue length. */

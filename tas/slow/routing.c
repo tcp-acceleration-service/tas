@@ -115,9 +115,11 @@ static inline uint32_t prefix_len_mask(uint8_t len)
 static inline struct routing_table_entry *resolve(uint32_t ip)
 {
   size_t i;
-
+  printf("resolve\n");
   for (i = 0; i < routing_table_len; i++) {
     if (routing_table[i].dest_ip == (ip & routing_table[i].dest_mask)) {
+      printf("i = %ld, ip = %x, mask = %x, next_hop = %x\n", i, 
+          routing_table[i].dest_ip, routing_table[i].dest_mask, routing_table[i].next_hop);
       return &routing_table[i];
     }
   }

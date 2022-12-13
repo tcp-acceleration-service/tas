@@ -94,7 +94,7 @@ void fast_flows_qman_pfbufs(struct dataplane_context *ctx, uint32_t *queues,
 
   for (i = 0; i < n; i++) {
     fs = &fp_state->flowst[queues[i]];
-    p = dma_pointer(fs->tx_base + fs->tx_next_pos, 1);
+    p = dma_pointer(fs->tx_base + fs->tx_next_pos, 1, fs->vm_id);
     rte_prefetch0(p);
     rte_prefetch0(p + 64);
   }
@@ -270,7 +270,7 @@ void fast_flows_packet_pfbufs(struct dataplane_context *ctx,
 
     fs = fss[i];
     rx_base = fs->rx_base_sp & FLEXNIC_PL_FLOWST_RX_MASK;
-    p = dma_pointer(rx_base + fs->rx_next_pos, 1);
+    p = dma_pointer(rx_base + fs->rx_next_pos, 1, fs->vm_id);
     rte_prefetch0(p);
   }
 }
@@ -613,7 +613,7 @@ unlock:
     trace_event(FLEXNIC_PL_TREV_ARX, sizeof(te_arx), &te_arx);
 #endif
 
-    arx_cache_add(ctx, fs->db_id, fs->app_id, fs->opaque, rx_bump, rx_pos, tx_bump, type);
+    arx_cache_add(ctx, fs->db_id, fs->vm_id, fs->opaque, rx_bump, rx_pos, tx_bump, type);
   }
 
   /* Flow control: More receiver space? -> might need to start sending */
@@ -838,11 +838,11 @@ static void flow_tx_read(struct flextcp_pl_flowst *fs, uint32_t pos,
   uint32_t part;
 
   if (LIKELY(pos + len <= fs->tx_len)) {
-    dma_read(fs->tx_base + pos, len, dst);
+    dma_read(fs->tx_base + pos, len, dst, fs->vm_id);
   } else {
     part = fs->tx_len - pos;
-    dma_read(fs->tx_base + pos, part, dst);
-    dma_read(fs->tx_base, len - part, (uint8_t *) dst + part);
+    dma_read(fs->tx_base + pos, part, dst, fs->vm_id);
+    dma_read(fs->tx_base, len - part, (uint8_t *) dst + part, fs->vm_id);
   }
 }
 
@@ -854,11 +854,11 @@ static void flow_rx_write(struct flextcp_pl_flowst *fs, uint32_t pos,
   uint64_t rx_base = fs->rx_base_sp & FLEXNIC_PL_FLOWST_RX_MASK;
 
   if (LIKELY(pos + len <= fs->rx_len)) {
-    dma_write(rx_base + pos, len, src);
+    dma_write(rx_base + pos, len, src, fs->vm_id);
   } else {
     part = fs->rx_len - pos;
-    dma_write(rx_base + pos, part, src);
-    dma_write(rx_base, len - part, (const uint8_t *) src + part);
+    dma_write(rx_base + pos, part, src, fs->vm_id);
+    dma_write(rx_base, len - part, (const uint8_t *) src + part, fs->vm_id);
   }
 }
 

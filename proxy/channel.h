@@ -9,7 +9,7 @@
 #include "../include/tas_memif.h"
 
 #define CHAN_OFFSET 0x1000
-#define CHAN_SIZE 0x2000
+#define CHAN_SIZE 0x1001
 
 #define MSG_TYPE_HELLO 1
 #define MSG_TYPE_TASINFO_REQ 2

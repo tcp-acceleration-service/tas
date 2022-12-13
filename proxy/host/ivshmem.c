@@ -9,9 +9,10 @@
 #include <sys/un.h>
 #include <errno.h>
 
+#include <tas_pxy.h>
 #include "../proxy.h"
 #include "../channel.h"
-#include "../../lib/tas/internal.h"
+// #include "../../lib/tas/internal.h"
 #include "ivshmem.h"
 
 /* Epoll that subscribes to:
@@ -33,7 +34,7 @@ static int ivshmem_notify_guest(int fd);
 static int ivshmem_uxsocket_init();
 static int ivshmem_uxsocket_poll();
 
-static int ivshmem_uxsocket_handle_newconn();
+static int ivshmem_uxsocket_accept();
 static int ivshmem_uxsocket_handle_notif();
 static int ivshmem_uxsocket_handle_error();
 static int ivshmem_uxsocket_handle_msg();
@@ -208,7 +209,7 @@ static int ivshmem_uxsocket_poll()
         ev = evs[i];
         if (ev.data.ptr == EP_LISTEN)
         {
-            ivshmem_uxsocket_handle_newconn();
+            ivshmem_uxsocket_accept();
         }
         else if (ev.data.ptr == EP_NOTIFY)
         {
@@ -231,7 +232,7 @@ static int ivshmem_uxsocket_poll()
 
 /* Accepts connection when a qemu vm starts and uses the
    uxsocket to set up the shared memory region */
-static int ivshmem_uxsocket_handle_newconn()
+static int ivshmem_uxsocket_accept()
 {   
     int ret;
     int cfd, ifd, nfd;
@@ -246,14 +247,14 @@ static int ivshmem_uxsocket_handle_newconn()
     /* Return error if max number of VMs has been reached */
     if (next_id > MAX_VMS)
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: max vms reached.\n");
+        fprintf(stderr, "ivshmem_uxsocket_accept: max vms reached.\n");
         return -1;
     }
 
     /* Accept connection from qemu ivshmem */
     if ((cfd = accept(uxfd, NULL, NULL)) < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: accept failed.\n");
+        fprintf(stderr, "ivshmem_uxsocket_accept: accept failed.\n");
         return -1;
     }
 
@@ -261,7 +262,7 @@ static int ivshmem_uxsocket_handle_newconn()
     ret = ivshmem_uxsocket_send_int(cfd, version);
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send "
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
                 "protocol version.\n");
         goto close_cfd;
     }
@@ -270,15 +271,15 @@ static int ivshmem_uxsocket_handle_newconn()
     ret = ivshmem_uxsocket_send_int(cfd, next_id);
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send vm id.\n");
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send vm id.\n");
         goto close_cfd;
     }
 
     /* Send shared memory fd to qemu */
-    ret = ivshmem_uxsocket_sendfd(cfd, flexnic_shmfd, -1);
+    ret = ivshmem_uxsocket_sendfd(cfd, flexnic_shmfds_pxy[next_id], -1);
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send shm fd.\n");
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send shm fd.\n");
         goto close_cfd;
     }
 
@@ -295,7 +296,7 @@ static int ivshmem_uxsocket_handle_newconn()
     ret = ivshmem_uxsocket_sendfd(cfd, nfd, hostid);
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send "
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
                 "notify fd.\n");
         goto close_nfd;
         
@@ -304,7 +305,7 @@ static int ivshmem_uxsocket_handle_newconn()
     /* Create and send fd so that host can interrupt vm */
     if ((ifd = eventfd(0, EFD_NONBLOCK)) < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to create "
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to create "
                 "interrupt fd.\n");
         goto close_nfd;
     }
@@ -312,7 +313,7 @@ static int ivshmem_uxsocket_handle_newconn()
     ret = ivshmem_uxsocket_sendfd(cfd, ifd, next_id);
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send "
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
                 "interrupt fd.\n");
         goto close_ifd;
     }
@@ -320,7 +321,7 @@ static int ivshmem_uxsocket_handle_newconn()
     /* Add connection fd to the epoll interest list */
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &ev) < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to add "
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
                 "cfd to epfd.\n");
         goto close_ifd;
     }
@@ -330,30 +331,29 @@ static int ivshmem_uxsocket_handle_newconn()
     ev.data.ptr = &vms[next_id];
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, nfd, &ev) < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to add "
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
                 "nfd to epfd.\n");
         goto close_ifd;
     }
 
     /* Init channel in shared memory */
-    tx_addr = flexnic_mem + CHAN_OFFSET + (next_id * CHAN_SIZE * 2)
-            + CHAN_SIZE;
-    rx_addr = flexnic_mem + CHAN_OFFSET + (next_id * CHAN_SIZE * 2);
+    tx_addr = flexnic_mem_pxy[next_id] + CHAN_OFFSET + CHAN_SIZE;
+    rx_addr = flexnic_mem_pxy[next_id] + CHAN_OFFSET;
     chan = channel_init(tx_addr, rx_addr, CHAN_SIZE);
     if (chan == NULL)
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to init chan.\n");
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to init chan.\n");
         goto close_ifd;
     }
 
     /* Write number of cores to channel for guest proxy to receive */
     h_msg.msg_type = MSG_TYPE_HELLO;
-    h_msg.n_cores = flexnic_info->cores_num;
+    h_msg.n_cores = flexnic_info_pxy->cores_num;
 
     ret = channel_write(chan, &h_msg, sizeof(struct hello_msg));
     if (ret < 0)
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_newconn: failed to send number "
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to send number "
                 "of cores to guest.\n");
         goto close_ifd;
     }
@@ -362,6 +362,7 @@ static int ivshmem_uxsocket_handle_newconn()
     vms[next_id].nfd = nfd;
     vms[next_id].id = next_id;
     vms[next_id].chan = chan;
+    printf("ivshmem_uxsocket_accept: chan = %p\n", vms[next_id].chan);
     fprintf(stdout, "Connected VM=%d\n", next_id);
     
     next_id++;
@@ -447,7 +448,7 @@ static int ivshmem_handle_tasinforeq_msg(struct v_machine *vm)
     }
 
     msg->msg_type = MSG_TYPE_TASINFO_RES;
-    if (memcpy(msg->flexnic_info, flexnic_info, FLEXNIC_INFO_BYTES) == NULL)
+    if (memcpy(msg->flexnic_info, flexnic_info_pxy, FLEXNIC_INFO_BYTES) == NULL)
     {
         fprintf(stderr, "ivshmem_handle_tasinforeq_msg: "
                 "failed to cpy flexnic_info to msg.\n");
@@ -561,7 +562,7 @@ static int ivshmem_ctxs_poll()
     n = epoll_wait(ctx_epfd, evs, 32, 0);
     if (n < 0) 
     {
-        fprintf(stderr, "ivshmem_poll: epoll_wait failed");
+        fprintf(stderr, "ivshmem_ctxs_poll: epoll_wait failed");
         if (errno == EINTR) 
         {
             return -1; 
@@ -578,6 +579,8 @@ static int ivshmem_ctxs_poll()
             
             msg.msg_type = MSG_TYPE_VPOKE;
             msg.vfd = vctx->vfd;
+            printf("the segfault write\n");
+            printf("ivshmem_ctxs_poll: chan = %p\n", vctx->vm->chan);
             ret = channel_write(vctx->vm->chan, &msg, sizeof(struct vpoke_msg));
             if (ret < sizeof(struct vpoke_msg))
             {
@@ -612,7 +615,8 @@ static int ivshmem_handle_ctx_req(struct v_machine *vm,
     return -1;
   }
 
-  if (flextcp_context_create(ctx, res_msg.resp, &res_msg.resp_size) == -1) 
+  if (flextcp_proxy_context_create(ctx, res_msg.resp, 
+        &res_msg.resp_size, vm->id) == -1) 
   {
     fprintf(stderr, "ivshmem_handle_ctxreq: "
             "failed to create context request.");
@@ -637,11 +641,15 @@ static int ivshmem_handle_ctx_req(struct v_machine *vm,
   vctx->vm = vm;
   vm->ctxs = vctx;
 
+  printf("ivshmem_handle_ctxreq: chan = %p\n", vm->chan);
+
   res_msg.msg_type = MSG_TYPE_CONTEXT_RES,
   res_msg.vfd = msg->vfd,
   res_msg.app_id = msg->app_id,
 
+  printf("ivshmem_handle_ctxreq: about to write to channel\n");
   ret = channel_write(vm->chan, &res_msg, sizeof(struct context_res_msg));
+  printf("ivshmem_handle_ctxreq: wrote to channel\n");
   if (ret < sizeof(struct context_res_msg))
   {
     fprintf(stderr, "ivshmem_handle_ctxreq: failed to send ctx res.\n");

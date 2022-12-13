@@ -70,10 +70,10 @@ void fast_appctx_poll_pf_all(struct dataplane_context *ctx)
 }
 
 static void fast_appctx_poll_pf(struct dataplane_context *ctx, uint32_t cid, 
-    uint16_t aid)
+    uint16_t vmid)
 {
-  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][aid][cid];
-  rte_prefetch0(dma_pointer(actx->tx_base + actx->tx_head, 1));
+  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][vmid][cid];
+  rte_prefetch0(dma_pointer(actx->tx_base + actx->tx_head, 1, vmid));
 }
 
 int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
@@ -182,9 +182,9 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
 }
 
 static int fast_appctx_poll_fetch(struct dataplane_context *ctx, uint32_t actx_id,
-    uint16_t app_id, void **pqe)
+    uint16_t vm_id, void **pqe)
 {
-  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][app_id][actx_id];
+  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][vm_id][actx_id];
   struct flextcp_pl_atx *atx;
   uint8_t type;
   uint32_t flow_id  = -1;
@@ -193,7 +193,7 @@ static int fast_appctx_poll_fetch(struct dataplane_context *ctx, uint32_t actx_i
   if (actx->tx_len == 0)
     return -1;
 
-  atx = dma_pointer(actx->tx_base + actx->tx_head, sizeof(*atx));
+  atx = dma_pointer(actx->tx_base + actx->tx_head, sizeof(*atx), vm_id);
 
   type = atx->type;
   MEM_BARRIER();
@@ -246,15 +246,14 @@ int fast_appctx_poll_bump(struct dataplane_context *ctx, void *pqe,
 }
 
 void fast_actx_rxq_pf(struct dataplane_context *ctx,
-    struct flextcp_pl_appctx *actx)
+    struct flextcp_pl_appctx *actx, uint16_t vmid)
 {
-
   rte_prefetch0(dma_pointer(actx->rx_base + actx->rx_head,
-        sizeof(struct flextcp_pl_arx)));
+        sizeof(struct flextcp_pl_arx), vmid));
 }
 
 int fast_actx_rxq_alloc(struct dataplane_context *ctx,
-    struct flextcp_pl_appctx *actx, struct flextcp_pl_arx **arx)
+    struct flextcp_pl_appctx *actx, struct flextcp_pl_arx **arx, uint16_t vmid)
 {
   struct flextcp_pl_arx *parx;
   uint32_t rxnhead;
@@ -265,7 +264,7 @@ int fast_actx_rxq_alloc(struct dataplane_context *ctx,
   }
 
   MEM_BARRIER();
-  parx = dma_pointer(actx->rx_base + actx->rx_head, sizeof(*parx));
+  parx = dma_pointer(actx->rx_base + actx->rx_head, sizeof(*parx), vmid);
 
   rxnhead = actx->rx_head + sizeof(*parx);
   if (rxnhead >= actx->rx_len) {
@@ -279,9 +278,9 @@ int fast_actx_rxq_alloc(struct dataplane_context *ctx,
 }
 
 static int fast_actx_rxq_probe(struct dataplane_context *ctx, uint32_t cid,
-    uint16_t aid)
+    uint16_t vmid)
 {
-  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][aid][cid];
+  struct flextcp_pl_appctx *actx = &fp_state->appctx[ctx->id][vmid][cid];
   struct flextcp_pl_arx *parx;
   uint32_t pos, i;
 
@@ -295,7 +294,7 @@ static int fast_actx_rxq_probe(struct dataplane_context *ctx, uint32_t cid,
 
   i = 0;
   while (actx->rx_avail < actx->rx_len && i < 2 * BATCH_SIZE) {
-    parx = dma_pointer(actx->rx_base + pos, sizeof(*parx));
+    parx = dma_pointer(actx->rx_base + pos, sizeof(*parx), vmid);
 
     if (parx->type != 0) {
       break;

@@ -71,8 +71,8 @@ void appif_conn_opened(struct connection *c, int status)
   kout->data.conn_opened.opaque = c->opaque;
   kout->data.conn_opened.status = status;
   if (status == 0) {
-    kout->data.conn_opened.rx_off = c->rx_buf - (uint8_t *) tas_shm;
-    kout->data.conn_opened.tx_off = c->tx_buf - (uint8_t *) tas_shm;
+    kout->data.conn_opened.rx_off = c->rx_buf - (uint8_t *) vm_shm[ctx->app->vm_id];
+    kout->data.conn_opened.tx_off = c->tx_buf - (uint8_t *) vm_shm[ctx->app->vm_id];
     kout->data.conn_opened.rx_len = c->rx_len;
     kout->data.conn_opened.tx_len = c->tx_len;
 
@@ -188,8 +188,8 @@ void appif_accept_conn(struct connection *c, int status)
   kout->data.accept_connection.opaque = c->opaque;
   kout->data.accept_connection.status = status;
   if (status == 0) {
-    kout->data.accept_connection.rx_off = c->rx_buf - (uint8_t *) tas_shm;
-    kout->data.accept_connection.tx_off = c->tx_buf - (uint8_t *) tas_shm;
+    kout->data.accept_connection.rx_off = c->rx_buf - (uint8_t *) vm_shm[app->vm_id];
+    kout->data.accept_connection.tx_off = c->tx_buf - (uint8_t *) vm_shm[app->vm_id];
     kout->data.accept_connection.rx_len = c->rx_len;
     kout->data.accept_connection.tx_len = c->tx_len;
 
@@ -246,7 +246,9 @@ unsigned appif_ctx_poll(struct application *app, struct app_context *ctx)
 
     case KERNEL_APPOUT_CONN_OPEN:
       /* connection request */
+      printf("got a request to open connection\n");
       kout_inc += kin_conn_open(app, ctx, kin, kout);
+      printf("processed request to open connection\n");
       break;
 
     case KERNEL_APPOUT_CONN_MOVE:

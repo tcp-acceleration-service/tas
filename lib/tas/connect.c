@@ -39,8 +39,39 @@
 static void *map_region(const char *name, size_t len, int fd, off_t off);
 static void *map_region_huge(const char *name, size_t len, int fd, off_t off)
     __attribute__((used));
+static int flexnic_driver_connect_sing(struct flexnic_info **p_info, void **p_mem_start,
+    int shmfd, int vmid);
 
 static struct flexnic_info *info = NULL;
+
+int flexnic_driver_connect_mult(struct flexnic_info **p_info, void **p_mem_start,
+    int shmfd[])
+{
+  int vmid;
+  int err_ret = -1;
+
+  /* return error, if already connected */
+  if (info != NULL) {
+    fprintf(stderr, "flexnic_driver_connect: already connected\n");
+    return -1;
+  }
+
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
+  {
+    printf("vm=%d\n", vmid);
+    err_ret = flexnic_driver_connect_sing(p_info, 
+        &p_mem_start[vmid], shmfd[vmid], vmid);
+    
+    if (err_ret < 0)
+    {
+      fprintf(stderr, "flexnic_driver_connect_mult: driver connect for "
+          "vm = %d failed.\n", vmid);
+      return err_ret;
+    }
+  }
+
+  return err_ret;
+}
 
 int flexnic_driver_connect(struct flexnic_info **p_info, void **p_mem_start,
     int shmfd)
@@ -83,6 +114,7 @@ int flexnic_driver_connect(struct flexnic_info **p_info, void **p_mem_start,
 
   *p_info = info = (struct flexnic_info *) fi;
   *p_mem_start = m;
+  printf("inside = %p\n", m);
   return 0;
 
 error_unmap_info:
@@ -115,6 +147,57 @@ int flexnic_driver_internal(void **int_mem_start)
 
   *int_mem_start = m;
   return 0;
+}
+
+
+static int flexnic_driver_connect_sing(struct flexnic_info **p_info, void **p_mem_start,
+    int shmfd, int vmid)
+{
+  void *m;
+  volatile struct flexnic_info *fi;
+  int err_ret = -1;
+
+  /* open and map flexnic info shm region */
+  if ((m = map_region(FLEXNIC_NAME_INFO, FLEXNIC_INFO_BYTES, -1, 0)) == NULL) {
+    perror("flexnic_driver_connect: map_region info failed");
+    goto error_exit;
+  }
+
+  /* abort if not ready yet */
+  fi = (volatile struct flexnic_info *) m;
+  if ((fi->flags & FLEXNIC_FLAG_READY) != FLEXNIC_FLAG_READY) {
+    err_ret = 1;
+    goto error_unmap_info;
+  }
+
+  /* open and map dma shm region */
+  if ((fi->flags & FLEXNIC_FLAG_HUGEPAGES) == FLEXNIC_FLAG_HUGEPAGES) {
+    char name[40];
+    snprintf(name, sizeof(name), "%s/%s-vm%d", 
+        FLEXNIC_HUGE_PREFIX, FLEXNIC_NAME_DMA_MEM, vmid);
+    m = map_region_huge(name, fi->dma_mem_size, 
+        shmfd, fi->dma_mem_off);
+  } else {
+    char name[30];
+    snprintf(name, sizeof(name), "%s-vm%d", 
+        FLEXNIC_NAME_DMA_MEM, vmid);
+    m = map_region(name, fi->dma_mem_size, 
+        shmfd, fi->dma_mem_off);
+  }
+  if (m == NULL) {
+    perror("flexnic_driver_connect: mapping dma memory failed");
+    goto error_unmap_info;
+  }
+
+  *p_info = info = (struct flexnic_info *) fi;
+  *p_mem_start = m;
+  printf("inside = %p\n", m);
+  return 0;
+
+error_unmap_info:
+  munmap(m, FLEXNIC_INFO_BYTES);
+error_exit:
+  return err_ret;
 }
 
 static void *map_region(const char *name, size_t len, int fd, off_t off)

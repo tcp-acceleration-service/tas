@@ -77,7 +77,7 @@ struct tcp_opts {
 static int conn_arp_done(struct connection *conn);
 static void conn_packet(struct connection *c, const struct pkt_tcp *p,
     const struct tcp_opts *opts, uint32_t fn_core, uint16_t flow_group);
-static inline struct connection *conn_alloc(void);
+static inline struct connection *conn_alloc(int vmid);
 static inline void conn_free(struct connection *conn);
 static void conn_register(struct connection *conn);
 static void conn_unregister(struct connection *conn);
@@ -148,12 +148,13 @@ void tcp_poll(void)
 int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
     uint16_t remote_port, uint32_t db_id, struct connection **pconn)
 {
+  printf("tcp_open\n");
   int ret;
   struct connection *conn;
   uint16_t local_port;
 
   /* allocate connection struct */
-  if ((conn = conn_alloc()) == NULL) {
+  if ((conn = conn_alloc(ctx->app->vm_id)) == NULL) {
     fprintf(stderr, "tcp_open: malloc failed\n");
     return -1;
   }
@@ -187,19 +188,25 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
 
 
   /* resolve IP to mac */
+  printf("resolving ip to mac\n");
   ret = routing_resolve(&conn->comp, remote_ip, &conn->remote_mac);
+  printf("resolved ip to mac\n");
   if (ret < 0) {
     fprintf(stderr, "tcp_open: nicif_arp failed\n");
     conn_free(conn);
     return -1;
   } else if (ret == 0) {
+    printf("routing_resolve succeeded immediately\n");
     CONN_DEBUG0(conn, "routing_resolve succeeded immediately\n");
     conn_register(conn);
+    printf("registered connection\n");
 
     ret = conn_arp_done(conn);
   } else {
     CONN_DEBUG0(conn, "routing_resolve pending\n");
+    printf("routing resolve pending\n");
     conn_register(conn);
+    printf("registered connection\n");
     ret = 0;
   }
 
@@ -326,7 +333,7 @@ int tcp_accept(struct app_context *ctx, uint64_t opaque,
   struct connection *conn;
 
   /* allocate listener struct */
-  if ((conn = conn_alloc()) == NULL) {
+  if ((conn = conn_alloc(ctx->app->vm_id)) == NULL) {
     fprintf(stderr, "tcp_accept: conn_alloc failed\n");
     return -1;
   }
@@ -357,6 +364,8 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
   struct tcp_opts opts;
   int ret = 0;
 
+  printf("tcp_packet\n");
+
   if (len < sizeof(*p)) {
     fprintf(stderr, "tcp_packet: incomplete TCP receive (%u received, "
         "%u expected)\n", len, (unsigned) sizeof(*p));
@@ -375,7 +384,9 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
   }
 
   if ((c = conn_lookup(p)) != NULL) {
+    printf("received tcp connection packet\n");
     conn_packet(c, p, &opts, fn_core, flow_group);
+    printf("processed tcp connection packet \n");
   } else if ((l = listener_lookup(p)) != NULL) {
     listener_packet(l, p, &opts, fn_core, flow_group);
   } else {
@@ -473,14 +484,17 @@ static void conn_packet(struct connection *c, const struct pkt_tcp *p,
 {
   int ret;
   uint32_t ecn_flags = 0;
+  printf("conn_packet\n");
 
   if (c->status == CONN_SYN_SENT) {
     /* hopefully a SYN-ACK received */
     c->fn_core = fn_core;
     c->flow_group = flow_group;
+    printf("about to send conn SYN packet\n");
     if ((ret = conn_syn_sent_packet(c, p, opts)) != 0) {
       conn_failed(c, ret);
     }
+    printf("sent conn SYN packet\n");
   } else if (c->status == CONN_OPEN &&
       (TCPH_FLAGS(&p->tcp) & ~ecn_flags) == TCP_SYN)
   {
@@ -537,6 +551,8 @@ static int conn_arp_done(struct connection *conn)
 static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
     const struct tcp_opts *opts)
 {
+  printf("conn_syn_sent_packet\n");
+  int vmid = c->ctx->app->vm_id;
   uint32_t ecn_flags = TCPH_FLAGS(&p->tcp) & (TCP_ECE | TCP_CWR);
 
   /* dis-arm timeout */
@@ -570,8 +586,8 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
   c->comp.status = 0;
 
   if (nicif_connection_add(c->db_id, c->ctx->app->id, c->remote_mac, c->local_ip, c->local_port,
-        c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) tas_shm,
-        c->rx_len, c->tx_buf - (uint8_t *) tas_shm, c->tx_len,
+        c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) vm_shm[vmid],
+        c->rx_len, c->tx_buf - (uint8_t *) vm_shm[vmid], c->tx_len,
         c->remote_seq, c->local_seq, c->opaque, c->flags, c->cc_rate,
         c->fn_core, c->flow_group, &c->flow_id)
       != 0)
@@ -632,7 +648,7 @@ static inline uint16_t port_alloc(void)
   return 0;
 }
 
-static inline struct connection *conn_alloc(void)
+static inline struct connection *conn_alloc(int vmid)
 {
   struct connection *conn;
   uintptr_t off_rx, off_tx;
@@ -655,9 +671,9 @@ static inline struct connection *conn_alloc(void)
     return NULL;
   }
 
-  conn->rx_buf = (uint8_t *) tas_shm + off_rx;
+  conn->rx_buf = (uint8_t *) vm_shm[vmid] + off_rx;
   conn->rx_len = config.tcp_rxbuf_len;
-  conn->tx_buf = (uint8_t *) tas_shm + off_tx;
+  conn->tx_buf = (uint8_t *) vm_shm[vmid] + off_tx;
   conn->tx_len = config.tcp_txbuf_len;
   conn->to_armed = 0;
 
@@ -893,6 +909,7 @@ static void listener_packet(struct listener *l, const struct pkt_tcp *p,
 
 static void listener_accept(struct listener *l)
 {
+  int vmid;
   struct connection *c = l->wait_conns;
   struct backlog_slot *bls;
   const struct pkt_tcp *p;
@@ -942,9 +959,11 @@ static void listener_accept(struct listener *l)
   c->comp.notify_fd = -1;
   c->comp.status = 0;
 
+  vmid = c->ctx->app->vm_id;
+
   if (nicif_connection_add(c->db_id, c->ctx->app->id, c->remote_mac, c->local_ip, c->local_port,
-        c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) tas_shm,
-        c->rx_len, c->tx_buf - (uint8_t *) tas_shm, c->tx_len,
+        c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) vm_shm[vmid],
+        c->rx_len, c->tx_buf - (uint8_t *) vm_shm[vmid], c->tx_len,
         c->remote_seq, c->local_seq + 1, c->opaque, c->flags, c->cc_rate,
         c->fn_core, c->flow_group, &c->flow_id)
       != 0)

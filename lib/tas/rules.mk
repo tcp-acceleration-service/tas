@@ -1,10 +1,10 @@
 include mk/subdir_pre.mk
 
 LIB_TAS_OBJS := $(addprefix $(d)/, \
-  init.o kernel.o conn.o connect.o)
+  init.o init_pxy.o kernel.o kernel_pxy.o conn.o connect.o)
 LIB_TAS_SOBJS := $(LIB_TAS_OBJS:.o=.shared.o)
 
-LIB_TAS_CPPFLAGS := -I$(d)/include/
+LIB_TAS_CPPFLAGS := -I$(d)/include/ -Itas/include/
 
 $(LIB_TAS_OBJS): CPPFLAGS += $(LIB_TAS_CPPFLAGS)
 $(LIB_TAS_SOBJS): CPPFLAGS += $(LIB_TAS_CPPFLAGS)

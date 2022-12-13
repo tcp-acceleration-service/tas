@@ -33,14 +33,8 @@
 #include <utils_timeout.h>
 #include "internal.h"
 
-#define NIC_RXQ_LEN (64 * 32 * 1024)
-#define NIC_TXQ_LEN (64 * 8192)
-
 static int ksock_fd = -1;
 static int kernel_evfd = 0;
-
-static int flextcp_kernel_get_notifyfd(int cfd, uint32_t *num_fds);
-static int flextcp_kernel_get_shmfd(int cfd, int *shmfd);
 
 void flextcp_kernel_kick(void)
 {
@@ -74,6 +68,7 @@ int flextcp_kernel_connect(int *shmfd)
   memset(&saun, 0, sizeof(saun));
   saun.sun_family = AF_UNIX;
   memcpy(saun.sun_path, KERNEL_SOCKET_PATH, sizeof(KERNEL_SOCKET_PATH));
+
   if ((fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) == -1) {
     perror("flextcp_kernel_connect: socket failed");
     return -1;
@@ -102,7 +97,7 @@ int flextcp_kernel_connect(int *shmfd)
     .msg_flags = 0,
   };
 
-  if (flextcp_kernel_get_notifyfd(fd, &num_fds) != 0)
+  if (flextcp_kernel_get_notifyfd(fd, &num_fds, &kernel_evfd) != 0)
   {
     fprintf(stderr, "flextcp_kernel_connect: failed to receive notify fd.\n");
     return -1;
@@ -290,7 +285,8 @@ int flextcp_kernel_reqscale(struct flextcp_context *ctx, uint32_t cores)
   return 0;
 }
 
-static int flextcp_kernel_get_notifyfd(int cfd, uint32_t *num_fds)
+int flextcp_kernel_get_notifyfd(int cfd, uint32_t *num_fds,
+    int *k_evfd)
 {
   ssize_t r;
   struct cmsghdr *cmsg;
@@ -330,12 +326,13 @@ static int flextcp_kernel_get_notifyfd(int cfd, uint32_t *num_fds)
          "accessing ancillary data failed.\n");
     abort();
   }
-  kernel_evfd = *pfd;
+
+  *k_evfd = *pfd;
 
   return 0;
 }
 
-static int flextcp_kernel_get_shmfd(int cfd, int *shmfd)
+int flextcp_kernel_get_shmfd(int cfd, int *shmfd)
 {
   uint8_t b;
   ssize_t r;

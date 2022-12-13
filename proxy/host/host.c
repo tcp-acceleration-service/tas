@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <tas_ll.h>
+#include <tas_pxy.h>
 #include "ivshmem.h"
 
 int exited = 0;
@@ -9,7 +9,7 @@ int exited = 0;
 int main(int argc, char *argv[])
 {
     /* Connect to tas and get shmfd, kernel_evfd and core_evfds */
-    if (flextcp_init() != 0)
+    if (flextcp_proxy_init() != 0)
     {
         fprintf(stderr, "main: flextcp_init failed.\n");
         return -1;

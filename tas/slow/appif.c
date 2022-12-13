@@ -61,21 +61,20 @@
 #include <tas_memif.h>
 #include <fastpath.h>
 
-/** epoll data for listening socket */
-#define EP_LISTEN (NULL)
-/** epoll data for notifyfd associated with #poll_to_ux queue */
-#define EP_NOTIFY ((void *) (-1))
+#define EP_NOTIFY 0
+#define EP_LISTEN 1
+#define EP_APP 2
 
 static int uxsocket_init(void);
+static int uxsocket_init_vm(int vm_id, int *fd, int efd);
 static void *uxsocket_thread(void *arg);
-static void uxsocket_accept(void);
+static void uxsocket_accept(int vm_id);
 static void uxsocket_notify(void);
 static void uxsocket_error(struct application *app);
 static void uxsocket_receive(struct application *app);
 static void uxsocket_notify_app(struct application *app);
-
-/** Listening UX socket for applications to connect to */
-static int uxfd = -1;
+/* Listening UX sockets for applications. One per VM */
+static int *vm_uxfds = NULL;
 /** Epoll object used by UX socket thread */
 static int epfd = -1;
 /** eventfd for notifying UX thread about completion on poll_to_ux */
@@ -98,11 +97,15 @@ static uint16_t app_id_next = 0;
 /** Linked list of all application structs */
 static struct application *applications = NULL;
 
-
 int appif_init(void)
 {
   struct app_doorbell *adb;
   uint32_t i;
+
+  if ((vm_uxfds = malloc(FLEXNIC_PL_VMST_NUM * sizeof(int))) == NULL) {
+    fprintf(stderr, "appif_init: Failed to allocate memory for group file descriptors.\n");
+    return -1;
+  }
 
   if (uxsocket_init()) {
     return -1;
@@ -198,61 +201,113 @@ unsigned appif_poll(void)
 
 static int uxsocket_init(void)
 {
-  int fd, efd, nfd;
-  struct sockaddr_un saun;
+  int efd, nfd, vm_id;
   struct epoll_event ev;
-
-  if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-    perror("uxsocket_init: socket failed");
-    goto error_exit;
-  }
-
-  memset(&saun, 0, sizeof(saun));
-  saun.sun_family = AF_UNIX;
-  memcpy(saun.sun_path, KERNEL_SOCKET_PATH, sizeof(KERNEL_SOCKET_PATH));
-  if (bind(fd, (struct sockaddr *) &saun, sizeof(saun))) {
-    perror("uxsocket_init: bind failed");
-    goto error_close;
-  }
-
-  if (listen(fd, 5)) {
-    perror("uxsocket_init: listen failed");
-    goto error_close;
-  }
+  struct appif_event *aev;
 
   if ((nfd = eventfd(0, EFD_NONBLOCK)) == -1) {
     perror("uxsocket_init: eventfd failed");
+    return -1;
   }
 
   if ((efd = epoll_create1(0)) == -1) {
     perror("uxsocket_init: epoll_create1 failed");
-    goto error_close;
+    return -1;
   }
 
-  ev.events = EPOLLIN;
-  ev.data.ptr = EP_LISTEN;
-  if (epoll_ctl(efd, EPOLL_CTL_ADD, fd, &ev) != 0) {
-    perror("uxsocket_init: epoll_ctl listen failed");
+  for (vm_id = 0; vm_id < FLEXNIC_PL_VMST_NUM; vm_id++) {
+    if (uxsocket_init_vm(vm_id, &vm_uxfds[vm_id], efd) != 0) {
+      perror("uxsocket_init: uxsocket_init_group failed");
+      goto error_close_ep;
+    }
+  }
+
+  if ((aev = malloc(sizeof(struct appif_event))) == NULL)
+  {
+    perror("uxsocket_init: failed to malloc appif_event");
     goto error_close_ep;
   }
 
+  aev->type = EP_NOTIFY;
+  aev->ptr = NULL;
+
   ev.events = EPOLLIN;
-  ev.data.ptr = EP_NOTIFY;
+  ev.data.ptr = aev;
   if (epoll_ctl(efd, EPOLL_CTL_ADD, nfd, &ev) != 0) {
     perror("uxsocket_init: epoll_ctl notify failed");
-    goto error_close_ep;
+    goto error_free_aev;
   }
 
-  uxfd = fd;
   epfd = efd;
   notifyfd = nfd;
   return 0;
 
+error_free_aev:
+  free(aev);
 error_close_ep:
   close(efd);
+
+  return -1;
+}
+
+static int uxsocket_init_vm(int vm_id, int *fd, int efd)
+{
+  struct epoll_event ev;
+  struct sockaddr_un saun;
+  struct application *app;
+  struct appif_event *aev;
+
+  if ((*fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+    perror("uxsocket_init_vm: socket failed");
+    return -1;
+  }
+
+  memset(&saun, 0, sizeof(saun));
+  saun.sun_family = AF_UNIX;
+  snprintf(saun.sun_path, sizeof(saun.sun_path), 
+      "%s_vm_%d", KERNEL_SOCKET_PATH, vm_id);
+
+  unlink(saun.sun_path);
+  if (bind(*fd, (struct sockaddr *) &saun, sizeof(saun))) {
+    perror("uxsocket_init_vm: bind failed");
+    goto error_close;
+  }
+
+  if (listen(*fd, 5)) {
+    perror("uxsocket_init_vm: listen failed");
+    goto error_close;
+  }
+
+  if ((app = malloc(sizeof(struct application))) == NULL) {
+    perror("uxsocket_init_vm: application ptr mem allocation failed");
+    goto error_close;
+  }
+
+  if ((aev = malloc(sizeof(struct appif_event))) == NULL)
+  {
+    perror("uxsocket_init_vm: failed to malloc appif_event");
+    goto error_close;
+  }
+
+  app->vm_id = vm_id;
+
+  aev->type = EP_LISTEN;
+  aev->ptr = app;
+
+  ev.events = EPOLLIN;
+  ev.data.ptr = aev;
+  if (epoll_ctl(efd, EPOLL_CTL_ADD, *fd, &ev) != 0) {
+    perror("uxsocket_init_vm: epoll_ctl listen failed");
+    goto error_free_aev;
+  }
+
+  return 0;
+
+error_free_aev:
+  free(aev);
 error_close:
-  close(fd);
-error_exit:
+  close(*fd);
+
   return -1;
 }
 
@@ -260,6 +315,7 @@ static void *uxsocket_thread(void *arg)
 {
   int n, i;
   struct epoll_event evs[32];
+  struct appif_event *aev;
   struct application *app;
 
   while (1) {
@@ -275,12 +331,13 @@ static void *uxsocket_thread(void *arg)
     }
 
     for (i = 0; i < n; i++) {
-      app = evs[i].data.ptr;
-      if (app == EP_LISTEN) {
-        uxsocket_accept();
-      } else if (app == EP_NOTIFY) {
+      aev = evs[i].data.ptr;
+      app = aev->ptr;
+      if (aev->type == EP_LISTEN) {
+        uxsocket_accept(app->vm_id);
+      } else if (aev->type == EP_NOTIFY) {
         uxsocket_notify();
-      } else {
+      } else if (aev->type == EP_APP) {
         if ((evs[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) != 0) {
           uxsocket_error(app);
         } else if ((evs[i].events & EPOLLIN) != 0) {
@@ -296,92 +353,26 @@ static void *uxsocket_thread(void *arg)
   return NULL;
 }
 
-static void uxsocket_accept(void)
+static void uxsocket_accept(int vm_id)
 {
   int cfd;
   struct application *app;
   struct epoll_event ev;
+  struct appif_event *aev;
   size_t sz;
 
+  printf("new application\n");
   /* new connection on unix socket */
-  if ((cfd = accept(uxfd, NULL, NULL)) < 0) {
+  if ((cfd = accept(vm_uxfds[vm_id], NULL, NULL)) < 0) {
     fprintf(stderr, "uxsocket_accept: accept failed\n");
     return;
   }
 
   if (appif_connect_accept(cfd, tas_info->cores_num,
-      kernel_notifyfd, core_evfds, tas_shm_fd) != 0) {
+      kernel_notifyfd, core_evfds, vm_shm_fd[vm_id]) != 0) {
     fprintf(stderr, "uxsocket_accept: appif_connect_accept failed.\n");
     return;
   }
-
-  // struct iovec iov = {
-  //   .iov_base = &tas_info->cores_num,
-  //   .iov_len = sizeof(uint32_t),
-  // };
-  // union {
-  //   char buf[CMSG_SPACE(sizeof(int) * 4)];
-  //   struct cmsghdr align;
-  // } u;
-  // struct msghdr msg = {
-  //   .msg_name = NULL,
-  //   .msg_namelen = 0,
-  //   .msg_iov = &iov,
-  //   .msg_iovlen = 1,
-  //   .msg_control = u.buf,
-  //   .msg_controllen = sizeof(u.buf),
-  //   .msg_flags = 0,
-  // };
-
-  // struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
-  // cmsg->cmsg_level = SOL_SOCKET;
-  // cmsg->cmsg_type = SCM_RIGHTS;
-  // cmsg->cmsg_len = CMSG_LEN(sizeof(int) * 2);
-
-  // pfd = (int *) CMSG_DATA(cmsg);
-  // pfd[0] = kernel_notifyfd;
-  // pfd[1] = tas_shm_fd;
-
-  // /* send out kernel notify fd */
-  // if((tx = sendmsg(cfd, &msg, 0)) != sizeof(uint32_t)) {
-  //   fprintf(stderr, "tx == %zd\n", tx);
-  //   if(tx == -1) {
-  //     fprintf(stderr, "errno == %d\n", errno);
-  //   }
-  // }
-
-  // /* send out fast path fds */
-  // off = 0;
-  // for (; off < tas_info->cores_num;) {
-  //   iov.iov_base = &b;
-  //   iov.iov_len = 1;
-
-  //   memset(&msg, 0, sizeof(msg));
-  //   msg.msg_iov = &iov;
-  //   msg.msg_iovlen = 1;
-  //   msg.msg_control = u.buf;
-  //   msg.msg_controllen = sizeof(u.buf);
-
-  //   n = (tas_info->cores_num - off >= 4 ? 4 : tas_info->cores_num - off);
-
-  //   cmsg->cmsg_level = SOL_SOCKET;
-  //   cmsg->cmsg_type = SCM_RIGHTS;
-  //   cmsg->cmsg_len = CMSG_LEN(sizeof(int) * n);
-
-  //   pfd = (int *) CMSG_DATA(cmsg);
-  //   for (j = 0; j < n; j++) {
-  //     pfd[j] = ctxs[off++]->evfd;
-  //   }
-
-  //   /* send out kernel notify fd */
-  //   if((tx = sendmsg(cfd, &msg, 0)) != 1) {
-  //     fprintf(stderr, "tx fd == %zd\n", tx);
-  //     if(tx == -1) {
-  //       fprintf(stderr, "errno fd == %d\n", errno);
-  //     }
-  //     abort();
-  //   }
-  // }
 
   /* allocate application struct */
   if ((app = malloc(sizeof(*app))) == NULL) {
@@ -400,13 +391,23 @@ static void uxsocket_accept(void)
     return;
   }
 
+  if ((aev = malloc(sizeof(struct appif_event))) == NULL)
+  {
+    perror("uxsocket_accept: malloc appif_event failed");
+    return;
+  }
+
   /* add to epoll */
+  aev->type = EP_APP;
+  aev->ptr = app;
+
   ev.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
-  ev.data.ptr = app;
+  ev.data.ptr = aev;
   if (epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &ev) != 0) {
     perror("uxsocket_accept: epoll_ctl failed");
     free(app->resp);
     free(app);
+    free(aev);
     close(cfd);
     return;
   }
@@ -418,7 +419,9 @@ static void uxsocket_accept(void)
   app->conns = NULL;
   app->listeners = NULL;
   app->id = app_id_next++;
+  app->vm_id = vm_id;
   nbqueue_enq(&ux_to_poll, &app->nqe);
+  printf("finished setting up new application\n");
 }
 
 static void uxsocket_notify(void)
@@ -464,12 +467,14 @@ static void uxsocket_error(struct application *app)
 
 static void uxsocket_receive(struct application *app)
 {
+  printf("uxsocket receive\n");
   ssize_t rx;
   struct app_context *ctx;
   struct packetmem_handle *pm_in, *pm_out;
   uintptr_t off_in, off_out, off_rxq, off_txq;
   size_t kin_qsize, kout_qsize, ctx_sz;
   struct epoll_event ev;
+  struct appif_event *aev;
   uint16_t i;
   int evfd = 0;
 
@@ -548,8 +553,8 @@ static void uxsocket_receive(struct application *app)
       packetmem_free(ctx->handles[i].rxq);
       goto error_pktmem;
     }
-    memset((uint8_t *) tas_shm + off_rxq, 0, app->req.rxq_len);
-    memset((uint8_t *) tas_shm + off_txq, 0, app->req.txq_len);
+    memset((uint8_t *) vm_shm[app->vm_id] + off_rxq, 0, app->req.rxq_len);
+    memset((uint8_t *) vm_shm[app->vm_id] + off_txq, 0, app->req.txq_len);
     app->resp->flexnic_qs[i].rxq_off = off_rxq;
     app->resp->flexnic_qs[i].txq_off = off_txq;
   }
@@ -565,13 +570,14 @@ static void uxsocket_receive(struct application *app)
   ctx->app = app;
 
   ctx->kin_handle = pm_in;
-  ctx->kin_base = (uint8_t *) tas_shm + off_in;
+  printf("set kin_base for vmid=%d appid=%d\n", app->vm_id, app->id);
+  ctx->kin_base = (uint8_t *) vm_shm[app->vm_id] + off_in;
   ctx->kin_len = kin_qsize / sizeof(struct kernel_appout);
   ctx->kin_pos = 0;
   memset(ctx->kin_base, 0, kin_qsize);
 
   ctx->kout_handle = pm_out;
-  ctx->kout_base = (uint8_t *) tas_shm + off_out;
+  ctx->kout_base = (uint8_t *) vm_shm[app->vm_id] + off_out;
   ctx->kout_len = kout_qsize / sizeof(struct kernel_appin);
   ctx->kout_pos = 0;
   memset(ctx->kout_base, 0, kout_qsize);
@@ -593,9 +599,18 @@ static void uxsocket_receive(struct application *app)
   app->resp->flexnic_qs_num = tas_info->cores_num;
   app->resp->status = 0;
 
+  if ((aev = malloc(sizeof(struct appif_event))) == NULL)
+  {
+    perror("uxsocket_receive: malloc appif_event failed");
+    goto error_dballoc;
+  }
+
   /* no longer wait on epoll in for this socket until we get the completion */
+  aev->type = EP_APP;
+  aev->ptr = app;
+
   ev.events = EPOLLRDHUP | EPOLLERR;
-  ev.data.ptr = app;
+  ev.data.ptr = aev;
   if (epoll_ctl(epfd, EPOLL_CTL_MOD, app->fd, &ev) != 0) {
     /* not sure how to  handle this */
     perror("uxsocket_receive: epoll_ctl failed");
@@ -618,8 +633,9 @@ static void uxsocket_receive(struct application *app)
   }
 #endif
 
-  return;
+  printf("exiting uxsocket receive\n");
 
+  return;
 
 error_dballoc:
   /* TODO: for () packetmem_free(ctx->txq_handle) */
@@ -641,6 +657,7 @@ static void uxsocket_notify_app(struct application *app)
   ssize_t tx;
   struct epoll_event ev;
   struct app_context *ctx;
+  struct appif_event *aev;
 
   if (app->comp.status != 0) {
     /* TODO: cleanup and return error */
@@ -664,9 +681,20 @@ static void uxsocket_notify_app(struct application *app)
     goto error_send;
   }
 
+  if ((aev = malloc(sizeof(struct appif_event))) == NULL)
+  {
+    fprintf(stderr, "uxsocket_notify_app: failed to malloc aev struct.\n");
+    goto error_send;
+  }
+
   /* wait for epoll in again */
+  aev->type = EP_APP;
+  aev->ptr = app;
+
   ev.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
-  ev.data.ptr = app;
+  ev.data.ptr = aev;
+  
+  /* TODO: free previous appif_event struct before modifying */
   if (epoll_ctl(epfd, EPOLL_CTL_MOD, app->fd, &ev) != 0) {
     /* not sure how to  handle this */
     perror("uxsocket_notify_app: epoll_ctl failed");

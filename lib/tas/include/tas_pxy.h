@@ -22,22 +22,20 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef FLEXNIC_DRIVER_H_
-#define FLEXNIC_DRIVER_H_
+#ifndef FLEXNIC_PXY_H_
+#define FLEXNIC_PXY_H_
 
-#include <stddef.h>
+#include <tas_ll.h>
 #include <tas_memif.h>
 
-/**
- * Connect to flexnic. Returns 0 on success, < 0 on error, > 0 if flexnic is not
- * ready yet.
- */
-int flexnic_driver_connect(struct flexnic_info **info, void **mem_start,
-    int shmfd);
-int flexnic_driver_connect_mult(struct flexnic_info **p_info, void **p_mem_start,
-    int shmfd[]);
+#include "../internal.h"
 
-/** Connect to flexnic internal memory. */
-int flexnic_driver_internal(void **int_mem_start);
+extern void *flexnic_mem_pxy[FLEXNIC_PL_VMST_NUM];
+extern int flexnic_shmfds_pxy[FLEXNIC_PL_VMST_NUM];
+extern struct flexnic_info *flexnic_info_pxy;
 
-#endif /* ndef FLEXNIC_DRIVER_H_ */
+int flextcp_proxy_init();
+int flextcp_proxy_context_create(struct flextcp_context *ctx,
+    uint8_t *presp, ssize_t *presp_sz, int vmid);
+
+#endif /* ndef FLEXNIC_PXY_H_ */

@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 /* Calculates one or two (in case of wrap-around) ranges of length `len' at
  * `pos' in circular buffer of length `b_len' at address `b_base'. */

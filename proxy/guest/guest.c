@@ -52,8 +52,6 @@ int main(int argc, char *argv[])
   unsigned int n;
   struct guest_proxy *pxy = guest_init_proxy();
 
-  fprintf(stdout, "running guest proxy.\n");  
-
   if ((pxy->kernel_notifyfd = epoll_create1(0)) < 0)
   {
     fprintf(stderr, "main: failed to create kernel_notifyfd.\n");
@@ -71,6 +69,7 @@ int main(int argc, char *argv[])
     return -1;
   }
 
+  fprintf(stdout, "running guest proxy.\n");  
   while (exited == 0)
   {
     n = 0;

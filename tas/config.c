@@ -35,7 +35,9 @@
 #include <config.h>
 
 enum cfg_params {
-  CP_SHM_LEN,
+  CP_INTERN_SHM_LEN,
+  CP_VM_SHM_LEN,
+  CP_VM_SHM_OFF,
   CP_NIC_RX_LEN,
   CP_NIC_TX_LEN,
   CP_APP_KIN_LEN,
@@ -88,7 +90,13 @@ enum cfg_params {
 static struct option opts[] = {
     { .name = "shm-len",
       .has_arg = required_argument,
-      .val = CP_SHM_LEN },
+      .val = CP_INTERN_SHM_LEN },
+    { .name = "vm-shm-len",
+      .has_arg = required_argument,
+      .val = CP_VM_SHM_LEN },
+    { .name = "vm_shm-off",
+      .has_arg = required_argument,
+      .val = CP_VM_SHM_OFF },
     { .name = "nic-rx-len",
       .has_arg = required_argument,
       .val = CP_NIC_RX_LEN },
@@ -257,9 +265,21 @@ int config_parse(struct configuration *c, int argc, char *argv[])
   while (!done) {
     ret = getopt_long(argc, argv, "", opts, NULL);
     switch (ret) {
-      case CP_SHM_LEN:
-        if (parse_int64(optarg, &c->shm_len) != 0) {
+      case CP_INTERN_SHM_LEN:
+        if (parse_int64(optarg, &c->internal_shm_len) != 0) {
           fprintf(stderr, "shm len parsing failed\n");
+          goto failed;
+        }
+        break;
+      case CP_VM_SHM_LEN:
+        if (parse_int64(optarg, &c->vm_shm_len) != 0) { 
+          fprintf(stderr, "group shm len parsing failed\n");
+          goto failed;
+        }
+        break;
+      case CP_VM_SHM_OFF:
+        if (parse_int64(optarg, &c->vm_shm_off) != 0) {
+          fprintf(stderr, "group shm offset parsing failed\n");
           goto failed;
         }
         break;
@@ -575,7 +595,9 @@ failed:
 static int config_defaults(struct configuration *c, char *progname)
 {
   c->ip = 0;
-  c->shm_len = 1024 * 1024 * 1024;
+  c->internal_shm_len = 1 * 256 * 1024 * 1024;
+  c->vm_shm_len = 1 * 256 * 1024 * 1024;
+  c->vm_shm_off = 0;
   c->nic_rx_len = 16 * 1024;
   c->nic_tx_len = 16 * 1024;
   c->app_kin_len = 1024 * 1024;
@@ -636,7 +658,7 @@ static void print_usage(struct configuration *c, char *progname)
   fprintf(stderr, "Usage: %s [OPTION]... --ip-addr=IP[/PREFIXLEN]\n"
       "\n"
       "Memory Sizes:\n"
-      "  --shm-len=LEN               Shared memory len "
+      "  --internal-shm-len=LEN      Shared memory len "
           "[default: %"PRIu64"]\n"
       "  --nic-rx-len=LEN            Kernel rx queue len "
           "[default: %"PRIu64"]\n"
@@ -647,6 +669,12 @@ static void print_usage(struct configuration *c, char *progname)
       "  --app-kout-len=LEN          Kernel->App queue len "
           "[default: %"PRIu64"]\n"
       "\n"
+      "VMs : \n"
+      "  --vm-shm-len=LEN           Shared memory len in each vm"
+          "[default: %"PRIu64"]\n"
+      "  --vm-shm-off=LEN           Shared memory offset for vm"
+          "[default: %"PRIu64"]\n"
+      "\n" 
       "TCP protocol parameters:\n"
       "  --tcp-rtt-init=RTT          Initial rtt for CC (us) "
           "[default: %"PRIu32"]\n"
@@ -738,8 +766,9 @@ static void print_usage(struct configuration *c, char *progname)
       "  --ready-fd=FD               File descriptor to signal readiness "
           "[default: disabled]\n"
       "\n",
-      progname, c->shm_len,
+      progname, c->internal_shm_len,
       c->nic_rx_len, c->nic_tx_len, c->app_kin_len, c->app_kout_len,
+      c->vm_shm_len, c->vm_shm_off,
       c->tcp_rtt_init, c->tcp_link_bw, c->tcp_rxbuf_len, c->tcp_txbuf_len,
       c->tcp_handshake_to, c->tcp_handshake_retries,
       c->cc_control_granularity, c->cc_control_interval, c->cc_rexmit_ints,

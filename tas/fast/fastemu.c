@@ -104,7 +104,7 @@ int dataplane_init(void)
 
 int dataplane_context_init(struct dataplane_context *ctx)
 {
-  int i, j;
+  int i, j, vmid;
   char name[32];
   struct polled_app *p_app;
   struct polled_context *p_ctx;
@@ -151,7 +151,11 @@ int dataplane_context_init(struct dataplane_context *ctx)
   ctx->ev.epdata.event = EPOLLIN;
   int r = rte_epoll_ctl(RTE_EPOLL_PER_THREAD, EPOLL_CTL_ADD, ctx->evfd, &ctx->ev);
   assert(r == 0);
-  fp_state->kctx[ctx->id].evfd = ctx->evfd;
+
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
+  {
+    fp_state->knotif[ctx->id].evfd = ctx->evfd;
+  }
 
   return 0;
 }
@@ -346,7 +350,7 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
     if (ret > 0) {
       freebuf[i] = 1;
     } else if (ret < 0) {
-      fast_kernel_packet(ctx, bhs[i]);
+      fast_kernel_packet(ctx, bhs[i], fss[i]);
     }
   }
 
@@ -694,14 +698,14 @@ static void poll_scale(struct dataplane_context *ctx)
 
 static void arx_cache_flush(struct dataplane_context *ctx, uint64_t tsc)
 {
-  uint16_t i, aid;
+  uint16_t i, vmid;
   struct flextcp_pl_appctx *actx;
   struct flextcp_pl_arx *parx[BATCH_SIZE];
 
   for (i = 0; i < ctx->arx_num; i++) {
-    aid = ctx->arx_ctx_appid[i];
-    actx = &fp_state->appctx[ctx->id][aid][ctx->arx_ctx[i]];
-    if (fast_actx_rxq_alloc(ctx, actx, &parx[i]) != 0) {
+    vmid = ctx->arx_vm[i];
+    actx = &fp_state->appctx[ctx->id][vmid][ctx->arx_ctx[i]];
+    if (fast_actx_rxq_alloc(ctx, actx, &parx[i], vmid) != 0) {
       /* TODO: how do we handle this? */
       fprintf(stderr, "arx_cache_flush: no space in app rx queue\n");
       abort();
@@ -717,8 +721,8 @@ static void arx_cache_flush(struct dataplane_context *ctx, uint64_t tsc)
   }
 
   for (i = 0; i < ctx->arx_num; i++) {
-    aid = ctx->arx_ctx_appid[i];
-    actx = &fp_state->appctx[ctx->id][aid][ctx->arx_ctx[i]];
+    vmid = ctx->arx_vm[i];
+    actx = &fp_state->appctx[ctx->id][vmid][ctx->arx_ctx[i]];
     notify_appctx(actx, tsc);
   }
 

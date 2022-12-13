@@ -52,6 +52,9 @@
 /** Indicates that huge pages should be used for the internal and dma memory */
 #define FLEXNIC_FLAG_HUGEPAGES 2
 
+/** ID of the mem region to use for the slow path */
+#define SP_MEM_ID 0
+
 /** Info struct: layout of info shared memory region */
 struct flexnic_info {
   /** Flags: see FLEXNIC_FLAG_* */
@@ -180,6 +183,7 @@ STATIC_ASSERT(sizeof(struct flextcp_pl_atx) == 16, atx_size);
 /******************************************************************************/
 /* Internal flexnic memory */
 
+#define FLEXNIC_PL_VMST_NUM         4
 #define FLEXNIC_PL_APPST_NUM        8
 #define FLEXNIC_PL_APPST_CTX_NUM   31
 #define FLEXNIC_PL_APPST_CTX_MCS   16
@@ -262,6 +266,9 @@ struct flextcp_pl_flowst {
   /** Id of applicatiion this flow belongs to */
   uint16_t app_id;
 
+  /** Id of VM this flow belongs to */
+  uint16_t vm_id;
+
   /** Flow group for this connection (rss bucket) */
   uint16_t flow_group;
   /** Sequence number of queue pointer bumps */
@@ -331,6 +338,11 @@ struct flextcp_pl_flowhte {
   uint32_t flow_hash;
 } __attribute__((packed));
 
+/** File descriptor and last ts used to notify core */
+struct flextcp_pl_corenotif {
+  int evfd;
+  uint64_t last_ts;
+} __attribute__((packed));
 
 #define FLEXNIC_PL_MAX_FLOWGROUPS 4096
 
@@ -347,7 +359,10 @@ struct flextcp_pl_mem {
   struct flextcp_pl_flowhte flowht[FLEXNIC_PL_FLOWHT_ENTRIES];
 
   /* registers for kernel queues */
-  struct flextcp_pl_appctx kctx[FLEXNIC_PL_APPST_CTX_MCS];
+  struct flextcp_pl_appctx kctx[FLEXNIC_PL_VMST_NUM][FLEXNIC_PL_APPST_CTX_MCS];
+
+  /* registers to notify fastpath cores */
+  struct flextcp_pl_corenotif knotif[FLEXNIC_PL_APPST_CTX_MCS];
 
   /* registers for application state */
   struct flextcp_pl_appst appst[FLEXNIC_PL_APPST_NUM];

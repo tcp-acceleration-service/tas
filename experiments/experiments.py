@@ -16,13 +16,16 @@ class Host(object):
     def run_tas(self):
         pane = self.wmanager.add_new_pane(self.config.tas_pane, 
                 self.config.is_remote)
+
+        pane.send_keys("ulimit -c unlimited")
         Host.compile_and_run(
                 pane=pane,
                 comp_dir=self.config.tas_comp_dir,
                 comp_cmd=self.config.tas_comp_cmd,
                 exec_file=self.config.tas_exec_file,
                 out_file=self.config.tas_out_file,
-                args=self.config.tas_args)
+                args=self.config.tas_args,
+                gdb=True)
     
     def run_setup_cmds(self):
         pane = self.wmanager.add_new_pane(self.config.setup_pane,
@@ -32,7 +35,7 @@ class Host(object):
             time.sleep(1)
         self.config_pane = pane
 
-    def run_tas_proxy(self):
+    def run_host_proxy(self):
         pane = self.wmanager.add_new_pane(self.config.proxy_pane,
                 self.config.is_remote)
         pane.send_keys('sudo rm ' + self.config.proxy_ivshm_socket_path)
@@ -42,7 +45,7 @@ class Host(object):
                 comp_cmd=self.config.host_proxy_comp_cmd,
                 exec_file=self.config.host_proxy_exec_file,
                 out_file=self.config.host_proxy_out_file,
-                args='')
+                args='', gdb=True, is_hp=True)
 
     def run_vms(self, num, exp):
         window_name = self.config.node_pane
@@ -66,6 +69,7 @@ class Host(object):
             benchmark_args = self.gen_config.benchmark_server_args
         else:
             benchmark_args = self.gen_config.benchmark_client_args
+ 
         self.run_benchmark_rpc(
                 pane = pane,
                 stack = self.hstack,
@@ -78,18 +82,26 @@ class Host(object):
 
     @staticmethod
     def compile_and_run(pane, comp_dir, comp_cmd, exec_file, out_file, args, 
-            bg=False):
+            bg=False, gdb=True, is_hp=False):
         pane.send_keys('cd ' + comp_dir)
         pane.send_keys('git pull')
         time.sleep(1)
         pane.send_keys(comp_cmd)
-        cmd = 'sudo ' + exec_file + ' ' + args
+        if gdb:
+            cmd = 'sudo gdb --args ' + exec_file + ' ' + args
+        else:
+            cmd = 'sudo ' + exec_file + ' ' + args
+
         if bg : 
             cmd += ' &  '
         # cmd += ' # | tee ' + out_file
-        print("Starting Server TAS: " + cmd)
         pane.send_keys(cmd)
-        print("Server TAS started.")
+        
+        if is_hp:
+            pane.send_keys("break ivshmem.c:334")
+
+        if gdb:
+            pane.send_keys("run")
 
     def run(self, exp):
         self.run_setup_cmds()
@@ -97,15 +109,20 @@ class Host(object):
             self.run_tas()
             time.sleep(3)
         if self.hstack == 'tas' and self.htype == 'virt':
-            self.run_tas_proxy()
+            self.run_host_proxy()
             time.sleep(3)
         for i in range(self.node_num):
             if self.htype == 'virt':
                 self.run_vms(i, exp=exp)
+                time.sleep(3)
                 self.run_guest_proxy()
                 self.run_guest_benchmark(exp, i)
-            else :
+            else:
                 self.run_benchmark(num=i, exp=exp)
+
+        import pdb
+        pdb.set_trace()
+        print()
 
     def login_vm(self, pane, window_name):
         print("logging in. ("+ window_name + ")")
@@ -241,11 +258,6 @@ class Host(object):
                 exec_file = self.node_config.benchmark_exec_file,
                 out = self.node_config.benchmark_out + '_' + exp + '_' + str(num),
                 args=benchmark_args)
-
-        
-        import pdb
-        pdb.set_trace()
-
 
 
 class Server(Host):

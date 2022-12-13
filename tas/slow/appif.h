@@ -80,7 +80,13 @@ struct application {
   struct nicif_completion comp;
 
   uint16_t id;
+  uint16_t vm_id;
   volatile bool closed;
+};
+
+struct appif_event {
+  int type;
+  void* ptr;
 };
 
 /**

@@ -43,8 +43,8 @@
 #include <utils_shm.h>
 #include <tas_memif.h>
 
-void *tas_shm = NULL;
-int tas_shm_fd = -1;
+void **vm_shm = NULL;
+int *vm_shm_fd = NULL;
 struct flextcp_pl_mem *fp_state = NULL;
 struct flexnic_info *tas_info = NULL;
 
@@ -54,17 +54,34 @@ static uint64_t us_to_cycles(uint32_t us);
 /* Allocate DMA memory before DPDK grabs all huge pages */
 int shm_preinit(void)
 {
-  /* create shm for dma memory */
-  if (config.fp_hugepages) {
-    tas_shm = util_create_shmsiszed_huge(FLEXNIC_NAME_DMA_MEM,
-        config.shm_len, NULL, &tas_shm_fd, FLEXNIC_HUGE_PREFIX);
-  } else {
-    tas_shm = util_create_shmsiszed(FLEXNIC_NAME_DMA_MEM, config.shm_len,
-        NULL, &tas_shm_fd);
-  }
-  if (tas_shm == NULL) {
-    fprintf(stderr, "mapping flexnic dma memory failed\n");
+  uint8_t i;
+  char name[20];
+
+  if ((vm_shm = malloc(FLEXNIC_PL_VMST_NUM * sizeof(void *))) == NULL) {
+    fprintf(stderr, "shm_preinit: failed to allocate handle for group shared memory handle.\n");
     return -1;
+  }
+
+  if ((vm_shm_fd = malloc(FLEXNIC_PL_VMST_NUM * sizeof(int))) == NULL) {
+    fprintf(stderr, "shm_preinit: failed to allocate memory for group memory fds.\n");
+    return -1;
+  }
+
+  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++) {
+    snprintf(name, sizeof(name), "%s-vm%d", FLEXNIC_NAME_DMA_MEM, i);
+
+    if (config.fp_hugepages) {
+      vm_shm[i] = util_create_shmsiszed_huge(name, config.vm_shm_len, 
+          NULL, &vm_shm_fd[i], FLEXNIC_HUGE_PREFIX);
+    } else {
+      vm_shm[i] = util_create_shmsiszed(name, config.vm_shm_len, 
+          NULL, &vm_shm_fd[i]);
+    }
+
+    if (vm_shm[i] == NULL) {
+      fprintf(stderr, "mapping group %d memory failed\n", i);
+      return -1;
+    }
   }
 
   /* create shm for internal memory */
@@ -97,7 +114,7 @@ int shm_init(unsigned num)
     return -1;
   }
 
-  tas_info->dma_mem_size = config.shm_len;
+  tas_info->dma_mem_size = config.internal_shm_len;
   tas_info->dma_mem_off = 0;
   tas_info->internal_mem_size = FLEXNIC_INTERNAL_MEM_SIZE;
   tas_info->qmq_num = FLEXNIC_NUM_QMQUEUES;
@@ -114,6 +131,9 @@ int shm_init(unsigned num)
 
 void shm_cleanup(void)
 {
+  uint8_t i;
+  char name[20];
+
   /* cleanup internal memory region */
   if (fp_state != NULL) {
     if (config.fp_hugepages) {
@@ -126,12 +146,13 @@ void shm_cleanup(void)
   }
 
   /* cleanup dma memory region */
-  if (tas_shm != NULL) {
+  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++) {
+    snprintf(name, sizeof(name), "%s-vm%d", FLEXNIC_NAME_DMA_MEM, i);
     if (config.fp_hugepages) {
-      util_destroy_shm_huge(FLEXNIC_NAME_DMA_MEM, config.shm_len, tas_shm,
-          FLEXNIC_HUGE_PREFIX);
+      util_destroy_shm_huge(name, config.vm_shm_len,
+          vm_shm[i], FLEXNIC_HUGE_PREFIX);
     } else {
-      util_destroy_shm(FLEXNIC_NAME_DMA_MEM, config.shm_len, tas_shm);
+      util_destroy_shm(name, config.vm_shm_len, vm_shm[i]);
     }
   }
 
