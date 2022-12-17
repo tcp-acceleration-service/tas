@@ -8,7 +8,7 @@
 #include "proxy.h"
 #include "../include/tas_memif.h"
 
-#define CHAN_OFFSET 0x1000
+#define CHAN_OFFSET 0x0000
 #define CHAN_SIZE 0x2000
 
 #define MSG_TYPE_HELLO 1

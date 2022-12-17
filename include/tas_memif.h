@@ -85,7 +85,7 @@ struct flexnic_info {
 #define FLEXTCP_PL_KRX_INVALID 0x0
 #define FLEXTCP_PL_KRX_PACKET 0x1
 
-/** Kernel RX queue entry */
+/** Kernel RX queue entry. */
 struct flextcp_pl_krx {
   uint64_t addr;
   union {
@@ -126,7 +126,6 @@ struct flextcp_pl_ktx {
 } __attribute__((packed));
 
 STATIC_ASSERT(sizeof(struct flextcp_pl_ktx) == 64, ktx_size);
-
 
 /******************************************************************************/
 /* App RX queue */
@@ -338,12 +337,6 @@ struct flextcp_pl_flowhte {
   uint32_t flow_hash;
 } __attribute__((packed));
 
-/** File descriptor and last ts used to notify core */
-struct flextcp_pl_corenotif {
-  int evfd;
-  uint64_t last_ts;
-} __attribute__((packed));
-
 #define FLEXNIC_PL_MAX_FLOWGROUPS 4096
 
 /** Layout of internal pipeline memory */
@@ -359,10 +352,7 @@ struct flextcp_pl_mem {
   struct flextcp_pl_flowhte flowht[FLEXNIC_PL_FLOWHT_ENTRIES];
 
   /* registers for kernel queues */
-  struct flextcp_pl_appctx kctx[FLEXNIC_PL_VMST_NUM][FLEXNIC_PL_APPST_CTX_MCS];
-
-  /* registers to notify fastpath cores */
-  struct flextcp_pl_corenotif knotif[FLEXNIC_PL_APPST_CTX_MCS];
+  struct flextcp_pl_appctx kctx[FLEXNIC_PL_APPST_CTX_MCS];
 
   /* registers for application state */
   struct flextcp_pl_appst appst[FLEXNIC_PL_APPST_NUM];

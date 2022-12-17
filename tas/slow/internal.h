@@ -105,8 +105,9 @@ unsigned nicif_poll(void);
  *
  * @return 0 on success, <0 else
  */
-int nicif_appctx_add(uint16_t appid, uint32_t db, uint64_t *rxq_base,
-    uint32_t rxq_len, uint64_t *txq_base, uint32_t txq_len, int evfd);
+int nicif_appctx_add(uint16_t appid, uint32_t db, 
+    uint64_t *rxq_base, uint32_t rxq_len, uint64_t *txq_base,
+    uint32_t txq_len, int evfd);
 
 /** Flags for connections (used in nicif_connection_add()) */
 enum nicif_connection_flags {
@@ -139,10 +140,10 @@ enum nicif_connection_flags {
  *
  * @return 0 on success, <0 else
  */
-int nicif_connection_add(uint32_t db, uint16_t app_id, uint64_t mac_remote, 
-    uint32_t ip_local, uint16_t port_local, uint32_t ip_remote, 
-    uint16_t port_remote, uint64_t rx_base, uint32_t rx_len, uint64_t tx_base,
-    uint32_t tx_len, uint32_t remote_seq, uint32_t local_seq, 
+int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
+    uint64_t mac_remote, uint32_t ip_local, uint16_t port_local,
+    uint32_t ip_remote, uint16_t port_remote, uint64_t rx_base, uint32_t rx_len, 
+    uint64_t tx_base, uint32_t tx_len, uint32_t remote_seq, uint32_t local_seq, 
     uint64_t app_opaque, uint32_t flags, uint32_t rate, uint32_t fn_core, 
     uint16_t flow_group, uint32_t *pf_id);
 
@@ -236,6 +237,7 @@ int nicif_connection_retransmit(uint32_t f_id, uint16_t core);
  * @param buf     Pointer to location where base address will be stored
  * @param opaque  Pointer to location to store opaque value that needs to be
  *                passed to nicif_tx_send().
+ * @param vmid    Id of the vm that wants to send this packet
  *
  * @return 0 on success, <0 else
  */
@@ -783,7 +785,8 @@ int routing_init(void);
  *
  * @return 0 on success, < 0 on error, and > 0 for asynchronous return.
  */
-int routing_resolve(struct nicif_completion *comp, uint32_t ip, uint64_t *mac);
+int routing_resolve(struct nicif_completion *comp, uint32_t ip, 
+    uint64_t *mac);
 
 /** @} */
 

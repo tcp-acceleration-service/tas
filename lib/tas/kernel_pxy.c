@@ -93,7 +93,6 @@ int flextcp_vm_kernel_connect(int vmid, int *shmfd, int *flexnic_evfd)
     return -1;
   }
 
-  /* TODO: For each VM get the shmfd. Maybe have separate function for proxy */
   if (flextcp_kernel_get_shmfd(fd, shmfd) != 0)
   {
     fprintf(stderr, "flextcp_vm_kernel_connect: failed to receive shm fd.\n");
@@ -175,7 +174,7 @@ int flextcp_proxy_kernel_newctx(struct flextcp_context *ctx,
   cmsg->cmsg_len = CMSG_LEN(sizeof(int));
   int *myfd = (int *)CMSG_DATA(cmsg);
   *myfd = ctx->evfd;
-  sz = sendmsg(ksock_fd_pxy[0], &msg, 0);
+  sz = sendmsg(ksock_fd_pxy[vmid], &msg, 0);
   assert(sz == sizeof(req));
 
   /* receive response on kernel socket */
@@ -184,7 +183,7 @@ int flextcp_proxy_kernel_newctx(struct flextcp_context *ctx,
     (struct kernel_uxsock_response *) presp;
   off = 0;
   while (off < sizeof(*resp)) {
-    sz = read(ksock_fd_pxy[0], (uint8_t *) resp + off, sizeof(*resp) - off);
+    sz = read(ksock_fd_pxy[vmid], (uint8_t *) resp + off, sizeof(*resp) - off);
     if (sz < 0) {
       perror("flextcp_proxy_kernel_newctx: read failed");
       return -1;
@@ -201,7 +200,7 @@ int flextcp_proxy_kernel_newctx(struct flextcp_context *ctx,
   /* receive queues in response */
   total_sz = sizeof(*resp) + resp->flexnic_qs_num * sizeof(resp->flexnic_qs[0]);
   while (off < total_sz) {
-    sz = read(ksock_fd_pxy[0], (uint8_t *) resp + off, total_sz - off);
+    sz = read(ksock_fd_pxy[vmid], (uint8_t *) resp + off, total_sz - off);
     if (sz < 0) {
       perror("flextcp_proxy_kernel_newctx: read failed");
       return -1;

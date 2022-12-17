@@ -54,7 +54,7 @@ struct configuration {
   /** memory region size of vms */
   uint64_t vm_shm_len;
   /** data memory reserved offset for vms */
-  uint64_t vm_shm_off;
+  uint64_t data_mem_off;
   /** Kernel nic receive queue length. */
   uint64_t nic_rx_len;
   /** Kernel nic transmit queue length. */
@@ -63,8 +63,6 @@ struct configuration {
   uint64_t app_kin_len;
   /** App context <- kernel queue length. */
   uint64_t app_kout_len;
-  /** Data memory reserved offset */
-  uint64_t data_mem_off;
   /** TCP receive buffer size. */
   uint64_t tcp_rxbuf_len;
   /** TCP transmit buffer size. */

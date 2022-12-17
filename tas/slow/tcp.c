@@ -56,8 +56,8 @@
 
 #define CONN_DEBUG(c, f, x...) do { } while (0)
 #define CONN_DEBUG0(c, f) do { } while (0)
-/*#define CONN_DEBUG(c, f, x...) fprintf(stderr, "conn(%p): " f, c, x)
-#define CONN_DEBUG0(c, f, x...) fprintf(stderr, "conn(%p): " f, c)*/
+// #define CONN_DEBUG(c, f, x...) fprintf(stderr, "conn(%p): " f, c, x)
+// #define CONN_DEBUG0(c, f, x...) fprintf(stderr, "conn(%p): " f, c)
 
 struct listen_multi {
   size_t num;
@@ -148,7 +148,6 @@ void tcp_poll(void)
 int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
     uint16_t remote_port, uint32_t db_id, struct connection **pconn)
 {
-  printf("tcp_open\n");
   int ret;
   struct connection *conn;
   uint16_t local_port;
@@ -188,25 +187,19 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
 
 
   /* resolve IP to mac */
-  printf("resolving ip to mac\n");
   ret = routing_resolve(&conn->comp, remote_ip, &conn->remote_mac);
-  printf("resolved ip to mac\n");
   if (ret < 0) {
     fprintf(stderr, "tcp_open: nicif_arp failed\n");
     conn_free(conn);
     return -1;
   } else if (ret == 0) {
-    printf("routing_resolve succeeded immediately\n");
     CONN_DEBUG0(conn, "routing_resolve succeeded immediately\n");
     conn_register(conn);
-    printf("registered connection\n");
 
     ret = conn_arp_done(conn);
   } else {
     CONN_DEBUG0(conn, "routing_resolve pending\n");
-    printf("routing resolve pending\n");
     conn_register(conn);
-    printf("registered connection\n");
     ret = 0;
   }
 
@@ -364,8 +357,6 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
   struct tcp_opts opts;
   int ret = 0;
 
-  printf("tcp_packet\n");
-
   if (len < sizeof(*p)) {
     fprintf(stderr, "tcp_packet: incomplete TCP receive (%u received, "
         "%u expected)\n", len, (unsigned) sizeof(*p));
@@ -384,9 +375,7 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
   }
 
   if ((c = conn_lookup(p)) != NULL) {
-    printf("received tcp connection packet\n");
     conn_packet(c, p, &opts, fn_core, flow_group);
-    printf("processed tcp connection packet \n");
   } else if ((l = listener_lookup(p)) != NULL) {
     listener_packet(l, p, &opts, fn_core, flow_group);
   } else {
@@ -484,17 +473,14 @@ static void conn_packet(struct connection *c, const struct pkt_tcp *p,
 {
   int ret;
   uint32_t ecn_flags = 0;
-  printf("conn_packet\n");
 
   if (c->status == CONN_SYN_SENT) {
     /* hopefully a SYN-ACK received */
     c->fn_core = fn_core;
     c->flow_group = flow_group;
-    printf("about to send conn SYN packet\n");
     if ((ret = conn_syn_sent_packet(c, p, opts)) != 0) {
       conn_failed(c, ret);
     }
-    printf("sent conn SYN packet\n");
   } else if (c->status == CONN_OPEN &&
       (TCPH_FLAGS(&p->tcp) & ~ecn_flags) == TCP_SYN)
   {
@@ -551,7 +537,6 @@ static int conn_arp_done(struct connection *conn)
 static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
     const struct tcp_opts *opts)
 {
-  printf("conn_syn_sent_packet\n");
   int vmid = c->ctx->app->vm_id;
   uint32_t ecn_flags = TCPH_FLAGS(&p->tcp) & (TCP_ECE | TCP_CWR);
 
@@ -585,7 +570,8 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
   c->comp.notify_fd = -1;
   c->comp.status = 0;
 
-  if (nicif_connection_add(c->db_id, c->ctx->app->id, c->remote_mac, c->local_ip, c->local_port,
+  if (nicif_connection_add(c->db_id, c->ctx->app->vm_id, c->ctx->app->id,
+        c->remote_mac, c->local_ip, c->local_port,
         c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) vm_shm[vmid],
         c->rx_len, c->tx_buf - (uint8_t *) vm_shm[vmid], c->tx_len,
         c->remote_seq, c->local_seq, c->opaque, c->flags, c->cc_rate,
@@ -961,7 +947,8 @@ static void listener_accept(struct listener *l)
 
   vmid = c->ctx->app->vm_id;
 
-  if (nicif_connection_add(c->db_id, c->ctx->app->id, c->remote_mac, c->local_ip, c->local_port,
+  if (nicif_connection_add(c->db_id, c->ctx->app->vm_id, c->ctx->app->id,
+        c->remote_mac, c->local_ip, c->local_port,
         c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) vm_shm[vmid],
         c->rx_len, c->tx_buf - (uint8_t *) vm_shm[vmid], c->tx_len,
         c->remote_seq, c->local_seq + 1, c->opaque, c->flags, c->cc_rate,

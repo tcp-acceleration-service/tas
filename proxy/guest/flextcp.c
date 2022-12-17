@@ -41,19 +41,19 @@ int vflextcp_init(struct guest_proxy *pxy)
   
   if (vflextcp_uxsocket_init(pxy) != 0) 
   {
-    fprintf(stderr, "flextcp_init: "
+    fprintf(stderr, "vflextcp_init: "
             "vflextcp_uxsocket_init failed.\n");
     return -1;
   }
 
   if ((pxy->flextcp_nfd = eventfd(0, EFD_NONBLOCK)) == -1) 
   {
-    fprintf(stderr, "flextcp_init: eventfd failed."); 
+    fprintf(stderr, "vflextcp_init: eventfd failed."); 
   }
 
   if ((pxy->flextcp_epfd = epoll_create1(0)) == -1) 
   {
-    fprintf(stderr, "flextcp_init: epoll_create1 failed."); 
+    fprintf(stderr, "vflextcp_init: epoll_create1 failed."); 
     goto error_close_nfd;
   }
 
@@ -61,13 +61,13 @@ int vflextcp_init(struct guest_proxy *pxy)
   ev.data.ptr = EP_LISTEN;
   if (epoll_ctl(pxy->flextcp_epfd, EPOLL_CTL_ADD, pxy->flextcp_uxfd, &ev) != 0) 
   {
-    fprintf(stderr, "flextcp_init: failed to add fd to epfd.");
+    fprintf(stderr, "vflextcp_init: failed to add fd to epfd.");
     goto error_close_epfd;
   }
 
   if (vflextcp_virtfd_init(pxy) != 0) 
   {
-    fprintf(stderr, "flextcp_init: "
+    fprintf(stderr, "vflextcp_init: "
             "vflextcp_virtfd_init failed.\n");
   }
 

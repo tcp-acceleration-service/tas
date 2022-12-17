@@ -114,7 +114,7 @@ int shm_init(unsigned num)
     return -1;
   }
 
-  tas_info->dma_mem_size = config.internal_shm_len;
+  tas_info->dma_mem_size = config.vm_shm_len;
   tas_info->dma_mem_off = 0;
   tas_info->internal_mem_size = FLEXNIC_INTERNAL_MEM_SIZE;
   tas_info->qmq_num = FLEXNIC_NUM_QMQUEUES;

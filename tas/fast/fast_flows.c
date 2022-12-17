@@ -37,6 +37,10 @@
 #define TCP_MSS 1448
 #define TCP_MAX_RTT 100000
 
+// #define PL_DEBUG_ARX
+// #define PL_DEBUG_ATX
+// #define PL_DEBUG_TCPPACK
+
 //#define SKIP_ACK 1
 
 struct flow_key {
@@ -142,7 +146,7 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t app_id, uint32_t que
   /* calculate how much is available to be sent */
   avail = tcp_txavail(fs, NULL);
 
-#if PL_DEBUG_ATX
+#ifdef PL_DEBUG_ATX
   fprintf(stderr, "ATX try_sendseg local=%08x:%05u remote=%08x:%05u "
       "tx_avail=%x tx_next_pos=%x avail=%u\n",
       f_beui32(fs->local_ip), f_beui16(fs->local_port),
@@ -297,7 +301,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
       f_beui16(p->ip.len) - (sizeof(p->ip) + sizeof(p->tcp) + tcp_extra_hlen);
   orig_payload = payload_bytes;
 
-#if PL_DEBUG_ARX
+#ifdef PL_DEBUG_ARX
   fprintf(stderr, "FLOW local=%08x:%05u remote=%08x:%05u  RX: seq=%u ack=%u "
       "flags=%x payload=%u\n",
       f_beui32(p->ip.dest), f_beui16(p->tcp.dest),
@@ -331,14 +335,14 @@ int fast_flows_packet(struct dataplane_context *ctx,
   trace_event(FLEXNIC_PL_TREV_RXFS, sizeof(te_rxfs), &te_rxfs);
 #endif
 
-#if PL_DEBUG_ARX
+#ifdef PL_DEBUG_ARX
   fprintf(stderr, "FLOW local=%08x:%05u remote=%08x:%05u  ST: op=%"PRIx64
       " rx_pos=%x rx_next_seq=%u rx_avail=%x  tx_pos=%x tx_next_seq=%u"
-      " tx_sent=%u sp=%u\n",
+      " tx_sent=%u\n",
       f_beui32(p->ip.dest), f_beui16(p->tcp.dest),
       f_beui32(p->ip.src), f_beui16(p->tcp.src), fs->opaque, fs->rx_next_pos,
       fs->rx_next_seq, fs->rx_avail, fs->tx_next_pos, fs->tx_next_seq,
-      fs->tx_sent, fs->slowpath);
+      fs->tx_sent);
 #endif
 
   /* state indicates slow path */
@@ -583,7 +587,7 @@ unlock:
   /* if we bumped at least one, then we need to add a notification to the
    * queue */
   if (LIKELY(rx_bump != 0 || tx_bump != 0 || fin_bump)) {
-#if PL_DEBUG_ARX
+#ifdef PL_DEBUG_ARX
     fprintf(stderr, "dma_krx_pkt_fastpath: updating application state\n");
 #endif
 
@@ -968,7 +972,7 @@ static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
 
   p = network_buf_bufoff(nbh);
 
-#if PL_DEBUG_TCPACK
+#ifdef PL_DEBUG_TCPACK
   fprintf(stderr, "FLOW local=%08x:%05u remote=%08x:%05u ACK: seq=%u ack=%u\n",
       f_beui32(p->ip.dest), f_beui16(p->tcp.dest),
       f_beui32(p->ip.src), f_beui16(p->tcp.src), seq, ack);

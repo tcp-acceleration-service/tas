@@ -58,7 +58,6 @@ int flexnic_driver_connect_mult(struct flexnic_info **p_info, void **p_mem_start
 
   for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
   {
-    printf("vm=%d\n", vmid);
     err_ret = flexnic_driver_connect_sing(p_info, 
         &p_mem_start[vmid], shmfd[vmid], vmid);
     
@@ -114,7 +113,6 @@ int flexnic_driver_connect(struct flexnic_info **p_info, void **p_mem_start,
 
   *p_info = info = (struct flexnic_info *) fi;
   *p_mem_start = m;
-  printf("inside = %p\n", m);
   return 0;
 
 error_unmap_info:
@@ -191,7 +189,6 @@ static int flexnic_driver_connect_sing(struct flexnic_info **p_info, void **p_me
 
   *p_info = info = (struct flexnic_info *) fi;
   *p_mem_start = m;
-  printf("inside = %p\n", m);
   return 0;
 
 error_unmap_info:

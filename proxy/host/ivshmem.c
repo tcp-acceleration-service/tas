@@ -9,6 +9,8 @@
 #include <sys/un.h>
 #include <errno.h>
 
+#include <fcntl.h>
+
 #include <tas_pxy.h>
 #include "../proxy.h"
 #include "../channel.h"
@@ -25,7 +27,7 @@ static int uxfd = -1;
 /* Epoll for contexsts */
 static int ctx_epfd = -1;
 /* ID of next virtual machine to connect */
-static int next_id = 0;
+static int next_id = 1;
 /* List of VMs */
 static struct v_machine vms[MAX_VMS];
 
@@ -244,6 +246,9 @@ static int ivshmem_uxsocket_accept()
     int64_t version = IVSHMEM_PROTOCOL_VERSION;
     uint64_t hostid = HOST_PEERID;
 
+    /* Init to 0 to prevent invalid argument errors from epoll ctl */
+    memset(&ev, 0, sizeof(ev));
+
     /* Return error if max number of VMs has been reached */
     if (next_id > MAX_VMS)
     {
@@ -318,7 +323,6 @@ static int ivshmem_uxsocket_accept()
         goto close_ifd;
     }
 
-    /* Add connection fd to the epoll interest list */
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &ev) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
@@ -362,7 +366,6 @@ static int ivshmem_uxsocket_accept()
     vms[next_id].nfd = nfd;
     vms[next_id].id = next_id;
     vms[next_id].chan = chan;
-    printf("ivshmem_uxsocket_accept: chan = %p\n", vms[next_id].chan);
     fprintf(stdout, "Connected VM=%d\n", next_id);
     
     next_id++;
@@ -579,8 +582,6 @@ static int ivshmem_ctxs_poll()
             
             msg.msg_type = MSG_TYPE_VPOKE;
             msg.vfd = vctx->vfd;
-            printf("the segfault write\n");
-            printf("ivshmem_ctxs_poll: chan = %p\n", vctx->vm->chan);
             ret = channel_write(vctx->vm->chan, &msg, sizeof(struct vpoke_msg));
             if (ret < sizeof(struct vpoke_msg))
             {
@@ -641,15 +642,11 @@ static int ivshmem_handle_ctx_req(struct v_machine *vm,
   vctx->vm = vm;
   vm->ctxs = vctx;
 
-  printf("ivshmem_handle_ctxreq: chan = %p\n", vm->chan);
-
   res_msg.msg_type = MSG_TYPE_CONTEXT_RES,
   res_msg.vfd = msg->vfd,
   res_msg.app_id = msg->app_id,
 
-  printf("ivshmem_handle_ctxreq: about to write to channel\n");
   ret = channel_write(vm->chan, &res_msg, sizeof(struct context_res_msg));
-  printf("ivshmem_handle_ctxreq: wrote to channel\n");
   if (ret < sizeof(struct context_res_msg))
   {
     fprintf(stderr, "ivshmem_handle_ctxreq: failed to send ctx res.\n");

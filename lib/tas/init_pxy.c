@@ -32,11 +32,6 @@ int flextcp_proxy_init()
   ret = flexnic_driver_connect_mult(&flexnic_info_pxy, flexnic_mem_pxy,
       flexnic_shmfds_pxy);
 
-  for (int i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
-  {
-    printf("outisde = %p\n", flexnic_mem_pxy[i]);
-  }
-
   if (ret < 0)
   {
     fprintf(stderr, "flextcp_proxy_init: failed to connect to all vm fds.\n");

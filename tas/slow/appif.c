@@ -361,7 +361,6 @@ static void uxsocket_accept(int vm_id)
   struct appif_event *aev;
   size_t sz;
 
-  printf("new application\n");
   /* new connection on unix socket */
   if ((cfd = accept(vm_uxfds[vm_id], NULL, NULL)) < 0) {
     fprintf(stderr, "uxsocket_accept: accept failed\n");
@@ -398,6 +397,15 @@ static void uxsocket_accept(int vm_id)
   }
 
   /* add to epoll */
+  app->fd = cfd;
+  app->contexts = NULL;
+  app->need_reg_ctx = NULL;
+  app->closed = false;
+  app->conns = NULL;
+  app->listeners = NULL;
+  app->id = app_id_next++;
+  app->vm_id = vm_id;
+
   aev->type = EP_APP;
   aev->ptr = app;
 
@@ -411,17 +419,7 @@ static void uxsocket_accept(int vm_id)
     close(cfd);
     return;
   }
-
-  app->fd = cfd;
-  app->contexts = NULL;
-  app->need_reg_ctx = NULL;
-  app->closed = false;
-  app->conns = NULL;
-  app->listeners = NULL;
-  app->id = app_id_next++;
-  app->vm_id = vm_id;
   nbqueue_enq(&ux_to_poll, &app->nqe);
-  printf("finished setting up new application\n");
 }
 
 static void uxsocket_notify(void)
@@ -467,7 +465,6 @@ static void uxsocket_error(struct application *app)
 
 static void uxsocket_receive(struct application *app)
 {
-  printf("uxsocket receive\n");
   ssize_t rx;
   struct app_context *ctx;
   struct packetmem_handle *pm_in, *pm_out;
@@ -570,7 +567,6 @@ static void uxsocket_receive(struct application *app)
   ctx->app = app;
 
   ctx->kin_handle = pm_in;
-  printf("set kin_base for vmid=%d appid=%d\n", app->vm_id, app->id);
   ctx->kin_base = (uint8_t *) vm_shm[app->vm_id] + off_in;
   ctx->kin_len = kin_qsize / sizeof(struct kernel_appout);
   ctx->kin_pos = 0;
@@ -632,8 +628,6 @@ static void uxsocket_receive(struct application *app)
     goto error_abort_app;
   }
 #endif
-
-  printf("exiting uxsocket receive\n");
 
   return;
 

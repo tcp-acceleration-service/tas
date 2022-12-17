@@ -34,7 +34,7 @@
 #include "internal.h"
 
 #define ARP_DEBUG(x...) do { } while (0)
-/*#define ARP_DEBUG(x...) fprintf(stderr, "arp: " x)*/
+// #define ARP_DEBUG(x...) fprintf(stderr, "arp: " x)
 
 struct arp_entry {
     int status;
@@ -99,7 +99,6 @@ int arp_request(struct nicif_completion *comp, uint32_t ip, uint64_t *mac)
     }
   }
 
-  printf("did not find arp entry\n");
 
   /* allocate cache entry */
   if ((ae = malloc(sizeof(*ae))) == NULL) {
@@ -114,12 +113,10 @@ int arp_request(struct nicif_completion *comp, uint32_t ip, uint64_t *mac)
   comp->ptr = mac;
 
   /* send out request */
-  printf("send arp request to the server\n");
   if (request_tx(ip) != 0) {
     /* timeout will take care of re-trying */
     fprintf(stderr, "arp_timeout: sending out request failed\n");
   }
-  printf("arp request to server sent\n");
 
   /* arm timeout */
   ae->timeout = config.arp_to;
@@ -177,7 +174,7 @@ void arp_packet(const void *pkt, uint16_t len)
 
     /* handle ARP response */
     if ((ae = ae_lookup(f_beui32(arp->spa))) == NULL) {
-      ARP_DEBUG(stderr, "arp_packet: response has no entry\n");
+      ARP_DEBUG("arp_packet: response has no entry\n");
       return;
     }
 
@@ -337,10 +334,8 @@ static inline int request_tx(uint32_t dst_ip)
 static inline struct arp_entry *ae_lookup(uint32_t ip)
 {
   struct arp_entry *ae;
-  printf("arp lookup want ip = %x\n", ip);
 
   for (ae = arp_table; ae != NULL; ae = ae->next) {
-    printf("current ip for arp = %x\n", ae->ip);
     if (ae->ip == ip) {
       return ae;
     }

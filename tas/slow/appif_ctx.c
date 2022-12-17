@@ -246,9 +246,7 @@ unsigned appif_ctx_poll(struct application *app, struct app_context *ctx)
 
     case KERNEL_APPOUT_CONN_OPEN:
       /* connection request */
-      printf("got a request to open connection\n");
       kout_inc += kin_conn_open(app, ctx, kin, kout);
-      printf("processed request to open connection\n");
       break;
 
     case KERNEL_APPOUT_CONN_MOVE:

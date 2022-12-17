@@ -36,64 +36,45 @@
 static inline void inject_tcp_ts(void *buf, uint16_t len, uint32_t ts,
     struct network_buf_handle *nbh);
 
-static int curr_vm_id = 0;
-
 int fast_kernel_poll(struct dataplane_context *ctx,
     struct network_buf_handle *nbh, uint32_t ts)
 {
-  int i;
   void *buf = network_buf_buf(nbh);
   struct flextcp_pl_ktx *ktx;
   struct flextcp_pl_appctx *kctx;
   uint32_t flow_id, len;
-  int ret = -1, kctx_hit = 0;
-  
-  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
-  {
-    curr_vm_id = (curr_vm_id + i) % FLEXNIC_PL_VMST_NUM;
-    kctx = &fp_state->kctx[curr_vm_id][ctx->id];
+  int ret = -1;
 
-    /* stop if context is not in use */
-    if (kctx->tx_len == 0)
-      continue;
+  kctx = &fp_state->kctx[ctx->id];
 
-    ktx = dma_pointer(kctx->tx_base + kctx->tx_head, sizeof(*ktx), curr_vm_id);
-
-    if (ktx->type == 0)
-      continue;
-
-    kctx_hit = 1;
-
-    break;
-  }
-
-  if (kctx_hit == 0)
-  {
+  /* stop if context is not in use */
+  if (kctx->tx_len == 0)
     return -1;
-  }
+
+  ktx = dma_pointer(kctx->tx_base + kctx->tx_head, sizeof(*ktx), SP_MEM_ID);
+
+  if (ktx->type == 0)
+    return -1;
 
   if (ktx->type == FLEXTCP_PL_KTX_PACKET) {
-    printf("fast_kernel_poll: got a packet with FLEXTCP_PL_KTX_PACKET type\n");
     len = ktx->msg.packet.len;
 
     /* Read transmit queue entry */
-    dma_read(ktx->msg.packet.addr, len, buf, curr_vm_id);
+    dma_read(ktx->msg.packet.addr, len, buf, SP_MEM_ID);
 
     ret = 0;
     inject_tcp_ts(buf, len, ts, nbh);
     tx_send(ctx, nbh, 0, len);
   } else if (ktx->type == FLEXTCP_PL_KTX_PACKET_NOTS) {
-    printf("fast_kernel_poll: got a packet with FLEXTCP_PL_KTX_PACKET_NOTS type\n");
     /* send packet without filling in timestamp */
     len = ktx->msg.packet.len;
 
     /* Read transmit queue entry */
-    dma_read(ktx->msg.packet.addr, len, buf, curr_vm_id);
+    dma_read(ktx->msg.packet.addr, len, buf, SP_MEM_ID);
 
     ret = 0;
     tx_send(ctx, nbh, 0, len);
   } else if (ktx->type == FLEXTCP_PL_KTX_CONNRETRAN) {
-    printf("fast_kernel_poll: got a packet with FLEXTCP_PL_KTX_CONNRETRAN type\n");
     flow_id = ktx->msg.connretran.flow_id;
     if (flow_id >= FLEXNIC_PL_FLOWST_NUM) {
       fprintf(stderr, "fast_kernel_qman: invalid flow id=%u\n", flow_id);
@@ -114,17 +95,13 @@ int fast_kernel_poll(struct dataplane_context *ctx,
   if (kctx->tx_head >= kctx->tx_len)
     kctx->tx_head -= kctx->tx_len;
 
-  curr_vm_id = (curr_vm_id + i) % FLEXNIC_PL_VMST_NUM;
-
   return ret;
 }
 
 void fast_kernel_packet(struct dataplane_context *ctx,
     struct network_buf_handle *nbh, void *fsp)
 {
-  printf("fast_kernel_packet\n");
-  // struct flextcp_pl_flowst *fs = fsp;
-  struct flextcp_pl_appctx *kctx = &fp_state->kctx[0][ctx->id];
+  struct flextcp_pl_appctx *kctx = &fp_state->kctx[ctx->id];
   struct flextcp_pl_krx *krx;
   uint16_t len;
 
@@ -133,7 +110,7 @@ void fast_kernel_packet(struct dataplane_context *ctx,
     return;
   }
 
-  krx = dma_pointer(kctx->rx_base + kctx->rx_head, sizeof(*krx), 0);
+  krx = dma_pointer(kctx->rx_base + kctx->rx_head, sizeof(*krx), SP_MEM_ID);
 
   /* queue full */
   if (krx->type != 0) {
@@ -147,7 +124,7 @@ void fast_kernel_packet(struct dataplane_context *ctx,
 
 
   len = network_buf_len(nbh);
-  dma_write(krx->addr, len, network_buf_bufoff(nbh), 0);
+  dma_write(krx->addr, len, network_buf_bufoff(nbh), SP_MEM_ID);
 
   if (network_buf_flowgroup(nbh, &krx->msg.packet.flow_group)) {
     fprintf(stderr, "fast_kernel_packet: network_buf_flowgroup failed\n");
@@ -160,8 +137,8 @@ void fast_kernel_packet(struct dataplane_context *ctx,
 
   /* krx queue header */
   krx->type = FLEXTCP_PL_KRX_PACKET;
+  /* vmid is 0 because mem group 0 is used by the kernel */
   notify_slowpath_core();
-  printf("fast_kernel_packet return\n");
 }
 
 static inline void inject_tcp_ts(void *buf, uint16_t len, uint32_t ts,

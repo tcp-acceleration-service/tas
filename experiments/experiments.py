@@ -25,7 +25,7 @@ class Host(object):
                 exec_file=self.config.tas_exec_file,
                 out_file=self.config.tas_out_file,
                 args=self.config.tas_args,
-                gdb=True)
+                gdb=False, is_tas=False)
     
     def run_setup_cmds(self):
         pane = self.wmanager.add_new_pane(self.config.setup_pane,
@@ -45,7 +45,7 @@ class Host(object):
                 comp_cmd=self.config.host_proxy_comp_cmd,
                 exec_file=self.config.host_proxy_exec_file,
                 out_file=self.config.host_proxy_out_file,
-                args='', gdb=True, is_hp=True)
+                args='', gdb=False, is_tas=False)
 
     def run_vms(self, num, exp):
         window_name = self.config.node_pane
@@ -82,7 +82,7 @@ class Host(object):
 
     @staticmethod
     def compile_and_run(pane, comp_dir, comp_cmd, exec_file, out_file, args, 
-            bg=False, gdb=True, is_hp=False):
+            bg=False, gdb=False, is_tas=False):
         pane.send_keys('cd ' + comp_dir)
         pane.send_keys('git pull')
         time.sleep(1)
@@ -96,9 +96,9 @@ class Host(object):
             cmd += ' &  '
         # cmd += ' # | tee ' + out_file
         pane.send_keys(cmd)
-        
-        if is_hp:
-            pane.send_keys("break ivshmem.c:334")
+
+        if is_tas:
+            pane.send_keys("break tcp.c:133")
 
         if gdb:
             pane.send_keys("run")
@@ -114,7 +114,6 @@ class Host(object):
         for i in range(self.node_num):
             if self.htype == 'virt':
                 self.run_vms(i, exp=exp)
-                time.sleep(3)
                 self.run_guest_proxy()
                 self.run_guest_benchmark(exp, i)
             else:
@@ -232,7 +231,7 @@ class Host(object):
                     out_file=self.node_config.guest_proxy_out_file,
                     args=' ',
                     bg=False)
-            time.sleep(10)
+            time.sleep(3)
             
     
     def run_guest_benchmark(self, exp, num):

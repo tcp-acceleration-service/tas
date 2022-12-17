@@ -40,7 +40,7 @@ void dma_dump_stats(void);
 static inline void dma_read(uintptr_t addr, size_t len, void *buf,
     int vm_id)
 {
-  assert(addr + len >= addr && addr + len <= config.internal_shm_len);
+  assert(addr + len >= addr && addr + len <= config.vm_shm_len);
 
   rte_memcpy(buf, (uint8_t *) vm_shm[vm_id] + addr, len);
 
@@ -57,7 +57,7 @@ static inline void dma_read(uintptr_t addr, size_t len, void *buf,
 static inline void dma_write(uintptr_t addr, size_t len, const void *buf,
     int vm_id)
 {
-  assert(addr + len >= addr && addr + len <= config.internal_shm_len);
+  assert(addr + len >= addr && addr + len <= config.vm_shm_len);
 
   rte_memcpy((uint8_t *) vm_shm[vm_id] + addr, buf, len);
 
@@ -75,7 +75,7 @@ static inline void *dma_pointer(uintptr_t addr, size_t len,
     int vm_id)
 {
   /* validate address */
-  assert(addr + len >= addr && addr + len <= config.internal_shm_len);
+  assert(addr + len >= addr && addr + len <= config.vm_shm_len);
 
   return (uint8_t *) vm_shm[vm_id] + addr;
 }

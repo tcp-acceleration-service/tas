@@ -41,7 +41,6 @@ struct timeout {
    * significant bits.
    */
   uint32_t timeout_type;
-
   /** Next pointer for internal list */
   struct timeout *next;
   /** Previous pointer for internal list */

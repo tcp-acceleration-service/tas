@@ -38,7 +38,7 @@
 #define LINUX_POLL_DELAY 10
 
 #define EPOLL_DEBUG(x...) do {} while (0)
-//#define EPOLL_DEBUG(x...) fprintf(stderr, x)
+// #define EPOLL_DEBUG(x...) fprintf(stderr, x)
 
 static inline void es_add_inactive(struct epoll_socket *es);
 static inline void es_activate(struct epoll_socket *es);

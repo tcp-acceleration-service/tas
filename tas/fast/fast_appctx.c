@@ -58,11 +58,11 @@ void fast_appctx_poll_pf_all(struct dataplane_context *ctx)
 {
   unsigned int i, j;
   uint32_t aid, cid;
-  for  (i = 0; i < FLEXNIC_PL_APPST_NUM; i++)
+  for  (i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
   {
     for (j = 0; j < FLEXNIC_PL_APPCTX_NUM; j++) 
     {
-      aid = (ctx->poll_next_app + i) % FLEXNIC_PL_APPST_NUM;
+      aid = (ctx->poll_next_app + i) % FLEXNIC_PL_VMST_NUM;
       cid = (ctx->polled_apps[aid].poll_next_ctx + j) % FLEXNIC_PL_APPCTX_NUM;
       fast_appctx_poll_pf(ctx, cid, aid);
     }
@@ -136,7 +136,7 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
   struct polled_app *p_app;
   struct polled_context *p_ctx;
 
-  for (i_a = 0; i_a < FLEXNIC_PL_APPST_NUM && k < max; i_a++)
+  for (i_a = 0; i_a < FLEXNIC_PL_VMST_NUM && k < max; i_a++)
   {
     next_app = ctx->poll_next_app;
     p_app = &ctx->polled_apps[next_app];
@@ -175,7 +175,7 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
       }
       p_app->poll_next_ctx = (p_app->poll_next_ctx + 1) % FLEXNIC_PL_APPCTX_NUM;
     }
-    ctx->poll_next_app = (ctx->poll_next_app + 1) % FLEXNIC_PL_APPST_NUM;
+    ctx->poll_next_app = (ctx->poll_next_app + 1) % FLEXNIC_PL_VMST_NUM;
   }
 
   return k;
@@ -335,7 +335,7 @@ void fast_actx_rxq_probe_all(struct dataplane_context *ctx)
 {
   unsigned int n;
   uint32_t aid;
-  for (aid = 0; aid < FLEXNIC_PL_APPST_NUM; aid++)
+  for (aid = 0; aid < FLEXNIC_PL_VMST_NUM; aid++)
   {
     for (n = 0; n < FLEXNIC_PL_APPCTX_NUM; n++) 
     { 

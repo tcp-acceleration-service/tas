@@ -37,12 +37,11 @@
 enum cfg_params {
   CP_INTERN_SHM_LEN,
   CP_VM_SHM_LEN,
-  CP_VM_SHM_OFF,
+  CP_DATA_MEM_OFF,
   CP_NIC_RX_LEN,
   CP_NIC_TX_LEN,
   CP_APP_KIN_LEN,
   CP_APP_KOUT_LEN,
-  CP_DATA_MEM_OFF,
   CP_ARP_TO,
   CP_ARP_TO_MAX,
   CP_TCP_RTT_INIT,
@@ -96,7 +95,7 @@ static struct option opts[] = {
       .val = CP_VM_SHM_LEN },
     { .name = "vm_shm-off",
       .has_arg = required_argument,
-      .val = CP_VM_SHM_OFF },
+      .val = CP_DATA_MEM_OFF },
     { .name = "nic-rx-len",
       .has_arg = required_argument,
       .val = CP_NIC_RX_LEN },
@@ -109,9 +108,6 @@ static struct option opts[] = {
     { .name = "app-kout-len",
       .has_arg = required_argument,
       .val = CP_APP_KOUT_LEN },
-    { .name = "data-mem-off",
-      .has_arg = required_argument,
-      .val = CP_DATA_MEM_OFF },
     { .name = "arp-timout",
       .has_arg = required_argument,
       .val = CP_ARP_TO },
@@ -277,8 +273,8 @@ int config_parse(struct configuration *c, int argc, char *argv[])
           goto failed;
         }
         break;
-      case CP_VM_SHM_OFF:
-        if (parse_int64(optarg, &c->vm_shm_off) != 0) {
+      case CP_DATA_MEM_OFF:
+        if (parse_int64(optarg, &c->data_mem_off) != 0) {
           fprintf(stderr, "group shm offset parsing failed\n");
           goto failed;
         }
@@ -304,12 +300,6 @@ int config_parse(struct configuration *c, int argc, char *argv[])
       case CP_APP_KOUT_LEN:
         if (parse_int64(optarg, &c->app_kout_len) != 0) {
           fprintf(stderr, "app kout len parsing failed\n");
-          goto failed;
-        }
-        break;
-      case CP_DATA_MEM_OFF:
-        if (parse_int64(optarg, &c->data_mem_off) != 0) {
-          fprintf(stderr, "data mem off parsing failed\n");
           goto failed;
         }
         break;
@@ -597,12 +587,12 @@ static int config_defaults(struct configuration *c, char *progname)
   c->ip = 0;
   c->internal_shm_len = 1 * 256 * 1024 * 1024;
   c->vm_shm_len = 1 * 256 * 1024 * 1024;
-  c->vm_shm_off = 0;
+  /* Set the data mem off to the end of the channel used by the proxy */
+  c->data_mem_off = 0x4000;
   c->nic_rx_len = 16 * 1024;
   c->nic_tx_len = 16 * 1024;
   c->app_kin_len = 1024 * 1024;
   c->app_kout_len = 1024 * 1024;
-  c->data_mem_off = 0;
   c->arp_to = 500;
   c->arp_to_max = 10000000;
   c->tcp_rtt_init = 50;
@@ -768,7 +758,7 @@ static void print_usage(struct configuration *c, char *progname)
       "\n",
       progname, c->internal_shm_len,
       c->nic_rx_len, c->nic_tx_len, c->app_kin_len, c->app_kout_len,
-      c->vm_shm_len, c->vm_shm_off,
+      c->vm_shm_len, c->data_mem_off,
       c->tcp_rtt_init, c->tcp_link_bw, c->tcp_rxbuf_len, c->tcp_txbuf_len,
       c->tcp_handshake_to, c->tcp_handshake_retries,
       c->cc_control_granularity, c->cc_control_interval, c->cc_rexmit_ints,
