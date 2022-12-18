@@ -127,7 +127,7 @@ unsigned nicif_poll(void)
 }
 
 /** Register application context */
-int nicif_appctx_add(uint16_t appid, uint32_t db,
+int nicif_appctx_add(uint16_t vmid, uint16_t appid, uint32_t db,
     uint64_t *rxq_base,  uint32_t rxq_len, 
     uint64_t *txq_base, uint32_t txq_len, int evfd)
 {
@@ -148,7 +148,7 @@ int nicif_appctx_add(uint16_t appid, uint32_t db,
   }
 
   for (i = 0; i < tas_info->cores_num; i++) {
-    actx = &fp_state->appctx[i][appid][db];
+    actx = &fp_state->appctx[i][vmid][db];
     actx->appst_id = appid;
     actx->rx_base = rxq_base[i];
     actx->tx_base = txq_base[i];
@@ -159,7 +159,7 @@ int nicif_appctx_add(uint16_t appid, uint32_t db,
   MEM_BARRIER();
 
   for (i = 0; i < tas_info->cores_num; i++) {
-    actx = &fp_state->appctx[i][appid][db];
+    actx = &fp_state->appctx[i][vmid][db];
     actx->tx_len = txq_len;
     actx->rx_len = rxq_len;
   }

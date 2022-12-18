@@ -60,14 +60,14 @@ struct qman_thread {
 
 struct polled_context {
   uint32_t id;
-  uint32_t aid;
+  uint32_t vmid;
   uint32_t next;
   uint32_t prev;
   uint16_t flags;
   uint16_t null_rounds;
 };
 
-struct polled_app {
+struct polled_vm {
   uint32_t id;
   uint32_t next;
   uint32_t prev;
@@ -104,10 +104,10 @@ struct dataplane_context {
   /* polling queues */
   /* polling rounds counter until we have to poll every queue */
   uint16_t poll_rounds;
-  uint32_t poll_next_app;
+  uint32_t poll_next_vm;
   uint32_t act_head;
   uint32_t act_tail;
-  struct polled_app polled_apps[FLEXNIC_PL_APPST_NUM];  
+  struct polled_vm polled_vms[FLEXNIC_PL_APPST_NUM];  
 
   /********************************************************/
   /* pre-allocated buffers for polling doorbells and queue manager */

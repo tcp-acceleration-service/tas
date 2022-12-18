@@ -105,7 +105,7 @@ unsigned nicif_poll(void);
  *
  * @return 0 on success, <0 else
  */
-int nicif_appctx_add(uint16_t appid, uint32_t db, 
+int nicif_appctx_add(uint16_t vmid, uint16_t appid, uint32_t db, 
     uint64_t *rxq_base, uint32_t rxq_len, uint64_t *txq_base,
     uint32_t txq_len, int evfd);
 

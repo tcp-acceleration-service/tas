@@ -343,7 +343,7 @@ struct flextcp_pl_flowhte {
 struct flextcp_pl_mem {
   /* registers for application context queues */
   struct flextcp_pl_appctx appctx[FLEXNIC_PL_APPST_CTX_MCS]
-      [FLEXNIC_PL_APPST_NUM][FLEXNIC_PL_APPCTX_NUM];
+      [FLEXNIC_PL_VMST_NUM][FLEXNIC_PL_APPCTX_NUM];
 
   /* registers for flow state */
   struct flextcp_pl_flowst flowst[FLEXNIC_PL_FLOWST_NUM];

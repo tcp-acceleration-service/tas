@@ -80,7 +80,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts) __attribut
 static unsigned poll_qman_fwd(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
 static void poll_scale(struct dataplane_context *ctx);
 
-static void polled_app_init(struct polled_app *app, uint16_t id);
+static void polled_app_init(struct polled_vm *app, uint16_t id);
 static void polled_ctx_init(struct polled_context *ctx, uint32_t id, uint32_t a_id);
 
 static inline uint8_t bufcache_prealloc(struct dataplane_context *ctx, uint16_t num,
@@ -128,7 +128,7 @@ int dataplane_context_init(struct dataplane_context *ctx)
 {
   int i, j;
   char name[32];
-  struct polled_app *p_app;
+  struct polled_vm *p_app;
   struct polled_context *p_ctx;
 
   /* initialize forwarding queue */
@@ -157,7 +157,7 @@ int dataplane_context_init(struct dataplane_context *ctx)
   /* Initialize polled apps and contexts */
   for (i = 0; i < FLEXNIC_PL_APPST_NUM; i++)
   {
-    p_app = &ctx->polled_apps[i];
+    p_app = &ctx->polled_vms[i];
     polled_app_init(p_app, i);
     for (j = 0; j < FLEXNIC_PL_APPCTX_NUM; j++)
     {
@@ -166,7 +166,7 @@ int dataplane_context_init(struct dataplane_context *ctx)
     }
   }
   ctx->poll_rounds = 0;
-  ctx->poll_next_app = 0;
+  ctx->poll_next_vm = 0;
   ctx->act_head = IDXLIST_INVAL;
   ctx->act_tail = IDXLIST_INVAL;
 
@@ -181,7 +181,7 @@ int dataplane_context_init(struct dataplane_context *ctx)
   return 0;
 }
 
-static void polled_app_init(struct polled_app *app, uint16_t id)
+static void polled_app_init(struct polled_vm *app, uint16_t id)
 {
   app->id = id;
   app->next = IDXLIST_INVAL;
@@ -195,7 +195,7 @@ static void polled_app_init(struct polled_app *app, uint16_t id)
 static void polled_ctx_init(struct polled_context *ctx, uint32_t id, uint32_t aid)
 {
   ctx->id = id;
-  ctx->aid = aid;
+  ctx->vmid = aid;
   ctx->next = IDXLIST_INVAL;
   ctx->prev = IDXLIST_INVAL;
   ctx->flags = 0;
@@ -462,8 +462,8 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
   fast_actx_rxq_probe_active(ctx);
 
   /* update round */
-  ctx->act_head = ctx->polled_apps[ctx->act_head].next;
-  ctx->act_tail = ctx->polled_apps[ctx->act_tail].next;
+  ctx->act_head = ctx->polled_vms[ctx->act_head].next;
+  ctx->act_tail = ctx->polled_vms[ctx->act_tail].next;
 
   /* remove contexts and apps that have not sent for a few rounds
      from active list */

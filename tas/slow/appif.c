@@ -172,7 +172,7 @@ unsigned appif_poll(void)
         txq_offs[i] = app->resp->flexnic_qs[i].txq_off;
       }
 
-      if (nicif_appctx_add(app->id, ctx->doorbell->id, rxq_offs,
+      if (nicif_appctx_add(app->vm_id, app->id, ctx->doorbell->id, rxq_offs,
             app->req.rxq_len, txq_offs, app->req.txq_len, ctx->evfd) != 0)
       {
         fprintf(stderr, "appif_poll: registering context failed\n");

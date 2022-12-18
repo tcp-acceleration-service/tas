@@ -54,12 +54,12 @@ void fast_actx_rxq_probe_all(struct dataplane_context *ctx);
 void fast_actx_rxq_probe_active(struct dataplane_context *ctx);
 void remove_ctxs_from_active(struct dataplane_context *ctx, 
     struct polled_context *ctxs[BATCH_SIZE], int n);
-void enqueue_ctx_to_active(struct polled_app *act_app, uint32_t cid); 
-void remove_ctx_from_active(struct polled_app *act_app, 
+void enqueue_ctx_to_active(struct polled_vm *act_vm, uint32_t cid); 
+void remove_ctx_from_active(struct polled_vm *act_vm, 
     struct polled_context *act_ctx);
-void enqueue_app_to_active(struct dataplane_context *ctx, uint16_t aid);
-void remove_app_from_active(struct dataplane_context *ctx, 
-    struct polled_app *act_app);
+void enqueue_vm_to_active(struct dataplane_context *ctx, uint16_t vmid);
+void remove_vm_from_active(struct dataplane_context *ctx, 
+    struct polled_vm *act_vm);
 
 /* fast_flows.c */
 void fast_flows_qman_pf(struct dataplane_context *ctx, uint32_t *queues,
