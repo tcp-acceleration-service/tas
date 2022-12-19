@@ -38,7 +38,12 @@ static void slowpath_block(uint32_t cur_ts);
 static void timeout_trigger(struct timeout *to, uint8_t type, void *opaque);
 static void signal_tas_ready(void);
 void flexnic_loadmon(uint32_t cur_ts);
+void update_budget(int vmid, int ctxid, struct total_budget *t_budget);
 
+static int budget_init(struct total_budget *budg);
+static void accumulate_budget(int threads_launched,
+    struct total_budget *total_budget);
+    
 struct timeout_manager timeout_mgr;
 static int exited = 0;
 struct kernel_statistics kstats;
@@ -46,10 +51,12 @@ uint32_t cur_ts;
 int kernel_notifyfd = 0;
 static int epfd;
 
-int slowpath_main(void)
+int slowpath_main(int threads_launched)
 {
+  struct total_budget total_budget;
   struct notify_blockstate nbs;
   uint32_t last_print = 0;
+  uint32_t last_baccum = 0;
   uint32_t loadmon_ts = 0;
 
   kernel_notifyfd = eventfd(0, EFD_NONBLOCK);
@@ -113,6 +120,11 @@ int slowpath_main(void)
     return EXIT_FAILURE;
   }
 
+  if (budget_init(&total_budget)) {
+    fprintf(stderr, "budget_init failed\n");
+    return EXIT_FAILURE;
+  }
+
   signal_tas_ready();
 
   notify_canblock_reset(&nbs);
@@ -137,6 +149,12 @@ int slowpath_main(void)
       notify_canblock_reset(&nbs);
     }
 
+    /* Accumulate per context VM budget and update total budget */
+    if (cur_ts - last_baccum >= 1000000) {
+      accumulate_budget(threads_launched, &total_budget);
+      last_baccum = cur_ts;
+    }
+
     if (cur_ts - last_print >= 1000000) {
       if (!config.quiet) {
         printf("stats: drops=%"PRIu64" k_rexmit=%"PRIu64" ecn=%"PRIu64" acks=%"PRIu64"\n",
@@ -145,9 +163,38 @@ int slowpath_main(void)
       }
       last_print = cur_ts;
     }
+
+
   }
 
   return EXIT_SUCCESS;
+}
+
+static int budget_init(struct total_budget *budg)
+{
+  int i;
+
+  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
+  {
+    budg->cycles[i] = 0;
+    budg->bandwidth[i] = 0;
+  }
+
+  return 0;
+}
+
+static void accumulate_budget(int threads_launched,
+    struct total_budget *total_budget)
+{
+  int ctxid, vmid;
+
+  for (ctxid = 0;  ctxid < threads_launched; ctxid++)
+  {
+    for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
+    {
+      update_budget(vmid, ctxid, total_budget);
+    }
+  }
 }
 
 static void slowpath_block(uint32_t cur_ts)

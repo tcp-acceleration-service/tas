@@ -80,7 +80,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts) __attribut
 static unsigned poll_qman_fwd(struct dataplane_context *ctx, uint32_t ts) __attribute__((noinline));
 static void poll_scale(struct dataplane_context *ctx);
 
-static void polled_app_init(struct polled_vm *app, uint16_t id);
+static void polled_vm_init(struct polled_vm *app, uint16_t id);
 static void polled_ctx_init(struct polled_context *ctx, uint32_t id, uint32_t a_id);
 
 static inline uint8_t bufcache_prealloc(struct dataplane_context *ctx, uint16_t num,
@@ -128,7 +128,7 @@ int dataplane_context_init(struct dataplane_context *ctx)
 {
   int i, j;
   char name[32];
-  struct polled_vm *p_app;
+  struct polled_vm *p_vm;
   struct polled_context *p_ctx;
 
   /* initialize forwarding queue */
@@ -155,13 +155,20 @@ int dataplane_context_init(struct dataplane_context *ctx)
   }
 
   /* Initialize polled apps and contexts */
-  for (i = 0; i < FLEXNIC_PL_APPST_NUM; i++)
+  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
   {
-    p_app = &ctx->polled_vms[i];
-    polled_app_init(p_app, i);
+    p_vm = &ctx->polled_vms[i];
+    polled_vm_init(p_vm, i);
+
+    /* Initialize budget for TX, RX and Poll phases */
+    ctx->budgets[i].vmid = i;
+    ctx->budgets[i].cycles = 0;
+    ctx->budgets[i].bandwidth = 0;
+    ctx->budgets[i].lock = 0;
+
     for (j = 0; j < FLEXNIC_PL_APPCTX_NUM; j++)
     {
-      p_ctx = &p_app->ctxs[j];
+      p_ctx = &p_vm->ctxs[j];
       polled_ctx_init(p_ctx, j, i);
     }
   }
@@ -181,15 +188,15 @@ int dataplane_context_init(struct dataplane_context *ctx)
   return 0;
 }
 
-static void polled_app_init(struct polled_vm *app, uint16_t id)
+static void polled_vm_init(struct polled_vm *vm, uint16_t id)
 {
-  app->id = id;
-  app->next = IDXLIST_INVAL;
-  app->prev = IDXLIST_INVAL;
-  app->flags = 0;
-  app->poll_next_ctx = 0;
-  app->act_ctx_head = IDXLIST_INVAL;
-  app->act_ctx_tail = IDXLIST_INVAL;
+  vm->id = id;
+  vm->next = IDXLIST_INVAL;
+  vm->prev = IDXLIST_INVAL;
+  vm->flags = 0;
+  vm->poll_next_ctx = 0;
+  vm->act_ctx_head = IDXLIST_INVAL;
+  vm->act_ctx_tail = IDXLIST_INVAL;
 }
 
 static void polled_ctx_init(struct polled_context *ctx, uint32_t id, uint32_t aid)
@@ -572,7 +579,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   max = bufcache_prealloc(ctx, max, &handles);
 
   /* poll queue manager */
-  ret = qman_poll(&ctx->qman, max, vq_ids, fq_ids, q_bytes);
+  ret = qman_poll(ctx, max, vq_ids, fq_ids, q_bytes);
   if (ret <= 0)
   {
     STATS_ADD(ctx, qm_empty, 1);

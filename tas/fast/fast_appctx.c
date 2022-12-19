@@ -25,6 +25,8 @@
 #include <assert.h>
 #include <rte_config.h>
 
+#include <utils.h>
+#include <utils_sync.h>
 #include <tas_memif.h>
 
 #include "internal.h"
@@ -41,9 +43,11 @@ void fast_appctx_poll_pf_active(struct dataplane_context *ctx)
 {
   uint32_t cid, vmid;
   struct polled_vm *act_vm;
+  uint64_t s_cycs, e_cycs;
 
   vmid = ctx->act_head;
   do {
+    s_cycs = util_rdtsc();
     act_vm = &ctx->polled_vms[vmid];
 
     cid = act_vm->act_ctx_head;
@@ -51,7 +55,12 @@ void fast_appctx_poll_pf_active(struct dataplane_context *ctx)
       fast_appctx_poll_pf(ctx, cid, vmid);
       cid = act_vm->ctxs[cid].next;
     } while(cid != act_vm->act_ctx_head);
-    
+    e_cycs = util_rdtsc();
+
+    util_spin_lock(&ctx->budgets[vmid].lock);
+    ctx->budgets[vmid].cycles += e_cycs - s_cycs;
+    util_spin_unlock(&ctx->budgets[vmid].lock);
+
     vmid = ctx->polled_vms[vmid].next;
   } while (vmid != ctx->act_head);
 } 
@@ -60,14 +69,22 @@ void fast_appctx_poll_pf_all(struct dataplane_context *ctx)
 {
   unsigned int i, j;
   uint32_t vmid, cid;
+  uint64_t s_cycs, e_cycs;
+
   for  (i = 0; i < FLEXNIC_PL_VMST_NUM - 1; i++)
   {
+    s_cycs = util_rdtsc();
+    vmid = (ctx->poll_next_vm + i) % (FLEXNIC_PL_VMST_NUM - 1);
     for (j = 0; j < FLEXNIC_PL_APPCTX_NUM; j++) 
     {
-      vmid = (ctx->poll_next_vm + i) % (FLEXNIC_PL_VMST_NUM - 1);
       cid = (ctx->polled_vms[vmid].poll_next_ctx + j) % FLEXNIC_PL_APPCTX_NUM;
       fast_appctx_poll_pf(ctx, cid, vmid);
     }
+    e_cycs = util_rdtsc();
+
+    util_spin_lock(&ctx->budgets[vmid].lock);
+    ctx->budgets[vmid].cycles += e_cycs - s_cycs;
+    util_spin_unlock(&ctx->budgets[vmid].lock);
   }
 }
 
@@ -88,13 +105,16 @@ int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
   uint32_t vmid, cid;
   struct polled_vm *act_vm;
   struct polled_context *act_ctx;
+  uint64_t s_cycs, e_cycs;
   
   vmid = ctx->act_head;
   do {
+    
     act_vm = &ctx->polled_vms[vmid];
 
     cid = act_vm->act_ctx_head;
     do  {
+      s_cycs = util_rdtsc();
       act_ctx = &act_vm->ctxs[cid];
       for (i_b = 0; i_b < BATCH_SIZE && k < max; i_b++) 
       {
@@ -121,6 +141,11 @@ int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
 
     act_vm->act_ctx_head = act_vm->ctxs[act_vm->act_ctx_head].next;
     act_vm->act_ctx_tail = act_vm->ctxs[act_vm->act_ctx_tail].next;
+    e_cycs = util_rdtsc();
+
+    util_spin_lock(&ctx->budgets[vmid].lock);
+    ctx->budgets[vmid].cycles += e_cycs - s_cycs;
+    util_spin_unlock(&ctx->budgets[vmid].lock);
 
     vmid = ctx->polled_vms[vmid].next; 
   } while (vmid != ctx->act_head && k < max);
@@ -137,9 +162,11 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
   uint32_t next_vm, next_ctx;
   struct polled_vm *p_vm;
   struct polled_context *p_ctx;
+  uint64_t s_cycs, e_cycs;
 
   for (i_v = 0; i_v < FLEXNIC_PL_VMST_NUM - 1 && k < max; i_v++)
   {
+    s_cycs = util_rdtsc();
     next_vm = ctx->poll_next_vm;
     p_vm = &ctx->polled_vms[next_vm];
     for (i_c = 0; i_c < FLEXNIC_PL_APPCTX_NUM && k < max; i_c++) 
@@ -177,6 +204,11 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
       }
       p_vm->poll_next_ctx = (p_vm->poll_next_ctx + 1) % FLEXNIC_PL_APPCTX_NUM;
     }
+    e_cycs = util_rdtsc();
+
+    util_spin_lock(&ctx->budgets[next_vm].lock);
+    ctx->budgets[next_vm].cycles += e_cycs - s_cycs;
+    util_spin_unlock(&ctx->budgets[next_vm].lock);
     ctx->poll_next_vm = (ctx->poll_next_vm + 1) % (FLEXNIC_PL_VMST_NUM - 1);
   }
 
@@ -318,9 +350,11 @@ void fast_actx_rxq_probe_active(struct dataplane_context *ctx)
 {
   uint32_t cid, vmid;
   struct polled_vm *act_vm;
+  uint64_t s_cycs, e_cycs;
 
   vmid = ctx->act_head;
   do {
+    s_cycs = util_rdtsc();
     act_vm = &ctx->polled_vms[vmid];
    
     cid = act_vm->act_ctx_head;
@@ -328,7 +362,12 @@ void fast_actx_rxq_probe_active(struct dataplane_context *ctx)
     fast_actx_rxq_probe(ctx, cid, vmid);
     cid = act_vm->ctxs[cid].next;
     } while(cid != act_vm->act_ctx_head); 
-    
+    e_cycs = util_rdtsc();
+
+    util_spin_lock(&ctx->budgets[vmid].lock);
+    ctx->budgets[vmid].cycles += e_cycs - s_cycs;
+    util_spin_unlock(&ctx->budgets[vmid].lock);
+
     vmid = ctx->polled_vms[vmid].next;
   } while (vmid != ctx->act_head);
 }
@@ -337,12 +376,20 @@ void fast_actx_rxq_probe_all(struct dataplane_context *ctx)
 {
   unsigned int n;
   uint32_t vmid;
+  uint64_t s_cycs, e_cycs;
+
   for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
   {
+    s_cycs = util_rdtsc();
     for (n = 0; n < FLEXNIC_PL_APPCTX_NUM; n++) 
     { 
       fast_actx_rxq_probe(ctx, n, vmid);
     }
+    e_cycs = util_rdtsc();
+
+    util_spin_lock(&ctx->budgets[vmid].lock);
+    ctx->budgets[vmid].cycles += e_cycs + s_cycs;
+    util_spin_unlock(&ctx->budgets[vmid].lock);
   }
 }
 

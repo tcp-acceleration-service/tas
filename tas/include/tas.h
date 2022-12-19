@@ -47,7 +47,7 @@ extern struct flexnic_info *tas_info;
 extern unsigned fp_cores_max;
 
 
-int slowpath_main(void);
+int slowpath_main(int threads_launched);
 
 int shm_preinit(void);
 int shm_init(unsigned num);

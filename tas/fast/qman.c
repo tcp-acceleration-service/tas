@@ -39,6 +39,7 @@
 #include <rte_cycles.h>
 
 #include <utils.h>
+#include <utils_sync.h>
 
 #include "internal.h"
 #include "../slow/internal.h"
@@ -120,7 +121,8 @@ static inline int timestamp_lessthaneq(struct qman_thread *t, uint32_t a,
 
 /** Qman functions for VM */
 static inline int vmcont_init(struct qman_thread *t);
-static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
+static inline int vm_qman_poll(struct qman_thread *t, 
+    struct vm_qman *vqman, struct vm_budget *budgets,
     unsigned num, unsigned *vm_id, unsigned *q_ids, uint16_t *q_bytes);
 static inline int vm_qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t flow_id,
     uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags);
@@ -181,13 +183,15 @@ int qman_thread_init(struct dataplane_context *ctx)
   return 0;
 }
 
-int qman_poll(struct qman_thread *t, unsigned num, unsigned *vm_id,
+int qman_poll(struct dataplane_context *ctx, unsigned num, unsigned *vm_ids,
               unsigned *q_ids, uint16_t *q_bytes)
 {
   int ret;
+  struct qman_thread *t = &ctx->qman;
+  struct vm_budget *budgets = ctx->budgets;
   struct vm_qman *vqman = t->vqman;
 
-  ret = vm_qman_poll(t, vqman, num, vm_id, q_ids, q_bytes);
+  ret = vm_qman_poll(t, vqman, budgets, num, vm_ids, q_ids, q_bytes);
   return ret;
 }
 
@@ -357,15 +361,18 @@ int vmcont_init(struct qman_thread *t)
   return 0;
 }
 
-static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman, unsigned num, 
-    unsigned *vm_id, unsigned *q_ids, uint16_t *q_bytes)
+static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman, 
+    struct vm_budget *budgets, unsigned num, 
+    unsigned *vm_ids, unsigned *q_ids, uint16_t *q_bytes)
 {
   int i, cnt, x;
   uint16_t quanta = BATCH_SIZE / 2;
   uint32_t idx;
+  uint64_t s_cycs, e_cycs;
 
   for (cnt = 0; cnt < num && vqman->head_idx != IDXLIST_INVAL;)
   {
+    s_cycs = util_rdtsc();
     idx = vqman->head_idx;
     struct vm_queue *vq = &vqman->queues[idx];
     struct flow_qman *fqman = vq->fqman;
@@ -393,7 +400,7 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman, uns
     // Update app_id list
     for (i = cnt - x; i < cnt; i++)
     {
-      vm_id[i] = idx;
+      vm_ids[i] = idx;
     }
 
     if (vq->avail > 0)
@@ -408,6 +415,11 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman, uns
     else{
       vq->dc += quanta;
     }
+    e_cycs = util_rdtsc();
+
+    util_spin_lock(&budgets[idx].lock);
+    budgets[idx].cycles += e_cycs - s_cycs;
+    util_spin_unlock(&budgets[idx].lock);
 
   }
 

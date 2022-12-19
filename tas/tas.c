@@ -39,10 +39,12 @@
 
 #include <tas_memif.h>
 #include <utils_timeout.h>
+#include <utils_sync.h>
 
 #include <tas.h>
 #include <fastpath.h>
 #include "fast/internal.h"
+#include "slow/internal.h"
 
 struct core_load {
   uint64_t cyc_busy;
@@ -65,14 +67,15 @@ static void thread_error(void);
 static int common_thread(void *arg);
 
 
-static void *slowpath_thread(void)
+static void *slowpath_thread(int threads_launched)
 {
-  slowpath_main();
+  slowpath_main(threads_launched);
   return NULL;
 }
 
 int main(int argc, char *argv[])
 {
+  struct vm_budget **budgets;
   int res = EXIT_SUCCESS;
 
   /* parse command line options */
@@ -121,13 +124,19 @@ int main(int argc, char *argv[])
 
   shm_set_ready();
 
-  if (start_threads() != 0) {
+  if ((threads_launched = start_threads()) < 0) {
     res = EXIT_FAILURE;
     goto error_dataplane_cleanup;
   }
 
+  if ((budgets = malloc(sizeof(struct vm_budget *) * threads_launched)) 
+      == NULL)
+  {
+    goto error_dataplane_cleanup;
+  }
+
   /* Start kernel thread */
-  slowpath_thread();
+  slowpath_thread(threads_launched);
 
 error_dataplane_cleanup:
   /* TODO */
@@ -222,7 +231,7 @@ static int start_threads(void)
     }
   }
 
-  return 0;
+  return threads_launched;
 }
 
 static void thread_error(void)
@@ -242,6 +251,14 @@ int flexnic_scale_to(uint32_t cores)
 
   notify_fastpath_core(0);
   return 0;
+}
+
+void update_budget(int vmid, int ctxid, struct total_budget *t_budget)
+{
+  util_spin_lock(&ctxs[ctxid]->budgets[vmid].lock);
+  t_budget->cycles[vmid] += ctxs[ctxid]->budgets[vmid].cycles;
+  t_budget->bandwidth[vmid] += ctxs[ctxid]->budgets[vmid].bandwidth;
+  util_spin_unlock(&ctxs[ctxid]->budgets[vmid].lock);
 }
 
 void flexnic_loadmon(uint32_t ts)

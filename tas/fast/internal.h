@@ -67,7 +67,7 @@ extern volatile unsigned fp_scale_to;
 
 /** Qman functions */
 int qman_thread_init(struct dataplane_context *ctx);
-int qman_poll(struct qman_thread *t, unsigned num, unsigned *vm_id, 
+int qman_poll(struct dataplane_context *ctx, unsigned num, unsigned *vm_id, 
     unsigned *q_ids, uint16_t *q_bytes);
 int qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t flow_id, uint32_t rate,
     uint32_t avail, uint16_t max_chunk, uint8_t flags);
