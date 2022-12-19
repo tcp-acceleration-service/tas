@@ -52,7 +52,7 @@ struct network_thread {
 struct qman_thread {
   /* modified by owner thread */
   /************************************/
-  struct app_qman *aqman;
+  struct vm_qman *vqman;
   uint32_t ts_real;
   uint32_t ts_virtual;
   struct utils_rng rng;

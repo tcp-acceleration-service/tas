@@ -56,10 +56,10 @@
 #define TIMESTAMP_BITS 32
 #define TIMESTAMP_MASK 0xFFFFFFFF
 
-/** Queue container for an application */
-struct app_qman {
-  /** Application queue */
-  struct app_queue *queues;
+/** Queue container for a virtual machine */
+struct vm_qman {
+  /** VM queue */
+  struct vm_queue *queues;
   /** Idx of head of queue */
   uint32_t head_idx;
   /** Idx of tail of queue */
@@ -80,13 +80,13 @@ struct flow_qman {
   bool nolimit_first;
 };
 
-/** Queue state for application */
-struct app_queue {
+/** Queue state for a virtual machine */
+struct vm_queue {
   /** Next pointer */
   uint32_t next_idx;
-  /** Pointer to container with flows for this app */
+  /** Pointer to container with flows for this VM */
   struct flow_qman *fqman;
-  /** Number of entries for this app */
+  /** Number of entries for this VM */
   uint32_t avail;
   /** Flags: FLAG_INNOLIMITL */
   uint16_t flags;
@@ -118,22 +118,22 @@ static inline uint32_t timestamp(void);
 static inline int timestamp_lessthaneq(struct qman_thread *t, uint32_t a,
     uint32_t b);
 
-/** Qman functions for app */
-static inline int appcont_init(struct qman_thread *t);
-static inline int app_qman_poll(struct qman_thread *t, struct app_qman *aqman,
-    unsigned num, unsigned *app_id, unsigned *q_ids, uint16_t *q_bytes);
-static inline int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id,
+/** Qman functions for VM */
+static inline int vmcont_init(struct qman_thread *t);
+static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
+    unsigned num, unsigned *vm_id, unsigned *q_ids, uint16_t *q_bytes);
+static inline int vm_qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t flow_id,
     uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags);
-static inline void app_queue_fire(struct app_qman *aqman, struct app_queue *q,
+static inline void vm_queue_fire(struct vm_qman *vqman, struct vm_queue *q,
     uint32_t idx, uint16_t *q_bytes, unsigned start, unsigned end);
 /** Actually update queue state for app queue */
-static inline void app_set_impl(struct app_qman *aqman, uint32_t a_idx,
+static inline void vm_set_impl(struct vm_qman *vqman, uint32_t v_idx,
     uint32_t f_idx, uint32_t avail, uint8_t flags);
-static inline void app_queue_activate(struct app_qman *aqman,
-    struct app_queue *q, uint32_t idx);
+static inline void vm_queue_activate(struct vm_qman *vqman,
+    struct vm_queue *q, uint32_t idx);
 
 /** Qman management functions for flows */
-static inline int flowcont_init(struct app_queue *aq);
+static inline int flowcont_init(struct vm_queue *vq);
 static inline int flow_qman_poll(struct qman_thread *t, struct flow_qman *fqman,
     unsigned num, unsigned *q_ids, uint16_t *q_bytes);
 int flow_qman_set(struct qman_thread *t, struct flow_qman *fqman, uint32_t flow_id,
@@ -168,7 +168,7 @@ int qman_thread_init(struct dataplane_context *ctx)
 {
   struct qman_thread *t = &ctx->qman;
 
-  if (appcont_init(t) != 0)
+  if (vmcont_init(t) != 0)
   {
     fprintf(stderr, "qman_thread_init: app_cont init failed\n");
     return -1;
@@ -181,40 +181,40 @@ int qman_thread_init(struct dataplane_context *ctx)
   return 0;
 }
 
-int qman_poll(struct qman_thread *t, unsigned num, unsigned *app_id,
+int qman_poll(struct qman_thread *t, unsigned num, unsigned *vm_id,
               unsigned *q_ids, uint16_t *q_bytes)
 {
   int ret;
-  struct app_qman *aqman = t->aqman;
+  struct vm_qman *vqman = t->vqman;
 
-  ret = app_qman_poll(t, aqman, num, app_id, q_ids, q_bytes);
+  ret = vm_qman_poll(t, vqman, num, vm_id, q_ids, q_bytes);
   return ret;
 }
 
-int qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id, uint32_t rate,
+int qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t flow_id, uint32_t rate,
              uint32_t avail, uint16_t max_chunk, uint8_t flags)
 {
   int ret;
-  ret = app_qman_set(t, app_id, flow_id, rate, avail, max_chunk, flags);
+  ret = vm_qman_set(t, vm_id, flow_id, rate, avail, max_chunk, flags);
 
   return ret;
 }
 
 uint32_t qman_next_ts(struct qman_thread *t, uint32_t cur_ts)
 {
-  struct app_queue *aq;
+  struct vm_queue *vq;
   struct flow_qman *fqman;
   uint32_t ts = timestamp();
   uint32_t ret_ts = t->ts_virtual + (ts - t->ts_real);
-  struct app_qman *aqman = t->aqman;
+  struct vm_qman *vqman = t->vqman;
 
-  if (aqman->head_idx == IDXLIST_INVAL)
+  if (vqman->head_idx == IDXLIST_INVAL)
   {
     return -1;
   }
 
-  aq = &aqman->queues[aqman->head_idx];
-  fqman = aq->fqman;
+  vq = &vqman->queues[vqman->head_idx];
+  fqman = vq->fqman;
 
   if (fqman->nolimit_head_idx != IDXLIST_INVAL)
   {
@@ -325,27 +325,27 @@ int timestamp_lessthaneq(struct qman_thread *t, uint32_t a,
 /*****************************************************************************/
 /* Manages application queues */
 
-int appcont_init(struct qman_thread *t)
+int vmcont_init(struct qman_thread *t)
 {
   int ret;
   unsigned i;
-  struct app_queue *aq;
-  t->aqman = malloc(sizeof(struct app_qman));
-  struct app_qman *aqman = t->aqman;
+  struct vm_queue *vq;
+  t->vqman = malloc(sizeof(struct vm_qman));
+  struct vm_qman *vqman = t->vqman;
 
-  aqman->queues = calloc(1, sizeof(*aqman->queues) * FLEXNIC_PL_APPST_NUM);
-  if (aqman->queues == NULL)
+  vqman->queues = calloc(1, sizeof(*vqman->queues) * (FLEXNIC_PL_VMST_NUM - 1));
+  if (vqman->queues == NULL)
   {
-    fprintf(stderr, "appcont_init: queues malloc failed\n");
+    fprintf(stderr, "vmcont_init: queues malloc failed\n");
     return -1;
   }
 
-  for (i = 0; i < FLEXNIC_PL_APPST_NUM; i++)
+  for (i = 0; i < FLEXNIC_PL_VMST_NUM - 1; i++)
   {
-    aq = &aqman->queues[i];
-    aq->avail = 0;
-    aq->dc = BATCH_SIZE;
-    ret = flowcont_init(aq);
+    vq = &vqman->queues[i];
+    vq->avail = 0;
+    vq->dc = BATCH_SIZE;
+    ret = flowcont_init(vq);
 
     if (ret != 0)
     {
@@ -353,60 +353,60 @@ int appcont_init(struct qman_thread *t)
     }
   }
 
-  aqman->head_idx = aqman->tail_idx = IDXLIST_INVAL;
+  vqman->head_idx = vqman->tail_idx = IDXLIST_INVAL;
   return 0;
 }
 
-static inline int app_qman_poll(struct qman_thread *t, struct app_qman *aqman, unsigned num, 
-    unsigned *app_id, unsigned *q_ids, uint16_t *q_bytes)
+static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman, unsigned num, 
+    unsigned *vm_id, unsigned *q_ids, uint16_t *q_bytes)
 {
   int i, cnt, x;
   uint16_t quanta = BATCH_SIZE / 2;
   uint32_t idx;
 
-  for (cnt = 0; cnt < num && aqman->head_idx != IDXLIST_INVAL;)
+  for (cnt = 0; cnt < num && vqman->head_idx != IDXLIST_INVAL;)
   {
-    idx = aqman->head_idx;
-    struct app_queue *aq = &aqman->queues[idx];
-    struct flow_qman *fqman = aq->fqman;
+    idx = vqman->head_idx;
+    struct vm_queue *vq = &vqman->queues[idx];
+    struct flow_qman *fqman = vq->fqman;
 
-    aqman->head_idx = aq->next_idx;
-    if (aq->next_idx == IDXLIST_INVAL)
+    vqman->head_idx = vq->next_idx;
+    if (vq->next_idx == IDXLIST_INVAL)
     {
-      aqman->tail_idx = IDXLIST_INVAL;
+      vqman->tail_idx = IDXLIST_INVAL;
     }
 
-    aq->flags &= ~FLAG_INNOLIMITL;
+    vq->flags &= ~FLAG_INNOLIMITL;
 
-    if (aq->dc < num - cnt)
+    if (vq->dc < num - cnt)
     {
-      x = flow_qman_poll(t, fqman, aq->dc, q_ids + cnt, q_bytes + cnt);
+      x = flow_qman_poll(t, fqman, vq->dc, q_ids + cnt, q_bytes + cnt);
     }
     else
     {
       x = flow_qman_poll(t, fqman, num - cnt, q_ids + cnt, q_bytes + cnt);
     }
 
-    aq->dc -= x;
+    vq->dc -= x;
     cnt += x;
 
     // Update app_id list
     for (i = cnt - x; i < cnt; i++)
     {
-      app_id[i] = idx;
+      vm_id[i] = idx;
     }
 
-    if (aq->avail > 0)
+    if (vq->avail > 0)
     {
-      app_queue_fire(aqman, aq, idx, q_bytes, cnt - x, cnt);
+      vm_queue_fire(vqman, vq, idx, q_bytes, cnt - x, cnt);
     }
   
-    if ((aq->dc + quanta) > BATCH_SIZE)
+    if ((vq->dc + quanta) > BATCH_SIZE)
     {
-      aq->dc = BATCH_SIZE;
+      vq->dc = BATCH_SIZE;
     }
     else{
-      aq->dc += quanta;
+      vq->dc += quanta;
     }
 
   }
@@ -415,28 +415,28 @@ static inline int app_qman_poll(struct qman_thread *t, struct app_qman *aqman, u
   return cnt;
 }
 
-static inline int app_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id, 
+static inline int vm_qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t flow_id, 
     uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags)
 {
   int ret;
-  struct app_qman *aqman = t->aqman;
-  struct app_queue *aq = &aqman->queues[app_id];
-  struct flow_qman *fqman = aq->fqman;
+  struct vm_qman *vqman = t->vqman;
+  struct vm_queue *vq = &vqman->queues[vm_id];
+  struct flow_qman *fqman = vq->fqman;
 
-  if (app_id >= FLEXNIC_PL_APPST_NUM) 
+  if (vm_id >= FLEXNIC_PL_VMST_NUM) 
   {
-    fprintf(stderr, "app_qman_set: invalid app id: %u >= %u\n", app_id,
-        FLEXNIC_PL_APPST_NUM);
+    fprintf(stderr, "vm_qman_set: invalid vm id: %u >= %u\n", vm_id,
+        FLEXNIC_PL_VMST_NUM);
     return -1;
   }
 
-  app_set_impl(aqman, app_id, flow_id, avail, flags);
+  vm_set_impl(vqman, vm_id, flow_id, avail, flags);
   ret = flow_qman_set(t, fqman, flow_id, rate, avail, max_chunk, flags);
 
   return ret;
 }
 
-static inline void app_queue_fire(struct app_qman *aqman, struct app_queue *q,
+static inline void vm_queue_fire(struct vm_qman *vqman, struct vm_queue *q,
     uint32_t idx, uint16_t *q_bytes, unsigned start, unsigned end)
 {
   uint32_t bytes;
@@ -446,16 +446,16 @@ static inline void app_queue_fire(struct app_qman *aqman, struct app_queue *q,
   q->avail -= bytes;
 
   if (q->avail > 0) {
-    app_queue_activate(aqman, q, idx);
+    vm_queue_activate(vqman, q, idx);
   }
 
 }
 
-static inline void app_set_impl(struct app_qman *aqman, uint32_t a_idx,
+static inline void vm_set_impl(struct vm_qman *vqman, uint32_t v_idx,
     uint32_t f_idx, uint32_t avail, uint8_t flags)
 {
-  struct app_queue *aq = &aqman->queues[a_idx];
-  struct flow_qman *fqman = aq->fqman;
+  struct vm_queue *vq = &vqman->queues[v_idx];
+  struct flow_qman *fqman = vq->fqman;
   struct flow_queue *fq = &fqman->queues[f_idx];
 
   int new_avail = 0;
@@ -464,40 +464,40 @@ static inline void app_set_impl(struct app_qman *aqman, uint32_t a_idx,
   {
     new_avail = 1;
     int prev_avail = fq->avail;
-    aq->avail -= prev_avail;
-    aq->avail += avail;
+    vq->avail -= prev_avail;
+    vq->avail += avail;
   }
   else if ((flags & QMAN_ADD_AVAIL) != 0)
   {
-    aq->avail += avail;
+    vq->avail += avail;
     new_avail = 1;
   }
 
-  if (new_avail && aq->avail > 0 && ((aq->flags & (FLAG_INNOLIMITL)) == 0)) 
+  if (new_avail && vq->avail > 0 && ((vq->flags & (FLAG_INNOLIMITL)) == 0)) 
   {
-    app_queue_activate(aqman, aq, a_idx);
+    vm_queue_activate(vqman, vq, v_idx);
   }
 
 }
 
-static inline void app_queue_activate(struct app_qman *aqman,
-    struct app_queue *q, uint32_t idx)
+static inline void vm_queue_activate(struct vm_qman *vqman,
+    struct vm_queue *q, uint32_t idx)
 {
-  struct app_queue *q_tail;
+  struct vm_queue *q_tail;
 
   assert((q->flags & FLAG_INNOLIMITL) == 0);
 
   q->flags |= FLAG_INNOLIMITL;
   q->next_idx = IDXLIST_INVAL;
-  if (aqman->tail_idx == IDXLIST_INVAL)
+  if (vqman->tail_idx == IDXLIST_INVAL)
   {
-    aqman->head_idx = aqman->tail_idx = idx;
+    vqman->head_idx = vqman->tail_idx = idx;
     return;
   }
 
-  q_tail = &aqman->queues[aqman->tail_idx];
+  q_tail = &vqman->queues[vqman->tail_idx];
   q_tail->next_idx = idx;
-  aqman->tail_idx = idx;
+  vqman->tail_idx = idx;
 }
 
 static inline uint32_t sum_bytes(uint16_t *q_bytes, unsigned start, unsigned end)
@@ -517,13 +517,13 @@ static inline uint32_t sum_bytes(uint16_t *q_bytes, unsigned start, unsigned end
 /*****************************************************************************/
 /* Manages flow queues */
 
-int flowcont_init(struct app_queue *aq) 
+int flowcont_init(struct vm_queue *vq) 
 {
   unsigned i;
   struct flow_qman *fqman;
 
-  aq->fqman = malloc(sizeof(struct flow_qman));
-  fqman = aq->fqman;
+  vq->fqman = malloc(sizeof(struct flow_qman));
+  fqman = vq->fqman;
 
   fqman->queues = calloc(1, sizeof(*fqman->queues) * FLEXNIC_NUM_QMFLOWQUEUES);
   if (fqman->queues == NULL)
@@ -857,36 +857,36 @@ static inline void flow_queue_activate(struct qman_thread *t, struct flow_qman *
 /*****************************************************************************/
 /* Helper functions for unit tests */
 
-void qman_free_app_cont(struct dataplane_context *ctx)
+void qman_free_vm_cont(struct dataplane_context *ctx)
 {
   int i;
-  struct app_qman *aqman;
-  struct app_queue *aq;
+  struct vm_qman *vqman;
+  struct vm_queue *vq;
   struct flow_qman *fqman;
 
-  aqman = ctx->qman.aqman;
+  vqman = ctx->qman.vqman;
 
-  for (i = 0; i < FLEXNIC_PL_APPST_NUM; i++)
+  for (i = 0; i < FLEXNIC_PL_VMST_NUM - 1; i++)
   {
-    aq = &aqman->queues[i];
-    fqman = aq->fqman;
+    vq = &vqman->queues[i];
+    fqman = vq->fqman;
     free(fqman->queues);
     free(fqman);
   }
 
-  free(aqman->queues);
-  free(aqman);
+  free(vqman->queues);
+  free(vqman);
 }
 
-uint32_t qman_app_get_avail(struct dataplane_context *ctx, uint32_t app_id)
+uint32_t qman_vm_get_avail(struct dataplane_context *ctx, uint32_t vm_id)
 {
   uint32_t avail;
-  struct app_qman *aqman;
-  struct app_queue *aq;
+  struct vm_qman *vqman;
+  struct vm_queue *vq;
   
-  aqman = ctx->qman.aqman;
-  aq = &aqman->queues[app_id];
-  avail = aq->avail;
+  vqman = ctx->qman.vqman;
+  vq = &vqman->queues[vm_id];
+  avail = vq->avail;
   
   return avail;
 }

@@ -67,15 +67,15 @@ extern volatile unsigned fp_scale_to;
 
 /** Qman functions */
 int qman_thread_init(struct dataplane_context *ctx);
-int qman_poll(struct qman_thread *t, unsigned num, unsigned *app_id, 
+int qman_poll(struct qman_thread *t, unsigned num, unsigned *vm_id, 
     unsigned *q_ids, uint16_t *q_bytes);
-int qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id, uint32_t rate,
+int qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t flow_id, uint32_t rate,
     uint32_t avail, uint16_t max_chunk, uint8_t flags);
 uint32_t qman_timestamp(uint64_t tsc);
 uint32_t qman_next_ts(struct qman_thread *t, uint32_t cur_ts);
 /** Helper functions for unit tests */
-uint32_t qman_app_get_avail(struct dataplane_context *ctx, uint32_t app_id);
-void qman_free_app_cont(struct dataplane_context *ctx);
+uint32_t qman_vm_get_avail(struct dataplane_context *ctx, uint32_t vm_id);
+void qman_free_vm_cont(struct dataplane_context *ctx);
 
 void *util_create_shmsiszed(const char *name, size_t size, void *addr,
     int *pfd);
