@@ -60,11 +60,11 @@ void fast_appctx_poll_pf_all(struct dataplane_context *ctx)
 {
   unsigned int i, j;
   uint32_t vmid, cid;
-  for  (i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
+  for  (i = 0; i < FLEXNIC_PL_VMST_NUM - 1; i++)
   {
     for (j = 0; j < FLEXNIC_PL_APPCTX_NUM; j++) 
     {
-      vmid = (ctx->poll_next_vm + i) % FLEXNIC_PL_VMST_NUM;
+      vmid = (ctx->poll_next_vm + i) % (FLEXNIC_PL_VMST_NUM - 1);
       cid = (ctx->polled_vms[vmid].poll_next_ctx + j) % FLEXNIC_PL_APPCTX_NUM;
       fast_appctx_poll_pf(ctx, cid, vmid);
     }
@@ -132,13 +132,13 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
     unsigned *total, void *aqes[BATCH_SIZE])
 {
   int ret;
-  unsigned i_a, i_c, i_b;
+  unsigned i_v, i_c, i_b;
   uint16_t k = 0;
   uint32_t next_vm, next_ctx;
   struct polled_vm *p_vm;
   struct polled_context *p_ctx;
 
-  for (i_a = 0; i_a < FLEXNIC_PL_VMST_NUM && k < max; i_a++)
+  for (i_v = 0; i_v < FLEXNIC_PL_VMST_NUM - 1 && k < max; i_v++)
   {
     next_vm = ctx->poll_next_vm;
     p_vm = &ctx->polled_vms[next_vm];
@@ -177,7 +177,7 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
       }
       p_vm->poll_next_ctx = (p_vm->poll_next_ctx + 1) % FLEXNIC_PL_APPCTX_NUM;
     }
-    ctx->poll_next_vm = (ctx->poll_next_vm + 1) % FLEXNIC_PL_VMST_NUM;
+    ctx->poll_next_vm = (ctx->poll_next_vm + 1) % (FLEXNIC_PL_VMST_NUM - 1);
   }
 
   return k;
@@ -337,7 +337,7 @@ void fast_actx_rxq_probe_all(struct dataplane_context *ctx)
 {
   unsigned int n;
   uint32_t vmid;
-  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
   {
     for (n = 0; n < FLEXNIC_PL_APPCTX_NUM; n++) 
     { 

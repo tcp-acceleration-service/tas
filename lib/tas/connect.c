@@ -56,7 +56,7 @@ int flexnic_driver_connect_mult(struct flexnic_info **p_info, void **p_mem_start
     return -1;
   }
 
-  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
   {
     err_ret = flexnic_driver_connect_sing(p_info, 
         &p_mem_start[vmid], shmfd[vmid], vmid);

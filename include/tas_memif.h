@@ -53,7 +53,7 @@
 #define FLEXNIC_FLAG_HUGEPAGES 2
 
 /** ID of the mem region to use for the slow path */
-#define SP_MEM_ID 0
+#define SP_MEM_ID FLEXNIC_PL_VMST_NUM - 1
 
 /** Info struct: layout of info shared memory region */
 struct flexnic_info {
