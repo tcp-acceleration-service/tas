@@ -171,13 +171,13 @@ static int flexnic_driver_connect_sing(struct flexnic_info **p_info, void **p_me
   /* open and map dma shm region */
   if ((fi->flags & FLEXNIC_FLAG_HUGEPAGES) == FLEXNIC_FLAG_HUGEPAGES) {
     char name[40];
-    snprintf(name, sizeof(name), "%s/%s-vm%d", 
+    snprintf(name, sizeof(name), "%s/%s_vm%d", 
         FLEXNIC_HUGE_PREFIX, FLEXNIC_NAME_DMA_MEM, vmid);
     m = map_region_huge(name, fi->dma_mem_size, 
         shmfd, fi->dma_mem_off);
   } else {
     char name[30];
-    snprintf(name, sizeof(name), "%s-vm%d", 
+    snprintf(name, sizeof(name), "%s_vm%d", 
         FLEXNIC_NAME_DMA_MEM, vmid);
     m = map_region(name, fi->dma_mem_size, 
         shmfd, fi->dma_mem_off);
@@ -241,12 +241,12 @@ static void *map_region_huge(const char *name, size_t len, int fd, off_t off)
   if (fd == -1)
   {
     if ((fd = open(path, O_RDWR)) == -1) {
-      perror("map_region: shm_open memory failed");
+      perror("map_region_huge: shm_open memory failed");
       return NULL;
     }
   }
 
-  m = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, 0);
+  m = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, off);
 
   /* Close fd only if it wasn't passed in */
   if (fd_old == -1)
@@ -255,7 +255,7 @@ static void *map_region_huge(const char *name, size_t len, int fd, off_t off)
   }
 
   if (m == (void *) -1) {
-    perror("flexnic_driver_connect: mmap failed");
+    perror("map_region_huge: mmap failed");
     return NULL;
   }
 

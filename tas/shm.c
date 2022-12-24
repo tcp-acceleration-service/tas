@@ -68,7 +68,7 @@ int shm_preinit(void)
   }
 
   for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++) {
-    snprintf(name, sizeof(name), "%s-vm%d", FLEXNIC_NAME_DMA_MEM, i);
+    snprintf(name, sizeof(name), "%s_vm%d", FLEXNIC_NAME_DMA_MEM, i);
 
     if (config.fp_hugepages) {
       vm_shm[i] = util_create_shmsiszed_huge(name, config.vm_shm_len, 
@@ -147,7 +147,7 @@ void shm_cleanup(void)
 
   /* cleanup dma memory region */
   for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++) {
-    snprintf(name, sizeof(name), "%s-vm%d", FLEXNIC_NAME_DMA_MEM, i);
+    snprintf(name, sizeof(name), "%s_vm%d", FLEXNIC_NAME_DMA_MEM, i);
     if (config.fp_hugepages) {
       util_destroy_shm_huge(name, config.vm_shm_len,
           vm_shm[i], FLEXNIC_HUGE_PREFIX);

@@ -36,7 +36,6 @@ int flextcp_proxy_kernel_connect(int *shmfds, int *flexnic_evfd)
           "failed to connect vm=%d.\n", vmid);
       return -1;
     }
-  
   }
 
   return 0;

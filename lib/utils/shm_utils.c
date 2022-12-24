@@ -87,7 +87,6 @@ void *util_create_shmsiszed_huge(const char *name, size_t size,
   else
     close(fd);
 
-  close(fd);
   return p;
 
 error_remove:

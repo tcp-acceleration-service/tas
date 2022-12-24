@@ -374,6 +374,6 @@ int flextcp_kernel_get_shmfd(int cfd, int *shmfd)
   }
 
   *shmfd = *pfd;
-
+  
   return 0;
 }

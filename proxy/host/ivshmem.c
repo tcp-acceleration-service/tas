@@ -27,7 +27,7 @@ static int uxfd = -1;
 /* Epoll for contexsts */
 static int ctx_epfd = -1;
 /* ID of next virtual machine to connect */
-static int next_id = 1;
+static int next_id = 0;
 /* List of VMs */
 static struct v_machine vms[MAX_VMS];
 
