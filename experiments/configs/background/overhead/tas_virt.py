@@ -34,7 +34,7 @@ class Config:
         self.snum = 1
         self.ctype = 'virt'
         self.cstack = 'tas'
-        self.cnum = 1
+        self.cnum = 3
         self.connum = 1
         self.msize = 64
 

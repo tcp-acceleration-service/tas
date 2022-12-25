@@ -23,7 +23,6 @@
  */
 
 // TODO: Add skiplist to app queues
-// TODO: Make deficit round robin use bytes transmitted rather than number of packets
 
 /**
  * Complete queue manager implementation
@@ -57,7 +56,7 @@
 #define TIMESTAMP_BITS 32
 #define TIMESTAMP_MASK 0xFFFFFFFF
 
-#define QUANTA BATCH_SIZE * 64
+#define QUANTA BATCH_SIZE * TCP_MSS
 
 /** Queue container for a virtual machine */
 struct vm_qman {
@@ -161,7 +160,7 @@ static inline unsigned flow_poll_skiplist(struct qman_thread *t,
     uint32_t cur_ts, unsigned num, unsigned *q_ids, uint16_t *q_bytes);
 static inline uint8_t flow_queue_level(struct qman_thread *t, 
     struct flow_qman *fqman);
-static inline int flow_queue_fire(struct qman_thread *t, 
+static inline void flow_queue_fire(struct qman_thread *t, 
     struct vm_queue *vqueue, struct flow_qman *fqman,
     struct flow_queue *q, uint32_t idx, unsigned *q_id, uint16_t *q_bytes);
 static inline void flow_queue_activate(struct qman_thread *t, struct flow_qman *fqman, 
@@ -334,7 +333,7 @@ int timestamp_lessthaneq(struct qman_thread *t, uint32_t a,
 /*****************************************************************************/
 
 /*****************************************************************************/
-/* Manages application queues */
+/* Manages vm queues */
 
 int vmcont_init(struct qman_thread *t)
 {
@@ -649,7 +648,6 @@ static inline unsigned flow_poll_nolimit(struct qman_thread *t, struct vm_queue 
     unsigned *q_ids, uint16_t *q_bytes)
 {
   unsigned cnt;
-  int stop;
   struct flow_queue *q;
   uint32_t idx;
 
@@ -665,14 +663,8 @@ static inline unsigned flow_poll_nolimit(struct qman_thread *t, struct vm_queue 
     q->flags &= ~FLAG_INNOLIMITL;
     dprintf("flow_poll_nolimit: t=%p q=%p idx=%u avail=%u rate=%u flags=%x\n", t, q, idx, q->avail, q->rate, q->flags);
     if (q->avail > 0) {
-      stop = flow_queue_fire(t, vqueue, fqman, q, idx, q_ids + cnt, q_bytes + cnt);
+      flow_queue_fire(t, vqueue, fqman, q, idx, q_ids + cnt, q_bytes + cnt);
       cnt++;
-    }
-
-    /* Means there were fewer available bytes to send
-       than the deficit counter */
-    if (stop) {
-      return cnt;
     }
   }
 
@@ -749,7 +741,6 @@ static inline unsigned flow_poll_skiplist(struct qman_thread *t,
     struct vm_queue *vqueue, struct flow_qman *fqman,
     uint32_t cur_ts, unsigned num, unsigned *q_ids, uint16_t *q_bytes)
 {
-  int stop;
   unsigned cnt;
   uint32_t idx, max_vts;
   int8_t l;
@@ -790,15 +781,10 @@ static inline unsigned flow_poll_skiplist(struct qman_thread *t,
     dprintf("flow_poll_skiplist: t=%p q=%p idx=%u avail=%u rate=%u flags=%x\n", t, q, idx, q->avail, q->rate, q->flags);
 
     if (q->avail > 0) {
-      stop = flow_queue_fire(t, vqueue, fqman, q, idx, q_ids + cnt, q_bytes + cnt);
+      flow_queue_fire(t, vqueue, fqman, q, idx, q_ids + cnt, q_bytes + cnt);
       cnt++;
     }
 
-    /* Means there were fewer available bytes to send
-       than the deficit counter */
-    if (stop) {
-      break;
-    }
   }
 
   /* if we reached the limit, update the virtual timestamp correctly */
@@ -831,16 +817,14 @@ static inline uint8_t flow_queue_level(struct qman_thread *t, struct flow_qman *
   return (x < QMAN_SKIPLIST_LEVELS ? x : QMAN_SKIPLIST_LEVELS - 1);
 }
 
-static inline int flow_queue_fire(struct qman_thread *t,
+static inline void flow_queue_fire(struct qman_thread *t,
     struct vm_queue *vqueue, struct flow_qman *fqman, 
     struct flow_queue *q, uint32_t idx, unsigned *q_id, uint16_t *q_bytes)
 {
-  int is_less_than_dc;
   uint32_t bytes;
 
   assert(q->avail > 0);
 
-  is_less_than_dc = q->avail < vqueue->dc;
   bytes = (q->avail <= q->max_chunk ? q->avail : q->max_chunk);
   bytes = (vqueue->dc < bytes ? vqueue->dc : bytes);
   q->avail -= bytes;
@@ -870,7 +854,6 @@ static inline int flow_queue_fire(struct qman_thread *t,
   /* Return wether in the beginning the number of available bytes
      was smaller than the deficit counter this is used to determine
      wether we should stop scheduling packets for this VM in this round */
-  return is_less_than_dc;
 }
 
 static inline void flow_queue_activate(struct qman_thread *t, struct flow_qman *fqman,

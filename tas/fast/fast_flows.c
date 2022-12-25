@@ -34,7 +34,6 @@
 #include "fastemu.h"
 #include "tcp_common.h"
 
-#define TCP_MSS 1448
 #define TCP_MAX_RTT 100000
 
 // #define PL_DEBUG_ARX

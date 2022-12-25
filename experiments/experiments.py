@@ -54,7 +54,8 @@ class Host(object):
         self.run_vm(
                 pane=pane, 
                 window_name=window_name + str(num), 
-                exp=exp)
+                exp=exp,
+                num=num)
 
     def run_benchmark(self, num, exp):
         print("benchmark", end = " ")
@@ -114,13 +115,11 @@ class Host(object):
         for i in range(self.node_num):
             if self.htype == 'virt':
                 self.run_vms(i, exp=exp)
-                self.run_guest_proxy()
+                self.run_guest_proxy(i)
                 self.run_guest_benchmark(exp, i)
             else:
                 self.run_benchmark(num=i, exp=exp)
 
-        import pdb
-        pdb.set_trace()
         print()
 
     def login_vm(self, pane, window_name):
@@ -212,11 +211,12 @@ class Host(object):
         print(cmd) 
         pane.send_keys(cmd)
 
-    def run_guest_proxy(self):
+    def run_guest_proxy(self, num):
         pane = self.wmanager.add_new_pane(self.config.proxy_guest_pane,
                 self.config.is_remote)
 
-        pane.send_keys("ssh -p 2222 tas@localhost")
+        ssh_com = "ssh -p 222{} tas@localhost".format(num)
+        pane.send_keys(ssh_com)
         time.sleep(2)
         pane.send_keys("tas")
 
@@ -238,7 +238,8 @@ class Host(object):
         pane = self.wmanager.add_new_pane(self.config.benchmark_pane,
                 self.config.is_remote)
 
-        pane.send_keys("ssh -p 2222 tas@localhost")
+        ssh_com = "ssh -p 222{} tas@localhost".format(num)
+        pane.send_keys(ssh_com)
         time.sleep(2)
         pane.send_keys("tas")
         
