@@ -11,6 +11,6 @@ tas_bare_exp = exp.Experiment(TasBareConf(), name="tas")
 tas_virt_exp = exp.Experiment(TasVirtConf(), name="tas")
 
 # experiments.append(lin_bare_exp)
-# experiments.append(lin_virt_exp)
+experiments.append(lin_virt_exp)
 # experiments.append(tas_bare_exp)
-experiments.append(tas_virt_exp)
+# experiments.append(tas_virt_exp)

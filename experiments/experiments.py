@@ -108,10 +108,10 @@ class Host(object):
         self.run_setup_cmds()
         if self.hstack == 'tas':
             self.run_tas()
-            time.sleep(3)
+            time.sleep(2)
         if self.hstack == 'tas' and self.htype == 'virt':
             self.run_host_proxy()
-            time.sleep(3)
+            time.sleep(2)
         for i in range(self.node_num):
             if self.htype == 'virt':
                 self.run_vms(i, exp=exp)
@@ -131,7 +131,7 @@ class Host(object):
         pane.enter()
         time.sleep(3)
         pane.send_keys('tmux')
-        time.sleep(5)
+        time.sleep(3)
 
     def run_vm(self, pane, window_name, exp, num = 0):
         """ Run preboot commands """
@@ -165,45 +165,11 @@ class Host(object):
             pane.send_keys(cmd)
             time.sleep(2)
 
-        # """ Run TAS proxy """
-        # if self.hstack == 'tas':
-        #     time.sleep(3)
-        #     Host.compile_and_run(
-        #             pane=pane,
-        #             comp_dir=self.node_config.guest_proxy_comp_dir,
-        #             comp_cmd=self.node_config.guest_proxy_comp_cmd,
-        #             exec_file=self.node_config.guest_proxy_exec_file,
-        #             out_file=self.node_config.guest_proxy_out_file,
-        #             args=' ',
-        #             bg=True)
-        #     time.sleep(3)
-        #     print("  * VM TAS proxy : " + cmd)
-        #     time.sleep(10)
-            
-            # print("")
-            # pane.send_keys('tmux new-window')
- 
-        # """ Run Benchmark """
-        # if self.node_config.is_server:
-        #     benchmark_args = self.gen_config.benchmark_server_args
-        # else:
-        #     benchmark_args = self.gen_config.benchmark_client_args
-
-        # self.run_benchmark_rpc(
-        #         pane = pane,
-        #         stack = self.hstack,
-        #         comp_dir = self.node_config.benchmark_comp_dir,
-        #         comp_cmd = self.node_config.benchmark_comp_cmd,
-        #         lib_so = self.node_config.tas_lib_so,
-        #         exec_file = self.node_config.benchmark_exec_file,
-        #         out = self.node_config.benchmark_out + '_' + exp + '_' + str(num),
-        #         args=benchmark_args)
-
     def run_benchmark_rpc(self, pane, stack, 
             comp_dir, comp_cmd, lib_so, exec_file, out, args):
         pane.send_keys('cd ' + comp_dir)
         pane.send_keys(comp_cmd)
-        time.sleep(5)
+        time.sleep(3)
         cmd = 'sudo '
         if stack == 'tas':
             cmd += 'LD_PRELOAD=' + lib_so + ' '
@@ -312,7 +278,7 @@ class WindowManager:
         pane = window.attached_pane 
         if is_remote:
             pane.send_keys(self.config.remote_connect_cmd)
-            time.sleep(3)
+            time.sleep(2)
         return pane
 
     def close_panes(self):
@@ -329,8 +295,9 @@ class Experiment:
         self.client_host = Client(self.wmanager, config)
 
     def run(self):
-        # self.server_host.run(self.get_name())
+        self.server_host.run(self.get_name())
         self.client_host.run(self.get_name())
+        time.sleep(1)
 
     def reset(self):
         self.wmanager.close_panes()

@@ -3,7 +3,7 @@ from configs.gen_config import HostConfig
 class Config:
     def __init__(self):
         self.pane_prefix = 'e_'
-        self.remote_connect_cmd = 'ssh swsnetlab03'
+        self.remote_connect_cmd = 'ssh swsnetlab04'
 
         self.server = HostConfig(
             name='server',

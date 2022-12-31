@@ -96,6 +96,8 @@ struct vm_queue {
   uint16_t dc;
   /* Bytes sent in this round for this VM. Reset every round. */
   uint16_t bytes;
+  /* Assigned rate in cpu cycles per second */
+  uint32_t rate;
 };
 
 /** Queue state for flow */
@@ -611,7 +613,8 @@ static void inline flow_set_impl(struct qman_thread *t, struct flow_qman *fqman,
     new_avail = 1;
   }
 
-  dprintf("flow_set_impl: t=%p q=%p idx=%u avail=%u rate=%u qflags=%x flags=%x\n", t, q, idx, q->avail, q->rate, q->flags, flags);
+  dprintf("flow_set_impl: t=%p q=%p idx=%u avail=%u rate=%u qflags=%x flags=%x\n", 
+      t, q, idx, q->avail, q->rate, q->flags, flags);
 
   if (new_avail && q->avail > 0
       && ((q->flags & (FLAG_INSKIPLIST | FLAG_INNOLIMITL)) == 0)) {
@@ -627,7 +630,8 @@ static inline void flow_queue_activate_nolimit(struct flow_qman *fqman,
 
   assert((q->flags & (FLAG_INSKIPLIST | FLAG_INNOLIMITL)) == 0);
 
-  dprintf("flow_queue_activate_nolimit: t=%p q=%p avail=%u rate=%u flags=%x\n", t, q, q->avail, q->rate, q->flags);
+  dprintf("flow_queue_activate_nolimit: t=%p q=%p avail=%u rate=%u flags=%x\n",
+      t, q, q->avail, q->rate, q->flags);
 
   q->flags |= FLAG_INNOLIMITL;
   q->next_idxs[0] = IDXLIST_INVAL;
@@ -661,7 +665,8 @@ static inline unsigned flow_poll_nolimit(struct qman_thread *t, struct vm_queue 
       fqman->nolimit_tail_idx = IDXLIST_INVAL;
 
     q->flags &= ~FLAG_INNOLIMITL;
-    dprintf("flow_poll_nolimit: t=%p q=%p idx=%u avail=%u rate=%u flags=%x\n", t, q, idx, q->avail, q->rate, q->flags);
+    dprintf("flow_poll_nolimit: t=%p q=%p idx=%u avail=%u rate=%u flags=%x\n",
+        t, q, idx, q->avail, q->rate, q->flags);
     if (q->avail > 0) {
       flow_queue_fire(t, vqueue, fqman, q, idx, q_ids + cnt, q_bytes + cnt);
       cnt++;
@@ -682,8 +687,9 @@ static inline void flow_queue_activate_skiplist(struct qman_thread *t,
 
   assert((q->flags & (FLAG_INSKIPLIST | FLAG_INNOLIMITL)) == 0);
 
-  dprintf("flow_queue_activate_skiplist: t=%p q=%p idx=%u avail=%u rate=%u flags=%x ts_virt=%u next_ts=%u\n", t, q, q_idx, q->avail, q->rate, q->flags,
-      t->ts_virtual, q->next_ts);
+  dprintf("flow_queue_activate_skiplist: t=%p q=%p idx=%u avail=%u "
+      "rate=%u flags=%x ts_virt=%u next_ts=%u\n", 
+      t, q, q_idx, q->avail, q->rate, q->flags, t->ts_virtual, q->next_ts);
 
   /* make sure queue has a reasonable next_ts:
    *  - not in the past
@@ -705,7 +711,6 @@ static inline void flow_queue_activate_skiplist(struct qman_thread *t,
     while (idx != IDXLIST_INVAL &&
         timestamp_lessthaneq(t, fqman->queues[idx].next_ts, ts))
     {
-      
       pred = idx;
       idx = fqman->queues[idx].next_idxs[l];
     }
@@ -778,7 +783,8 @@ static inline unsigned flow_poll_skiplist(struct qman_thread *t,
     /* advance virtual timestamp */
     t->ts_virtual = q->next_ts;
 
-    dprintf("flow_poll_skiplist: t=%p q=%p idx=%u avail=%u rate=%u flags=%x\n", t, q, idx, q->avail, q->rate, q->flags);
+    dprintf("flow_poll_skiplist: t=%p q=%p idx=%u avail=%u rate=%u flags=%x\n",
+        t, q, idx, q->avail, q->rate, q->flags);
 
     if (q->avail > 0) {
       flow_queue_fire(t, vqueue, fqman, q, idx, q_ids + cnt, q_bytes + cnt);
@@ -829,7 +835,8 @@ static inline void flow_queue_fire(struct qman_thread *t,
   bytes = (vqueue->dc < bytes ? vqueue->dc : bytes);
   q->avail -= bytes;
 
-  dprintf("flow_queue_fire: t=%p q=%p idx=%u gidx=%u bytes=%u avail=%u rate=%u\n", t, q, idx, idx, bytes, q->avail, q->rate);
+  dprintf("flow_queue_fire: t=%p q=%p idx=%u gidx=%u bytes=%u avail=%u rate=%u\n",
+      t, q, idx, idx, bytes, q->avail, q->rate);
   if (q->rate > 0) 
   {
     q->next_ts = flow_queue_new_ts(t, q, bytes);
@@ -851,9 +858,6 @@ static inline void flow_queue_fire(struct qman_thread *t,
   trace_event(FLEXNIC_TRACE_EV_QMEVT, sizeof(evt), &evt);
 #endif
 
-  /* Return wether in the beginning the number of available bytes
-     was smaller than the deficit counter this is used to determine
-     wether we should stop scheduling packets for this VM in this round */
 }
 
 static inline void flow_queue_activate(struct qman_thread *t, struct flow_qman *fqman,
