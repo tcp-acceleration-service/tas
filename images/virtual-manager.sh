@@ -5,6 +5,7 @@ set -ex
 machineName=$1
 option=$2
 num=$3
+mac=$4
 cnt=0
 
 STTY_SETTINGS="$( stty -g )"

@@ -54,4 +54,5 @@ for e in experiments:
     e.run()
     print(e.get_name())
     time.sleep(100)
+    e.cleanup()
     e.reset()

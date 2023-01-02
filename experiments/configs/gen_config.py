@@ -12,6 +12,7 @@ class HostConfig:
         self.setup_cmds = []
         self.cleanup_cmds = []
         self.setup_pane = name + '_setup'
+        self.cleanup_pane = name + '_cleanup'
 
         # tas configurations
         self.tas_pane = name + '_tas'

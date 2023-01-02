@@ -1,9 +1,44 @@
 from configs.gen_config import HostConfig
 
+def setup_tap(num, intf, ip):
+    setup_cmds = ["sudo brctl addbr br0",
+            "sudo ip addr flush dev {}".format(intf),
+            "sudo brctl addif br0 {}".format(intf)]
+
+    for i in range(num):
+        setup_cmds.append("sudo tunctl -t tap{} -u `whoami`".format(i))
+        setup_cmds.append("sudo brctl addif br0 tap{}".format(i))
+        setup_cmds.append("sudo ifconfig tap{} up".format(i))
+
+    setup_cmds.append("sudo ifconfig {} up".format(intf))
+    setup_cmds.append("sudo ifconfig br0 up")
+    setup_cmds.append("sudo ip addr add {}/24 dev br0".format(ip))
+
+    return setup_cmds
+    
+
+def cleanup_tap(num, intf, ip):
+    cleanup_cmds = []
+
+    for i in range(num):
+        cleanup_cmds.append("sudo brctl delif br0 tap{}".format(i))
+        cleanup_cmds.append("sudo tunctl -d tap{}".format(i))
+
+    cleanup_cmds.append("sudo brctl delif br0 {}".format(intf))
+    cleanup_cmds.append("sudo ifconfig br0 down")
+    cleanup_cmds.append("sudo brctl delbr br0")
+    cleanup_cmds.append("sudo ifonfig {} up".format(intf))
+    cleanup_cmds.append("sudo ip addr add {}/24 dev {}".format(ip, intf))
+
+    return cleanup_cmds
+
+
 class Config:
     def __init__(self):
         self.pane_prefix = 'e_'
         self.remote_connect_cmd = 'ssh swsnetlab04'
+        server_ip = "192.168.10.14"
+        client_ip = "192.168.10.13"
 
         self.server = HostConfig(
             name='server',
@@ -39,40 +74,12 @@ class Config:
         self.msize = 64
 
         # Setup and clean up of tap device
-        self.server.setup_cmds = ["sudo brctl add br0",
-                "sudo ip addr flush dev ens1f0",
-                "sudo brctl addif br0 ens1f0",
-                "sudo tunctl -t tap0 -u `whoami`",
-                "sudo brctl addif br0 tap0",
-                "sudo ifconfig ens1f0 up",
-                "sudo ifconfig tap0 up",
-                "sudo ifconfig br0 up"
-                "sudo ip addr add 192.168.10.14/24 dev ens1f0"]
-        self.server.cleanup_cmds = ["sudo brctl delif br0 tap0",
-                "sudo tunctl -d tap0",
-                "sudo brctl delif br0 ens1f0",
-                "sudo ifconfig br0 down",
-                "sudo brctl delbr br0",
-                "sudo ifonfig ens1f0 up",
-                "sudo ip addr add 192.168.10.14/24 dev ens1f0"]
+        self.server.setup_cmds = setup_tap(self.snum, "ens1f0", server_ip)
+        self.server.cleanup_cmds = cleanup_tap(self.snum, "ens1f0", server_ip)
 
-        self.client.setup_cmds = ["sudo brctl add br0",
-                "sudo ip addr flush dev ens1f0np0",
-                "sudo brctl addif br0 ens1f0np0",
-                "sudo tunctl -t tap0 -u `whoami`",
-                "sudo brctl addif br0 tap0",
-                "sudo ifconfig ens1f0np0 up",
-                "sudo ifconfig tap0 up",
-                "sudo ifconfig br0 up"
-                "sudo ip addr add 192.168.10.13/24 dev ens1f0np0"]
-        self.client.cleanup_cmds = ["sudo brctl delif br0 tap0",
-                "sudo tunctl -d tap0",
-                "sudo brctl delif br0 ens1f0np0",
-                "sudo ifconfig br0 down",
-                "sudo brctl delbr br0",
-                "sudo ifonfig ens1f0np0 up",
-                "sudo ip addr add 192.168.10.14/24 dev ens1f0np0"]
+        self.client.setup_cmds = setup_tap(self.cnum, "ens1f0np0", client_ip)
+        self.client.cleanup_cmds = cleanup_tap(self.cnum, "ens1f0np0", client_ip)
 
-        self.benchmark_server_args = " 1234 1 foo 4096 1024"
-        self.benchmark_client_args = " 192.168.10.14 1234 1 foo " + \
-                str(self.msize) + " 64 " + str(self.connum) + " 0 0 16"
+        self.benchmark_server_args = "1234 1 foo 4096 1024"
+        self.benchmark_client_args = "{} 1234 1 foo {} 64 {} 0 0 16".format(
+                server_ip, self.msize, self.connum)

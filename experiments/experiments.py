@@ -30,10 +30,21 @@ class Host(object):
     def run_setup_cmds(self):
         pane = self.wmanager.add_new_pane(self.config.setup_pane,
                 self.config.is_remote)
+        time.sleep(3)
         for cmd in self.config.setup_cmds:
             pane.send_keys(cmd)
             time.sleep(1)
-        self.config_pane = pane
+        self.setup_pane = pane
+
+    def run_cleanup_cmds(self):
+        pane = self.wmanager.add_new_pane(self.config.cleanup_pane,
+                self.config.is_remote)
+
+        for cmd in self.config.cleanup_cmds:
+            pane.send_keys(cmd)
+            time.sleep(1)
+        self.cleanup_pane = pane
+
 
     def run_host_proxy(self):
         pane = self.wmanager.add_new_pane(self.config.proxy_pane,
@@ -143,10 +154,16 @@ class Host(object):
         pane.send_keys('cd ' + self.config.vm_manager_dir)
 
         cmd = 'sudo '
-        if self.hstack == 'linux':
-            cmd += self.config.vm_manager('base', 'tap', num)
+
+        if self.config.is_server:
+            mac = num
         else:
-            cmd += self.config.vm_manager('base', 'proxy', num)
+            mac = 100 + num
+        
+        if self.hstack == 'linux':
+            cmd += self.config.vm_manager('base', 'tap', num, mac)
+        else:
+            cmd += self.config.vm_manager('base', 'proxy', num, mac)
         pane.send_keys(cmd)
         print("CMD : " + cmd)
         print("Server VM"+ window_name + " started.")
@@ -154,11 +171,6 @@ class Host(object):
 
         self.login_vm(pane, window_name)
         pane.send_keys('tmux set-option remain-on-exit on')
-       
-        """ Run setup commands """
-        for cmd in self.node_config.setup_cmds:
-            pane.send_keys(cmd(num))
-            time.sleep(2)
 
         """ Run VM specific postboot setup commands """
         for cmd in self.node_config.vm_manager_postboot_cmds:
@@ -259,6 +271,7 @@ class WindowManager:
         self.window_names.append(config.client.benchmark_pane)
         self.window_names.append(config.client.node_pane)
         self.window_names.append(config.client.proxy_guest_pane)
+        self.window_names.append(config.client.cleanup_pane)
 
         self.window_names.append(config.server.setup_pane)
         self.window_names.append(config.server.tas_pane)
@@ -266,6 +279,7 @@ class WindowManager:
         self.window_names.append(config.server.benchmark_pane)
         self.window_names.append(config.server.node_pane)
         self.window_names.append(config.server.proxy_guest_pane)
+        self.window_names.append(config.server.cleanup_pane)
     
     def close_pane(self, name):
         wname  = self.config.pane_prefix + name
@@ -301,6 +315,10 @@ class Experiment:
 
     def reset(self):
         self.wmanager.close_panes()
+
+    def cleanup(self):
+        self.server_host.run_cleanup_cmds()
+        self.client_host.run_cleanup_cmds()
 
     def get_name(self):
         e = self.name + '-' + self.server_host.htype + '-' + \
