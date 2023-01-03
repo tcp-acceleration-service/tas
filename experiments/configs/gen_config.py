@@ -59,10 +59,11 @@ class HostConfig:
             "sudo echo 1af4 1110 > /sys/bus/pci/drivers/vfio-pci/new_id",
             "exit"
         ]
+        self.vm_manager_vmspecific_postboot_cmds = []
         self.vm_manager_dir = self.project_dir + 'images/'
-        self.vm_manager = lambda machine, stack, id : self.vm_manager_dir + \
+        self.vm_manager = lambda machine, stack, id, mac: self.vm_manager_dir + \
                 'virtual-manager.sh' + ' ' + str(machine) + \
-                ' ' + str(stack) + ' ' + str(id)
+                ' ' + str(stack) + ' ' + str(id) + ' ' + str(mac)
 
         # benchmark configurations
         self.benchmark_pane = 'benchmark_' + name

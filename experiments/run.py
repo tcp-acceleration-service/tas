@@ -37,7 +37,7 @@ for path in args.experiments:
 
 if (args.reset):
     for e in experiments:
-        e.wmanager.close_panes()
+        e.reset()
     exit()
 
 for e in experiments:
@@ -53,6 +53,7 @@ for e in experiments:
     e.reset()
     e.run()
     print(e.get_name())
+    import pdb
+    pdb.set_trace()
     time.sleep(100)
-    e.cleanup()
     e.reset()

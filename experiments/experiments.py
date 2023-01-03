@@ -141,8 +141,6 @@ class Host(object):
         pane.send_keys(suppress_history=False, cmd='tas')
         pane.enter()
         time.sleep(3)
-        pane.send_keys('tmux')
-        time.sleep(3)
 
     def run_vm(self, pane, window_name, exp, num = 0):
         """ Run preboot commands """
@@ -155,10 +153,11 @@ class Host(object):
 
         cmd = 'sudo '
 
+        # Can't set one's place bit or else MAC address won't be valid
         if self.config.is_server:
-            mac = num
+            mac = 10 + num * 2
         else:
-            mac = 100 + num
+            mac = 30 + num * 2
         
         if self.hstack == 'linux':
             cmd += self.config.vm_manager('base', 'tap', num, mac)
@@ -174,6 +173,10 @@ class Host(object):
 
         """ Run VM specific postboot setup commands """
         for cmd in self.node_config.vm_manager_postboot_cmds:
+            pane.send_keys(cmd)
+            time.sleep(2)
+
+        for cmd in self.config.vm_manager_vmspecific_postboot_cmds[num]:
             pane.send_keys(cmd)
             time.sleep(2)
 
@@ -193,7 +196,8 @@ class Host(object):
         pane = self.wmanager.add_new_pane(self.config.proxy_guest_pane,
                 self.config.is_remote)
 
-        ssh_com = "ssh -p 222{} tas@localhost".format(num)
+        ip = self.get_vm_ip(num)
+        ssh_com = "ssh tas@{}".format(ip)
         pane.send_keys(ssh_com)
         time.sleep(2)
         pane.send_keys("tas")
@@ -216,7 +220,8 @@ class Host(object):
         pane = self.wmanager.add_new_pane(self.config.benchmark_pane,
                 self.config.is_remote)
 
-        ssh_com = "ssh -p 222{} tas@localhost".format(num)
+        ip = self.get_vm_ip(num)
+        ssh_com = "ssh tas@{}".format(ip)
         pane.send_keys(ssh_com)
         time.sleep(2)
         pane.send_keys("tas")
@@ -236,6 +241,12 @@ class Host(object):
                 exec_file = self.node_config.benchmark_exec_file,
                 out = self.node_config.benchmark_out + '_' + exp + '_' + str(num),
                 args=benchmark_args)
+
+    def get_vm_ip(self, i):
+        if self.node_config.is_server:
+            return "192.168.10.{}".format(i + 20)
+        else:
+            return "192.168.10.{}".format(i + 30)
 
 
 class Server(Host):
@@ -309,15 +320,16 @@ class Experiment:
         self.client_host = Client(self.wmanager, config)
 
     def run(self):
-        self.server_host.run(self.get_name())
+        # self.server_host.run(self.get_name())
         self.client_host.run(self.get_name())
         time.sleep(1)
 
     def reset(self):
+        self.cleanup()
         self.wmanager.close_panes()
 
     def cleanup(self):
-        self.server_host.run_cleanup_cmds()
+        # self.server_host.run_cleanup_cmds()
         self.client_host.run_cleanup_cmds()
 
     def get_name(self):

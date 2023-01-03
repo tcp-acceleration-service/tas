@@ -20,7 +20,7 @@ disk_img="base.img"
 seed_img="seed.img"
 disk_img_snapshot="${machineName}.snapshot.qcow2"
 
-echo "NUM = ${num}"
+echo "NUM = ${mac}"
 
 if [[ $option == proxy ]]; then
   sudo qemu-system-x86_64 \
@@ -45,10 +45,8 @@ elif [[ $option == tap ]]; then
     -smp 16 \
     -m 12G \
     -snapshot \
-    -device virtio-net-pci,netdev=net0 \
-    -netdev user,id=net0,hostfwd=tcp::222${num}-:22 \
-    -netdev tap,ifname=tap0,script=no,downscript=no,vhost=on,id=nInt\
-    -device virtio-net-pci,mac=52:54:00:12:34:56,netdev=nInt \
+    -netdev tap,ifname=tap${num},script=no,downscript=no,vhost=on,id=net0 \
+    -device virtio-net-pci,mac=52:54:00:12:34:${mac},netdev=net0 \
     -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
     -drive if=virtio,format=raw,file="seed.img" \
   ;

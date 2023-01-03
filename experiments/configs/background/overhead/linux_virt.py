@@ -32,6 +32,21 @@ def cleanup_tap(num, intf, ip):
 
     return cleanup_cmds
 
+def postboot_cmds(num, is_server):
+    postboot_cmds = []
+
+    for i in range(num):
+        cmds = []
+        if is_server:
+            cmds.append("sudo ip addr add 192.168.10.{}/24 dev enp0s2".format(i + 20))
+        else:
+            cmds.append("sudo ip addr add 192.168.10.{}/24 dev enp0s2".format(i + 30))
+
+        cmds.append("sudo ip link set enp0s2 up")
+        postboot_cmds.append(cmds)
+
+    return postboot_cmds
+
 class Config:
     def __init__(self):
         self.pane_prefix = 'e_'
@@ -68,16 +83,18 @@ class Config:
         self.snum = 1
         self.ctype = 'virt'
         self.cstack = 'linux'
-        self.cnum = 1
+        self.cnum = 5
         self.connum = 1
         self.msize = 64
 
         # Setup and clean up of tap device
         self.server.setup_cmds = setup_tap(self.snum, "ens1f0", server_ip)
         self.server.cleanup_cmds = cleanup_tap(self.snum, "ens1f0", server_ip)
+        self.server.vm_manager_vmspecific_postboot_cmds = postboot_cmds(self.snum, True)
 
         self.client.setup_cmds = setup_tap(self.cnum, "ens1f0np0", client_ip)
         self.client.cleanup_cmds = cleanup_tap(self.cnum, "ens1f0np0", client_ip)
+        self.client.vm_manager_vmspecific_postboot_cmds = postboot_cmds(self.cnum, False)
 
         self.benchmark_server_args = "1234 1 foo 4096 1024"
         self.benchmark_client_args = "{} 1234 1 foo {} 64 {} 0 0 16".format(
