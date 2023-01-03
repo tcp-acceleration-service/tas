@@ -52,7 +52,9 @@ class Config:
         self.pane_prefix = 'e_'
         self.remote_connect_cmd = 'ssh swsnetlab04'
         server_ip = "192.168.10.14"
+        server_ip_vm = "192.168.10.20"
         client_ip = "192.168.10.13"
+
 
         self.server = HostConfig(
             name='server',
@@ -83,7 +85,7 @@ class Config:
         self.snum = 1
         self.ctype = 'virt'
         self.cstack = 'linux'
-        self.cnum = 5
+        self.cnum = 3
         self.connum = 1
         self.msize = 64
 
@@ -98,4 +100,4 @@ class Config:
 
         self.benchmark_server_args = "1234 1 foo 4096 1024"
         self.benchmark_client_args = "{} 1234 1 foo {} 64 {} 0 0 16".format(
-                server_ip, self.msize, self.connum)
+                server_ip_vm, self.msize, self.connum)

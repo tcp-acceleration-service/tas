@@ -176,7 +176,13 @@ class Host(object):
             pane.send_keys(cmd)
             time.sleep(2)
 
-        for cmd in self.config.vm_manager_vmspecific_postboot_cmds[num]:
+
+        if len(self.config.vm_manager_vmspecific_postboot_cmds) > 0:
+            spec_postboot_cmds = self.config.vm_manager_vmspecific_postboot_cmds[num]
+        else:
+            spec_postboot_cmds = []
+        
+        for cmd in spec_postboot_cmds:
             pane.send_keys(cmd)
             time.sleep(2)
 
@@ -188,7 +194,7 @@ class Host(object):
         cmd = 'sudo '
         if stack == 'tas':
             cmd += 'LD_PRELOAD=' + lib_so + ' '
-        cmd += exec_file + ' ' +  args # + ' | tee ' + out
+        cmd += exec_file + ' ' +  args + ' | tee ' + out
         print(cmd) 
         pane.send_keys(cmd)
 
@@ -197,7 +203,11 @@ class Host(object):
                 self.config.is_remote)
 
         ip = self.get_vm_ip(num)
-        ssh_com = "ssh tas@{}".format(ip)
+        if self.hstack == "linux":
+            ssh_com = "ssh tas@{}".format(ip)
+        else:
+            ssh_com = "ssh -p 222{} tas@localhost".format(num)
+
         pane.send_keys(ssh_com)
         time.sleep(2)
         pane.send_keys("tas")
@@ -221,7 +231,11 @@ class Host(object):
                 self.config.is_remote)
 
         ip = self.get_vm_ip(num)
-        ssh_com = "ssh tas@{}".format(ip)
+        if self.hstack == "linux":
+            ssh_com = "ssh tas@{}".format(ip)
+        else:
+            ssh_com = "ssh -p 222{} tas@localhost".format(num)
+
         pane.send_keys(ssh_com)
         time.sleep(2)
         pane.send_keys("tas")
@@ -320,7 +334,7 @@ class Experiment:
         self.client_host = Client(self.wmanager, config)
 
     def run(self):
-        # self.server_host.run(self.get_name())
+        self.server_host.run(self.get_name())
         self.client_host.run(self.get_name())
         time.sleep(1)
 
@@ -329,7 +343,7 @@ class Experiment:
         self.wmanager.close_panes()
 
     def cleanup(self):
-        # self.server_host.run_cleanup_cmds()
+        self.server_host.run_cleanup_cmds()
         self.client_host.run_cleanup_cmds()
 
     def get_name(self):
