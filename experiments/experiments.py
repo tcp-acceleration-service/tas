@@ -1,10 +1,11 @@
 import libtmux
 import time
+import os
 
 class Host(object):
 
     def __init__(self, wmanager, gen_config, config, nconfig,
-            htype, hstack, hnum):
+            htype, hstack, hnum, log_paths):
         self.htype = htype
         self.hstack = hstack
         self.wmanager = wmanager
@@ -12,6 +13,7 @@ class Host(object):
         self.config = config
         self.node_config = nconfig
         self.node_num = hnum
+        self.log_paths = log_paths
 
     def run_tas(self):
         pane = self.wmanager.add_new_pane(self.config.tas_pane, 
@@ -166,7 +168,7 @@ class Host(object):
         pane.send_keys(cmd)
         print("CMD : " + cmd)
         print("Server VM"+ window_name + " started.")
-        time.sleep(20)
+        time.sleep(23)
 
         self.login_vm(pane, window_name)
         pane.send_keys('tmux set-option remain-on-exit on')
@@ -198,15 +200,13 @@ class Host(object):
         print(cmd) 
         pane.send_keys(cmd)
 
+        self.log_paths.append(out)
+
     def run_guest_proxy(self, num):
         pane = self.wmanager.add_new_pane(self.config.proxy_guest_pane,
                 self.config.is_remote)
 
-        ip = self.get_vm_ip(num)
-        if self.hstack == "linux":
-            ssh_com = "ssh tas@{}".format(ip)
-        else:
-            ssh_com = "ssh -p 222{} tas@localhost".format(num)
+        ssh_com = self.get_ssh_command(num)
 
         pane.send_keys(ssh_com)
         time.sleep(2)
@@ -230,11 +230,7 @@ class Host(object):
         pane = self.wmanager.add_new_pane(self.config.benchmark_pane,
                 self.config.is_remote)
 
-        ip = self.get_vm_ip(num)
-        if self.hstack == "linux":
-            ssh_com = "ssh tas@{}".format(ip)
-        else:
-            ssh_com = "ssh -p 222{} tas@localhost".format(num)
+        ssh_com = self.get_ssh_command(num)
 
         pane.send_keys(ssh_com)
         time.sleep(2)
@@ -256,6 +252,24 @@ class Host(object):
                 out = self.node_config.benchmark_out + '_' + exp + '_' + str(num),
                 args=benchmark_args)
 
+    def get_ssh_command(self, num):
+        ip = self.get_vm_ip(num)
+        if self.hstack == "linux":
+            ssh_com = "ssh tas@{}".format(ip)
+        else:
+            ssh_com = "ssh -p 222{} tas@localhost".format(num)
+        
+        return ssh_com
+
+    def get_scp_command(self, num, src_path, save_path):
+        ip = self.get_vm_ip(num)
+        if self.hstack == "linux":
+            ssh_com = "scp tas@{}:{} {}".format(ip, src_path, save_path)
+        else:
+            ssh_com = "scp -P 222{} tas@localhost:{} {}".format(num, src_path, save_path)
+        
+        return ssh_com
+
     def get_vm_ip(self, i):
         if self.node_config.is_server:
             return "192.168.10.{}".format(i + 20)
@@ -265,15 +279,15 @@ class Host(object):
 
 class Server(Host):
 
-    def __init__(self, wmanager, config):
+    def __init__(self, wmanager, config, log_paths):
         Host.__init__(self, wmanager, config, config.server, config.snode, 
-            config.stype, config.sstack, config.snum)
+            config.stype, config.sstack, config.snum, log_paths)
 
 
 class Client(Host):
-    def __init__(self, wmanager, config):
+    def __init__(self, wmanager, config, log_paths):
         Host.__init__(self, wmanager, config, config.client, config.cnode, 
-                config.ctype, config.cstack, config.cnum)
+                config.ctype, config.cstack, config.cnum, log_paths)
         self.message_size = config.msize
         self.client_num = config.cnum
 
@@ -297,6 +311,7 @@ class WindowManager:
         self.window_names.append(config.client.node_pane)
         self.window_names.append(config.client.proxy_guest_pane)
         self.window_names.append(config.client.cleanup_pane)
+        self.window_names.append(config.client.save_logs_pane)
 
         self.window_names.append(config.server.setup_pane)
         self.window_names.append(config.server.tas_pane)
@@ -305,6 +320,7 @@ class WindowManager:
         self.window_names.append(config.server.node_pane)
         self.window_names.append(config.server.proxy_guest_pane)
         self.window_names.append(config.server.cleanup_pane)
+        self.window_names.append(config.server.save_logs_pane)
     
     def close_pane(self, name):
         wname  = self.config.pane_prefix + name
@@ -328,14 +344,18 @@ class WindowManager:
 class Experiment:
 
     def __init__(self,  config, name):
+        self.log_paths_client = []
+        self.log_paths_server = []
         self.wmanager = WindowManager(config)
         self.name = name
-        self.server_host = Server(self.wmanager, config)
-        self.client_host = Client(self.wmanager, config)
+        self.server_host = Server(self.wmanager, config, self.log_paths_server)
+        self.client_host = Client(self.wmanager, config, self.log_paths_client)
+        self.config = config
+        self.exp_path = ''
 
     def run(self):
         self.server_host.run(self.get_name())
-        self.client_host.run(self.get_name())
+        # self.client_host.run(self.get_name())
         time.sleep(1)
 
     def reset(self):
@@ -344,7 +364,36 @@ class Experiment:
 
     def cleanup(self):
         self.server_host.run_cleanup_cmds()
-        self.client_host.run_cleanup_cmds()
+        # self.client_host.run_cleanup_cmds()
+
+    def save_logs(self):
+        split_path = self.exp_path.split("/")
+        n = len(split_path)
+        
+        out_dir = os.getcwd() + "/" + "/".join(split_path[:n - 1]) + "/out/"
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+       
+        if self.client_host.htype == "virt":
+            self.save_logs_virt(out_dir)
+        else:
+            self.save_logs_bare(out_dir)
+
+    def save_logs_virt(self, out_dir, host):
+        pane = self.wmanager.add_new_pane(self.client_host.config.save_logs_pane,
+                self.client_host.config.is_remote)
+        for i, path in enumerate(self.log_paths_client):
+            scp_com = self.client_host.get_scp_command(i, 
+                    path, out_dir + "/.")
+            pane.send_keys(scp_com)
+            time.sleep(2)
+            pane.send_keys(suppress_history=False, cmd='tas')
+            time.sleep(1)
+            
+
+    def save_logs_bare(self, out_dir):
+        for path in self.log_paths_client:
+            os.rename(path, out_dir + os.path.basename(path))
 
     def get_name(self):
         e = self.name + '-' + self.server_host.htype + '-' + \

@@ -41,6 +41,7 @@ if (args.reset):
     exit()
 
 for e in experiments:
+    e.exp_path = path
     if (args.filter) and (len(args.filter) > 0):
         match = False
         for f in args.filter:
@@ -52,6 +53,7 @@ for e in experiments:
     print('******' + e.get_name() + '********')
     e.reset()
     e.run()
-    print(e.get_name())
+    print(e.get_name()) 
     time.sleep(100)
+    e.save_logs()
     e.reset()

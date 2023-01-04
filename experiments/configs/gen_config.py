@@ -7,6 +7,7 @@ class HostConfig:
         self.vm_project_dir = '/home/tas/projects/tas/'
         self.output_dir = self.project_dir + 'experiments/out/'
         self.vm_output_dir = self.vm_project_dir + "experiments/out/"
+        self.save_logs_pane = name + '_savelogs'
 
         # pre-start commands
         self.setup_cmds = []
@@ -23,7 +24,7 @@ class HostConfig:
         self.tas_client_out_file = self.output_dir + 'tas_c'
         self.tas_out_file = ''
         self.tas_lib_so = self.tas_comp_dir + 'lib/libtas_interpose.so'
-        self.tas_args = ' --fp-cores-max=1' + \
+        self.tas_args = ' --fp-cores-max=3' + \
             ' --cc=const-rate --cc-const-rate=0 --fp-no-ints' + \
             ' --fp-no-autoscale --dpdk-extra="-w3b:00.0"'
         if is_server:

@@ -49,9 +49,7 @@ enum config_cc_algorithm {
 
 /** Struct containing the parsed configuration parameters */
 struct configuration {
-  /* shared memory size */
-  uint64_t internal_shm_len;
-  /** memory region size of vms */
+  /** shared memory size for one vm */
   uint64_t vm_shm_len;
   /** data memory reserved offset for vms */
   uint64_t data_mem_off;

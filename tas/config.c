@@ -35,7 +35,6 @@
 #include <config.h>
 
 enum cfg_params {
-  CP_INTERN_SHM_LEN,
   CP_VM_SHM_LEN,
   CP_DATA_MEM_OFF,
   CP_NIC_RX_LEN,
@@ -87,9 +86,6 @@ enum cfg_params {
 };
 
 static struct option opts[] = {
-    { .name = "shm-len",
-      .has_arg = required_argument,
-      .val = CP_INTERN_SHM_LEN },
     { .name = "vm-shm-len",
       .has_arg = required_argument,
       .val = CP_VM_SHM_LEN },
@@ -261,12 +257,6 @@ int config_parse(struct configuration *c, int argc, char *argv[])
   while (!done) {
     ret = getopt_long(argc, argv, "", opts, NULL);
     switch (ret) {
-      case CP_INTERN_SHM_LEN:
-        if (parse_int64(optarg, &c->internal_shm_len) != 0) {
-          fprintf(stderr, "shm len parsing failed\n");
-          goto failed;
-        }
-        break;
       case CP_VM_SHM_LEN:
         if (parse_int64(optarg, &c->vm_shm_len) != 0) { 
           fprintf(stderr, "group shm len parsing failed\n");
@@ -585,8 +575,7 @@ failed:
 static int config_defaults(struct configuration *c, char *progname)
 {
   c->ip = 0;
-  c->internal_shm_len = 1 * 256 * 1024 * 1024;
-  c->vm_shm_len = 1 * 256 * 1024 * 1024;
+  c->vm_shm_len = 1 * 1024 * 1024 * 1024;
   /* Set the data mem off to the end of the channel used by the proxy */
   c->data_mem_off = 0x4000;
   c->nic_rx_len = 16 * 1024;
@@ -648,8 +637,6 @@ static void print_usage(struct configuration *c, char *progname)
   fprintf(stderr, "Usage: %s [OPTION]... --ip-addr=IP[/PREFIXLEN]\n"
       "\n"
       "Memory Sizes:\n"
-      "  --internal-shm-len=LEN      Shared memory len "
-          "[default: %"PRIu64"]\n"
       "  --nic-rx-len=LEN            Kernel rx queue len "
           "[default: %"PRIu64"]\n"
       "  --nic-tx-len=LEN            Kernel tx queue len "
@@ -660,7 +647,7 @@ static void print_usage(struct configuration *c, char *progname)
           "[default: %"PRIu64"]\n"
       "\n"
       "VMs : \n"
-      "  --vm-shm-len=LEN           Shared memory len in each vm"
+      "  --vm-shm-len=LEN           Shared memory len for one vm"
           "[default: %"PRIu64"]\n"
       "  --vm-shm-off=LEN           Shared memory offset for vm"
           "[default: %"PRIu64"]\n"
@@ -756,7 +743,7 @@ static void print_usage(struct configuration *c, char *progname)
       "  --ready-fd=FD               File descriptor to signal readiness "
           "[default: disabled]\n"
       "\n",
-      progname, c->internal_shm_len,
+      progname,
       c->nic_rx_len, c->nic_tx_len, c->app_kin_len, c->app_kout_len,
       c->vm_shm_len, c->data_mem_off,
       c->tcp_rtt_init, c->tcp_link_bw, c->tcp_rxbuf_len, c->tcp_txbuf_len,

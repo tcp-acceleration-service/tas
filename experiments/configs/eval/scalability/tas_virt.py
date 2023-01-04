@@ -36,10 +36,10 @@ class Config:
         self.snum = 1
         self.ctype = 'virt'
         self.cstack = 'tas'
-        self.cnum = 3
-        self.connum = 1
+        self.cnum = 4
+        self.connum = 1000
         self.msize = 64
 
-        self.benchmark_server_args = "1234 1 foo 4096 1024"
-        self.benchmark_client_args = "{} 1234 1 foo {} 64 {} 0 0 16".format(
+        self.benchmark_server_args = "1234 20 foo 4096 1024"
+        self.benchmark_client_args = "{} 1234 4 foo {} 64 {} 0 0 16".format(
                 server_ip, self.msize, self.connum)
