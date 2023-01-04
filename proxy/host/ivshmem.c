@@ -41,6 +41,7 @@ static int ivshmem_uxsocket_handle_notif();
 static int ivshmem_uxsocket_handle_error();
 static int ivshmem_uxsocket_handle_msg();
 static int ivshmem_handle_tasinforeq_msg(struct v_machine *vm);
+static int ivshmem_handle_newapp_req(struct v_machine *vm);
 
 static int ivshmem_uxsocket_send_int(int fd, int64_t i);
 static int ivshmem_uxsocket_sendfd(int uxfd, int fd, int64_t i);
@@ -428,6 +429,9 @@ static int ivshmem_uxsocket_handle_msg(struct v_machine *vm)
             ivshmem_handle_ctx_req(vm, msg);
             ivshmem_notify_guest(vm->ifd);
             break;
+        case MSG_TYPE_NEWAPP_REQ:
+            ivshmem_handle_newapp_req(vm);
+            ivshmem_notify_guest(vm->ifd);
         default:
             fprintf(stderr, "ivshmem_uxsocket_handle_msg: unknown message.\n");
     }
@@ -472,6 +476,34 @@ free_msg:
     free(msg);
 
     return -1;
+
+}
+
+static int ivshmem_handle_newapp_req(struct v_machine *vm)
+{
+    int ret;
+    struct newapp_res_msg msg;
+    msg.msg_type = MSG_TYPE_NEWAPP_RES;
+    /* Notify TAS that new app connected */
+    if (flextcp_proxy_init_app(vm->id) < 0)
+    {
+        msg.success = 0;
+        fprintf(stderr, "ivshmem_handle_newapp_req: " 
+                "failed to init app with flextcp.\n");
+    } else 
+    {
+        msg.success = 1;
+    }
+
+    ret = channel_write(vm->chan, &msg, sizeof(msg));
+    if (ret < sizeof(struct newapp_res_msg))
+    {
+        fprintf(stderr, "ivshmem_handle_newapp_req: "
+                "failed to write response.\n");
+        return -1;
+    }      
+
+    return 0;
 
 }
 
@@ -604,6 +636,8 @@ static int ivshmem_handle_ctx_req(struct v_machine *vm,
   struct vmcontext_req *vctx;
   uint8_t resp_buf[CTX_RESP_MAX_SIZE];
   struct epoll_event ev;
+
+  printf("GOT REQUEST FOR NEW CTX\n");
 
   /* allocate a flextcp_context and set it up */
   ctx = malloc(sizeof(struct flextcp_context));

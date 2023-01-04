@@ -17,6 +17,8 @@
 #define MSG_TYPE_CONTEXT_REQ 4
 #define MSG_TYPE_CONTEXT_RES 5
 #define MSG_TYPE_VPOKE 6
+#define MSG_TYPE_NEWAPP_REQ 7
+#define MSG_TYPE_NEWAPP_RES 8
 
 /* Used to get CTX_RESP_MAX_SIZE... kinda ugly */
 struct kernel_uxsock_response *placeholder_resp;
@@ -57,6 +59,15 @@ struct context_res_msg {
 struct vpoke_msg {
   uint8_t msg_type;
   uint32_t vfd;
+} __attribute__((packed));
+
+struct newapp_req_msg {
+  uint8_t msg_type;
+} __attribute__((packed));
+
+struct newapp_res_msg {
+  uint8_t msg_type;
+  uint8_t success;
 } __attribute__((packed));
 
 struct channel {

@@ -240,9 +240,12 @@ static int vflextcp_uxsocket_poll(struct guest_proxy *pxy)
 
 static int vflextcp_uxsocket_accept(struct guest_proxy *pxy) 
 {
-  int cfd, n_cores;
+  int cfd, n_cores, ret;
   struct epoll_event ev;
   struct proxy_application *app;
+  struct newapp_req_msg req_msg;
+  struct newapp_res_msg res_msg;
+  struct epoll_event evs[1];
   
   if ((cfd  = accept(pxy->flextcp_uxfd, NULL, NULL)) < 0) 
   {
@@ -287,6 +290,42 @@ static int vflextcp_uxsocket_accept(struct guest_proxy *pxy)
     fprintf(stderr, "vflextcp_uxsocket_accept: epoll_ctl failed.");
     free(app);
     close(cfd);
+    return -1;
+  }
+
+  /* Notify host proxy new app wants to register */
+  req_msg.msg_type = MSG_TYPE_NEWAPP_REQ;
+  ret = channel_write(pxy->chan, &req_msg, sizeof(struct newapp_req_msg));
+  if (ret < sizeof(struct newapp_req_msg))
+  {
+    fprintf(stderr, "vflextcp_uxsocket_accept: "
+        "failed to write to channel.\n");
+    return -1;
+  }
+  ivshmem_notify_host(pxy);
+
+
+  /* Receive app registration response */
+  ret = epoll_wait(pxy->epfd, evs, 1, -1);
+  if (ret == 0)
+  {
+    fprintf(stderr, "vflextcp_uxsocket_accept: failed to receive "
+        "app registration response.\n");
+    return -1;
+  }
+  
+  ivshmem_drain_evfd(pxy->irq_fd);
+  ret = channel_read(pxy->chan, &res_msg, sizeof(struct newapp_res_msg));
+  if (ret < sizeof(struct newapp_res_msg))
+  {
+    fprintf(stderr, "vflextcp_uxsocket_accept: " 
+        "failed to read app registration response.\n");
+        return -1;
+  }
+
+  if (res_msg.success == 0)
+  {
+    fprintf(stderr, "vflextcp_uxsocket_accept: app registration failed.\n");
     return -1;
   }
 
