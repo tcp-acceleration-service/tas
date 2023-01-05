@@ -41,17 +41,6 @@ int flextcp_proxy_init()
   return 0;
 }
 
-int flextcp_proxy_init_app(int vmid)
-{
-  if (flextcp_app_kernel_connect(vmid) < 0) {
-    fprintf(stderr, "flextcp__proxy_init_app: failed to "
-        "connect app with kernel.\n");
-    return -1;
-  }
-  
-  return 0;
-}
-
 int flextcp_proxy_context_create(struct flextcp_context *ctx,
     uint8_t *presp, ssize_t *presp_sz, int vmid)
 {

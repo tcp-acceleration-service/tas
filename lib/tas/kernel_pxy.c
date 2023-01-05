@@ -53,7 +53,8 @@ int flextcp_vm_kernel_connect(int vmid, int *shmfd, int *flexnic_evfd)
   /* prepare socket address */
   memset(&saun, 0, sizeof(saun));
   saun.sun_family = AF_UNIX;
-  snprintf(saun.sun_path, sizeof(saun.sun_path), "%s", KERNEL_SOCKET_PATH);
+  snprintf(saun.sun_path, sizeof(saun.sun_path), "%s_vm_%d",
+      KERNEL_SOCKET_PATH, vmid);
 
   if ((fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) == -1) {
     perror("flextcp_vm_kernel_connect: socket failed");
@@ -135,57 +136,9 @@ int flextcp_vm_kernel_connect(int vmid, int *shmfd, int *flexnic_evfd)
   return 0;
 }
 
-int flextcp_app_kernel_connect(int vmid)
-{
-  int64_t i = 0;
-  int fd, n;
-  struct sockaddr_un saun;
-
-  /* prepare socket address */
-  memset(&saun, 0, sizeof(saun));
-  saun.sun_family = AF_UNIX;
-  snprintf(saun.sun_path, sizeof(saun.sun_path), "%s_%d",
-      KERNEL_SOCKET_PATH, vmid);
-
-  if ((fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) == -1) {
-    perror("flextcp_app_kernel_connect: socket failed");
-    return -1;
-  }
-
-  if (connect(fd, (struct sockaddr *) &saun, sizeof(saun)) != 0) {
-    perror("flextcp_app_kernel_connect: connect failed");
-    return -1;
-  }
-
-  struct iovec iov = {
-      .iov_base = &i,
-      .iov_len = sizeof(i),
-  };
-
-  struct msghdr msg = {
-      .msg_name = NULL,
-      .msg_namelen = 0,
-      .msg_iov = &iov,
-      .msg_iovlen = 1,
-      .msg_control = NULL,
-      .msg_controllen = 0,
-      .msg_flags = 0,
-  };
-
-  if ((n = sendmsg(fd, &msg, 0)) != sizeof(int64_t)) 
-  {
-      fprintf(stderr, "flextcp_app_kernel_connect: failed to send msg.\n");
-
-      return -1;
-  }
-
-  return n;
-}
-
 int flextcp_proxy_kernel_newctx(struct flextcp_context *ctx,
     uint8_t *presp, ssize_t *presp_sz, int vmid)
 {
-  printf("INSIDE FLEXTCP_PROXY_KERNEL_NEWCTX\n");
   ssize_t sz, off, total_sz;
   struct kernel_uxsock_response *resp;
   uint8_t resp_buf[sizeof(*resp) +
@@ -265,6 +218,7 @@ int flextcp_proxy_kernel_newctx(struct flextcp_context *ctx,
     return 0;
   }
 
+  /* Use flexnic_mem_pxy[0] for the host proxy, so VMs start with ID=1 */
   /* fill in ctx struct */
   ctx->kin_base = (uint8_t *) flexnic_mem_pxy[vmid] + resp->app_out_off;
   ctx->kin_len = resp->app_out_len / sizeof(struct kernel_appout);

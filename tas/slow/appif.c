@@ -62,24 +62,19 @@
 #include <fastpath.h>
 
 #define EP_NOTIFY 0
-#define EP_LISTEN_VM 1
-#define EP_LISTEN_APP 2
-#define EP_APP 3
+#define EP_LISTEN 1
+#define EP_APP 2
 
 static int uxsocket_init(void);
-static int uxsocket_init_vmuxfd(int efd);
-static int uxsocket_init_appuxfd(int vm_id, int *fd, int efd);
+static int uxsocket_init_vm(int vm_id, int *fd, int efd);
 static void *uxsocket_thread(void *arg);
-static void uxsocket_accept_vm();
-static void uxsocket_accept_app(int vmid);
+static void uxsocket_accept(int vm_id);
 static void uxsocket_notify(void);
 static void uxsocket_error(struct application *app);
 static void uxsocket_receive(struct application *app);
 static void uxsocket_notify_app(struct application *app);
-/** Listening UX socket for new vms */
-static int vm_uxfd = -1;
-/** Listening UX sockets for new applications. One per VM */
-static int *app_uxfds = NULL;
+/* Listening UX sockets for applications. One per VM */
+static int *vm_uxfds = NULL;
 /** Epoll object used by UX socket thread */
 static int epfd = -1;
 /** eventfd for notifying UX thread about completion on poll_to_ux */
@@ -98,19 +93,16 @@ static pthread_t pt_ux;
 static struct app_doorbell *free_doorbells = NULL;
 /** Next unused application id, used for allocation */
 static uint16_t app_id_next = 0;
-static uint16_t vm_id_next = 0;
 
 /** Linked list of all application structs */
 static struct application *applications = NULL;
-/** List of whether a vm has been accepted */
-static int accepted_vms[FLEXNIC_PL_VMST_NUM];
 
 int appif_init(void)
 {
   struct app_doorbell *adb;
   uint32_t i;
 
-  if ((app_uxfds = malloc(FLEXNIC_PL_VMST_NUM * sizeof(int))) == NULL) {
+  if ((vm_uxfds = malloc(FLEXNIC_PL_VMST_NUM * sizeof(int))) == NULL) {
     fprintf(stderr, "appif_init: Failed to allocate memory for group file descriptors.\n");
     return -1;
   }
@@ -139,11 +131,6 @@ int appif_init(void)
     adb->id = i;
     adb->next = free_doorbells;
     free_doorbells = adb;
-  }
-
-  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
-  {
-    accepted_vms[i] = -1;
   }
 
   nbqueue_init(&ux_to_poll);
@@ -228,14 +215,9 @@ static int uxsocket_init(void)
     return -1;
   }
 
-  if (uxsocket_init_vmuxfd(efd) != 0) {
-    perror("uxsocket_init: failed to init socket for vm");
-    goto error_close_ep;
-  }
-
   for (vm_id = 0; vm_id < FLEXNIC_PL_VMST_NUM; vm_id++) {
-    if (uxsocket_init_appuxfd(vm_id, &app_uxfds[vm_id], efd) != 0) {
-      perror("uxsocket_init: failed to init socket for app");
+    if (uxsocket_init_vm(vm_id, &vm_uxfds[vm_id], efd) != 0) {
+      perror("uxsocket_init: uxsocket_init_group failed");
       goto error_close_ep;
     }
   }
@@ -268,67 +250,11 @@ error_close_ep:
   return -1;
 }
 
-static int uxsocket_init_vmuxfd(int efd)
+static int uxsocket_init_vm(int vm_id, int *fd, int efd)
 {
   struct epoll_event ev;
   struct sockaddr_un saun;
-  struct appif_event *aev;
-
-  /* Init socket used for vms to be initialized */
-  if ((vm_uxfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) 
-  {
-    perror("uxsocket_init: vm_uxfd socket failed");
-    return -1;
-  }
-
-  memset(&saun, 0, sizeof(saun));
-  saun.sun_family = AF_UNIX;
-  snprintf(saun.sun_path, sizeof(saun.sun_path), 
-      "%s", KERNEL_SOCKET_PATH);
-
-  unlink(saun.sun_path);
-  if (bind(vm_uxfd, (struct sockaddr *) &saun, sizeof(saun))) 
-  {
-    perror("uxsocket_init_vm: bind failed");
-    goto error_close;
-  }
-
-  if (listen(vm_uxfd, 5)) {
-    perror("uxsocket_init_vm: listen failed");
-    goto error_close;
-  }
-
-  if ((aev = malloc(sizeof(struct appif_event))) == NULL)
-  {
-    perror("uxsocket_init_vm: failed to malloc appif_event");
-    goto error_close;
-  }
-
-  aev->type = EP_LISTEN_VM;
-  aev->ptr = NULL;
-
-  ev.events = EPOLLIN;
-  ev.data.ptr = aev;
-  if (epoll_ctl(efd, EPOLL_CTL_ADD, vm_uxfd, &ev) != 0) {
-    perror("uxsocket_init_vm: epoll_ctl listen failed");
-    goto error_free_aev;
-  }
-
-  return 0;
-
-  error_free_aev:
-    free(aev);
-  error_close:
-    close(vm_uxfd);
-
-  return -1;
-}
-
-static int uxsocket_init_appuxfd(int vm_id, int *fd, int efd)
-{
-  struct epoll_event ev;
-  struct sockaddr_un saun;
-  struct virtual_machine *vm;
+  struct application *app;
   struct appif_event *aev;
 
   if ((*fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -352,7 +278,7 @@ static int uxsocket_init_appuxfd(int vm_id, int *fd, int efd)
     goto error_close;
   }
 
-  if ((vm = malloc(sizeof(struct virtual_machine))) == NULL) {
+  if ((app = malloc(sizeof(struct application))) == NULL) {
     perror("uxsocket_init_vm: application ptr mem allocation failed");
     goto error_close;
   }
@@ -363,11 +289,10 @@ static int uxsocket_init_appuxfd(int vm_id, int *fd, int efd)
     goto error_close;
   }
 
-  vm->id = vm_id;
-  vm->closed = true;
+  app->vm_id = vm_id;
 
-  aev->type = EP_LISTEN_APP;
-  aev->ptr = vm;
+  aev->type = EP_LISTEN;
+  aev->ptr = app;
 
   ev.events = EPOLLIN;
   ev.data.ptr = aev;
@@ -392,7 +317,6 @@ static void *uxsocket_thread(void *arg)
   struct epoll_event evs[32];
   struct appif_event *aev;
   struct application *app;
-  struct virtual_machine *vm;
 
   while (1) {
   again:
@@ -408,16 +332,12 @@ static void *uxsocket_thread(void *arg)
 
     for (i = 0; i < n; i++) {
       aev = evs[i].data.ptr;
-      if (aev->type == EP_LISTEN_VM) {
-        vm = aev->ptr;
-        uxsocket_accept_vm();
-      } else if (aev->type == EP_LISTEN_APP) {
-        vm = aev->ptr;
-        uxsocket_accept_app(vm->id);
+      app = aev->ptr;
+      if (aev->type == EP_LISTEN) {
+        uxsocket_accept(app->vm_id);
       } else if (aev->type == EP_NOTIFY) {
         uxsocket_notify();
       } else if (aev->type == EP_APP) {
-        app = aev->ptr;
         if ((evs[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) != 0) {
           uxsocket_error(app);
         } else if ((evs[i].events & EPOLLIN) != 0) {
@@ -433,90 +353,7 @@ static void *uxsocket_thread(void *arg)
   return NULL;
 }
 
-static void uxsocket_accept_vm()
-{
-  int vmid;
-  int cfd;
-
-  /* new connection on unix socket */
-  if ((cfd = accept(vm_uxfd, NULL, NULL)) < 0) {
-    fprintf(stderr, "uxsocket_accept: accept failed\n");
-    return;
-  }
-
-  vmid = vm_id_next;
-
-  if (appif_connect_accept(cfd, tas_info->cores_num,
-      kernel_notifyfd, core_evfds, vm_shm_fd[vmid]) != 0) {
-    fprintf(stderr, "uxsocket_accept: appif_connect_accept failed.\n");
-    return;
-  }
-
-  vm_id_next++;
-
-  // /* allocate virtual machine struct */
-  // if ((vm = malloc(sizeof(*vm))) == NULL) {
-  //   fprintf(stderr, "uxsocket_accept: malloc of vm struct failed\n");
-  //   close(cfd);
-  //   return;
-  // }  
-
-  /* allocate application struct */
-  // if ((app = malloc(sizeof(*app))) == NULL) {
-  //   fprintf(stderr, "uxsocket_accept: malloc of app struct failed\n");
-  //   close(cfd);
-  //   return;
-  // }
-
-  // sz = sizeof(*app->resp) +
-  //   tas_info->cores_num * sizeof(app->resp->flexnic_qs[0]);
-  // app->resp_sz = sz;
-  // if ((app->resp = malloc(sz)) == NULL) {
-  //   fprintf(stderr, "uxsocket_accept: malloc of app resp struct failed\n");
-  //   free(app);
-  //   close(cfd);
-  //   return;
-  // }
-
-  // if ((aev = malloc(sizeof(struct appif_event))) == NULL)
-  // {
-  //   perror("uxsocket_accept: malloc appif_event failed");
-  //   return;
-  // }
-
-  // accepted_vms[vm_id] = vm_id;
-
-  // vm->id = vmid;
-  // vm->fd = cfd;
-  // vm->closed = false;
-  /* add to epoll */
-  // app->fd = cfd;
-  // app->contexts = NULL;
-  // app->need_reg_ctx = NULL;
-  // app->closed = false;
-  // app->conns = NULL;
-  // app->listeners = NULL;
-  // app->id = app_id_next++;
-  // app->vm_id = vm_id;
-
-  // aev->type = EP_APP;
-  // aev->ptr = vm;
-
-  // ev.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
-  // ev.data.ptr = aev;
-  // if (epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &ev) != 0) {
-  //   perror("uxsocket_accept: epoll_ctl failed");
-  //   // free(app->resp);
-  //   // free(app);
-  //   free(vm);
-  //   free(aev);
-  //   close(cfd);
-  //   return;
-  // }
-  // nbqueue_enq(&ux_to_poll, &app->nqe);
-}
-
-static void uxsocket_accept_app(int vm_id)
+static void uxsocket_accept(int vm_id)
 {
   int cfd;
   struct application *app;
@@ -525,8 +362,14 @@ static void uxsocket_accept_app(int vm_id)
   size_t sz;
 
   /* new connection on unix socket */
-  if ((cfd = accept(app_uxfds[vm_id], NULL, NULL)) < 0) {
+  if ((cfd = accept(vm_uxfds[vm_id], NULL, NULL)) < 0) {
     fprintf(stderr, "uxsocket_accept: accept failed\n");
+    return;
+  }
+
+  if (appif_connect_accept(cfd, tas_info->cores_num,
+      kernel_notifyfd, core_evfds, vm_shm_fd[vm_id]) != 0) {
+    fprintf(stderr, "uxsocket_accept: appif_connect_accept failed.\n");
     return;
   }
 

@@ -61,12 +61,6 @@ struct app_context {
   } handles[];
 };
 
-struct virtual_machine {
-  uint16_t id;
-  int fd;
-  volatile bool closed;
-};
-
 struct application {
   int fd;
   struct nbqueue_el nqe;

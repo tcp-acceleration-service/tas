@@ -35,7 +35,6 @@ extern int flexnic_shmfds_pxy[FLEXNIC_PL_VMST_NUM];
 extern struct flexnic_info *flexnic_info_pxy;
 
 int flextcp_proxy_init();
-int flextcp_proxy_init_app(int vmid);
 int flextcp_proxy_context_create(struct flextcp_context *ctx,
     uint8_t *presp, ssize_t *presp_sz, int vmid);
 
