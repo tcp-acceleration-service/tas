@@ -254,7 +254,7 @@ static int vflextcp_uxsocket_accept(struct guest_proxy *pxy)
   }
 
   /* Register app with host */
-  req_msg.msg_type = MSG_TYPE_CONTEXT_REQ;
+  req_msg.msg_type = MSG_TYPE_NEWAPP_REQ;
   ret = channel_write(pxy->chan, &req_msg, sizeof(req_msg));
   if (ret != sizeof(req_msg))
   {
