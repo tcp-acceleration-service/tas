@@ -503,6 +503,7 @@ static inline void vm_queue_activate(struct vm_qman *vqman,
   q_tail = &vqman->queues[vqman->tail_idx];
   q_tail->next_idx = idx;
   vqman->tail_idx = idx;
+  vqman->queues[idx].dc = QUANTA;
 }
 
 static inline uint32_t sum_bytes(uint16_t *q_bytes, unsigned start, unsigned end)
