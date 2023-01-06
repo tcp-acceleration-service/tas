@@ -82,7 +82,7 @@ class Host(object):
         if self.node_config.is_server:
             benchmark_args = self.gen_config.benchmark_server_args
         else:
-            benchmark_args = self.gen_config.benchmark_client_args
+            benchmark_args = self.gen_config.benchmark_client_args[num]
  
         self.run_benchmark_rpc(
                 pane = pane,
@@ -240,7 +240,7 @@ class Host(object):
         if self.node_config.is_server:
             benchmark_args = self.gen_config.benchmark_server_args
         else:
-            benchmark_args = self.gen_config.benchmark_client_args
+            benchmark_args = self.gen_config.benchmark_client_args[num]
 
         self.run_benchmark_rpc(
                 pane = pane,
@@ -355,7 +355,7 @@ class Experiment:
 
     def run(self):
         self.server_host.run(self.get_name())
-        # self.client_host.run(self.get_name())
+        self.client_host.run(self.get_name())
         time.sleep(1)
 
     def reset(self):
@@ -364,13 +364,13 @@ class Experiment:
 
     def cleanup(self):
         self.server_host.run_cleanup_cmds()
-        # self.client_host.run_cleanup_cmds()
+        self.client_host.run_cleanup_cmds()
 
     def save_logs(self):
         split_path = self.exp_path.split("/")
         n = len(split_path)
         
-        out_dir = os.getcwd() + "/" + "/".join(split_path[:n - 1]) + "/out/"
+        out_dir = os.getcwd() + "/" + "/".join(split_path[:n - 1]) + "/out"
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
        
@@ -379,7 +379,7 @@ class Experiment:
         else:
             self.save_logs_bare(out_dir)
 
-    def save_logs_virt(self, out_dir, host):
+    def save_logs_virt(self, out_dir):
         pane = self.wmanager.add_new_pane(self.client_host.config.save_logs_pane,
                 self.client_host.config.is_remote)
         for i, path in enumerate(self.log_paths_client):
@@ -390,7 +390,6 @@ class Experiment:
             pane.send_keys(suppress_history=False, cmd='tas')
             time.sleep(1)
             
-
     def save_logs_bare(self, out_dir):
         for path in self.log_paths_client:
             os.rename(path, out_dir + os.path.basename(path))

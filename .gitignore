@@ -36,3 +36,5 @@ doc/_build
 .vscode
 Makefile.local
 virt-manager
+out/
+*.dat

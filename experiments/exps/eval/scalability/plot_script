@@ -1,0 +1,12 @@
+#!/usr/bin/gnuplot -persist
+set terminal pdf
+set output "plot.pdf"
+set colorsequence podo
+set key autotitle columnhead
+set title "Victim Client Throughput"
+set xlabel "# of Connections in Agressor Client"
+set ylabel "Throughput (Mbps)"
+
+plot 'tp.dat' using 1:2 title 'virt-linux' linetype 2 w lp, \
+     'tp.dat' using 1:3 title 'virt-tas' linetype 3 w lp
+ 
