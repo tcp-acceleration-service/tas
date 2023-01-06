@@ -17,7 +17,8 @@
 #define NIC_RXQ_LEN (64 * 32 * 1024)
 #define NIC_TXQ_LEN (64 * 8192)
 
-static int ksock_fd_pxy[FLEXNIC_PL_VMST_NUM];
+static int ksock_fd_vm = -1;
+static int ksock_fd_app[FLEXNIC_PL_VMST_NUM][FLEXNIC_PL_APPST_NUM];
 static int kernel_evfd_pxy[FLEXNIC_PL_VMST_NUM];
 
 int flextcp_vm_kernel_connect(int vmid, int *shmfd, int *flexnic_evfd);
@@ -53,8 +54,7 @@ int flextcp_vm_kernel_connect(int vmid, int *shmfd, int *flexnic_evfd)
   /* prepare socket address */
   memset(&saun, 0, sizeof(saun));
   saun.sun_family = AF_UNIX;
-  snprintf(saun.sun_path, sizeof(saun.sun_path), "%s_vm_%d",
-      KERNEL_SOCKET_PATH, vmid);
+  memcpy(saun.sun_path, KERNEL_SOCKET_PATH, sizeof(KERNEL_SOCKET_PATH));
 
   if ((fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) == -1) {
     perror("flextcp_vm_kernel_connect: socket failed");
@@ -132,12 +132,38 @@ int flextcp_vm_kernel_connect(int vmid, int *shmfd, int *flexnic_evfd)
     }
   }
   
-  ksock_fd_pxy[vmid] = fd;
+  ksock_fd_vm = fd;
+  return 0;
+}
+
+int flextcp_proxy_kernel_newapp(int vmid, int appid)
+{
+  int fd;
+  struct sockaddr_un saun;
+
+  /* prepare socket address */
+  memset(&saun, 0, sizeof(saun));
+  saun.sun_family = AF_UNIX;
+  snprintf(saun.sun_path, sizeof(saun.sun_path), "%s_vm_%d",
+      KERNEL_SOCKET_PATH, vmid);
+
+  if ((fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) == -1) {
+    perror("flextcp_vm_kernel_connect: socket failed");
+    return -1;
+  }
+
+  if (connect(fd, (struct sockaddr *) &saun, sizeof(saun)) != 0) {
+    perror("flextcp_vm_kernel_connect: connect failed");
+    return -1;
+  }
+
+  ksock_fd_app[vmid][appid] = fd;
+
   return 0;
 }
 
 int flextcp_proxy_kernel_newctx(struct flextcp_context *ctx,
-    uint8_t *presp, ssize_t *presp_sz, int vmid)
+    uint8_t *presp, ssize_t *presp_sz, int vmid, int appid)
 {
   ssize_t sz, off, total_sz;
   struct kernel_uxsock_response *resp;
@@ -173,7 +199,7 @@ int flextcp_proxy_kernel_newctx(struct flextcp_context *ctx,
   cmsg->cmsg_len = CMSG_LEN(sizeof(int));
   int *myfd = (int *)CMSG_DATA(cmsg);
   *myfd = ctx->evfd;
-  sz = sendmsg(ksock_fd_pxy[vmid], &msg, 0);
+  sz = sendmsg(ksock_fd_app[vmid][appid], &msg, 0);
   assert(sz == sizeof(req));
 
   /* receive response on kernel socket */
@@ -182,7 +208,7 @@ int flextcp_proxy_kernel_newctx(struct flextcp_context *ctx,
     (struct kernel_uxsock_response *) presp;
   off = 0;
   while (off < sizeof(*resp)) {
-    sz = read(ksock_fd_pxy[vmid], (uint8_t *) resp + off, sizeof(*resp) - off);
+    sz = read(ksock_fd_app[vmid][appid], (uint8_t *) resp + off, sizeof(*resp) - off);
     if (sz < 0) {
       perror("flextcp_proxy_kernel_newctx: read failed");
       return -1;
@@ -199,7 +225,7 @@ int flextcp_proxy_kernel_newctx(struct flextcp_context *ctx,
   /* receive queues in response */
   total_sz = sizeof(*resp) + resp->flexnic_qs_num * sizeof(resp->flexnic_qs[0]);
   while (off < total_sz) {
-    sz = read(ksock_fd_pxy[vmid], (uint8_t *) resp + off, total_sz - off);
+    sz = read(ksock_fd_app[vmid][appid], (uint8_t *) resp + off, total_sz - off);
     if (sz < 0) {
       perror("flextcp_proxy_kernel_newctx: read failed");
       return -1;

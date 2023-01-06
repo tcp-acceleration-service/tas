@@ -41,8 +41,20 @@ int flextcp_proxy_init()
   return 0;
 }
 
+
+int flextcp_proxy_newapp(int vmid, int appid)
+{
+  if (flextcp_proxy_kernel_newapp(vmid, appid) < 0)
+  {
+    fprintf(stderr, "flextcp_proxy_newapp: failed to register new app.\n");
+    return -1;
+  };
+
+  return 0;
+}
+
 int flextcp_proxy_context_create(struct flextcp_context *ctx,
-    uint8_t *presp, ssize_t *presp_sz, int vmid)
+    uint8_t *presp, ssize_t *presp_sz, int vmid, int appid)
 {
   static uint16_t ctx_id = 0;
 
@@ -63,5 +75,5 @@ int flextcp_proxy_context_create(struct flextcp_context *ctx,
     return -1;
   }
 
-  return flextcp_proxy_kernel_newctx(ctx, presp, presp_sz, vmid);
+  return flextcp_proxy_kernel_newctx(ctx, presp, presp_sz, vmid, appid);
 }

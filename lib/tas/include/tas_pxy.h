@@ -36,6 +36,7 @@ extern struct flexnic_info *flexnic_info_pxy;
 
 int flextcp_proxy_init();
 int flextcp_proxy_context_create(struct flextcp_context *ctx,
-    uint8_t *presp, ssize_t *presp_sz, int vmid);
+    uint8_t *presp, ssize_t *presp_sz, int vmid, int appid);
+int flextcp_proxy_newapp(int vmid, int appid);
 
 #endif /* ndef FLEXNIC_PXY_H_ */

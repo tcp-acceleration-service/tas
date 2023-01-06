@@ -68,8 +68,9 @@ int flextcp_kernel_connect(int *shmfd);
 int flextcp_proxy_kernel_connect(int *shmfds, int *flexnic_evfd);
 int flextcp_kernel_newctx(struct flextcp_context *ctx,
     uint8_t *presp, ssize_t *presp_sz);
+int flextcp_proxy_kernel_newapp(int vmid, int appid);
 int flextcp_proxy_kernel_newctx(struct flextcp_context *ctx,
-    uint8_t *presp, ssize_t *presp_sz, int vmid);
+    uint8_t *presp, ssize_t *presp_sz, int vmid, int appid);
 void flextcp_kernel_kick(void);
 int flextcp_kernel_get_notifyfd(int cfd, uint32_t *num_fds,
     int *k_evfd);

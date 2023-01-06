@@ -32,7 +32,7 @@
 /******************************************************************************/
 /* Unix socket for initialization with application */
 
-#define KERNEL_SOCKET_PATH "\0flexnic_os"
+#define KERNEL_SOCKET_PATH "flexnic_os"
 #define KERNEL_UXSOCK_MAXQ 8
 
 struct kernel_uxsock_request {

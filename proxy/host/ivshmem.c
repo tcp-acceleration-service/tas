@@ -27,7 +27,9 @@ static int uxfd = -1;
 /* Epoll for contexsts */
 static int ctx_epfd = -1;
 /* ID of next virtual machine to connect */
-static int next_id = 0;
+static int next_vm_id = 0;
+/* ID of next app for each vm */
+static int next_app_id[FLEXNIC_PL_VMST_NUM];
 /* List of VMs */
 static struct v_machine vms[MAX_VMS];
 
@@ -41,6 +43,7 @@ static int ivshmem_uxsocket_handle_notif();
 static int ivshmem_uxsocket_handle_error();
 static int ivshmem_uxsocket_handle_msg();
 static int ivshmem_handle_tasinforeq_msg(struct v_machine *vm);
+static int ivshmem_handle_newapp(struct v_machine *vm);
 
 static int ivshmem_uxsocket_send_int(int fd, int64_t i);
 static int ivshmem_uxsocket_sendfd(int uxfd, int fd, int64_t i);
@@ -82,6 +85,9 @@ int ivshmem_init()
         fprintf(stderr, "ivshmem_init: epoll_ctl listen failed.\n"); 
         goto close_ctx_epfd;
     }
+
+    /* Initialize all ids to 0 */
+    memset(next_app_id, 0, sizeof(next_app_id));
 
     return 0;
 
@@ -250,7 +256,7 @@ static int ivshmem_uxsocket_accept()
     memset(&ev, 0, sizeof(ev));
 
     /* Return error if max number of VMs has been reached */
-    if (next_id > MAX_VMS)
+    if (next_vm_id > MAX_VMS)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: max vms reached.\n");
         return -1;
@@ -273,7 +279,7 @@ static int ivshmem_uxsocket_accept()
     }
 
     /* Send vm id to qemu */
-    ret = ivshmem_uxsocket_send_int(cfd, next_id);
+    ret = ivshmem_uxsocket_send_int(cfd, next_vm_id);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send vm id.\n");
@@ -281,7 +287,7 @@ static int ivshmem_uxsocket_accept()
     }
 
     /* Send shared memory fd to qemu */
-    ret = ivshmem_uxsocket_sendfd(cfd, flexnic_shmfds_pxy[next_id], -1);
+    ret = ivshmem_uxsocket_sendfd(cfd, flexnic_shmfds_pxy[next_vm_id], -1);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send shm fd.\n");
@@ -315,7 +321,7 @@ static int ivshmem_uxsocket_accept()
         goto close_nfd;
     }
 
-    ret = ivshmem_uxsocket_sendfd(cfd, ifd, next_id);
+    ret = ivshmem_uxsocket_sendfd(cfd, ifd, next_vm_id);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
@@ -332,7 +338,7 @@ static int ivshmem_uxsocket_accept()
 
     /* Add notify fd to the epoll interest list */
     ev.events = EPOLLIN;
-    ev.data.ptr = &vms[next_id];
+    ev.data.ptr = &vms[next_vm_id];
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, nfd, &ev) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
@@ -341,8 +347,8 @@ static int ivshmem_uxsocket_accept()
     }
 
     /* Init channel in shared memory */
-    tx_addr = flexnic_mem_pxy[next_id] + CHAN_OFFSET + CHAN_SIZE;
-    rx_addr = flexnic_mem_pxy[next_id] + CHAN_OFFSET;
+    tx_addr = flexnic_mem_pxy[next_vm_id] + CHAN_OFFSET + CHAN_SIZE;
+    rx_addr = flexnic_mem_pxy[next_vm_id] + CHAN_OFFSET;
     chan = channel_init(tx_addr, rx_addr, CHAN_SIZE);
     if (chan == NULL)
     {
@@ -362,13 +368,13 @@ static int ivshmem_uxsocket_accept()
         goto close_ifd;
     }
 
-    vms[next_id].ifd = ifd;
-    vms[next_id].nfd = nfd;
-    vms[next_id].id = next_id;
-    vms[next_id].chan = chan;
-    fprintf(stdout, "Connected VM=%d\n", next_id);
+    vms[next_vm_id].ifd = ifd;
+    vms[next_vm_id].nfd = nfd;
+    vms[next_vm_id].id = next_vm_id;
+    vms[next_vm_id].chan = chan;
+    fprintf(stdout, "Connected VM=%d\n", next_vm_id);
     
-    next_id++;
+    next_vm_id++;
 
     return 0;
 
@@ -428,6 +434,10 @@ static int ivshmem_uxsocket_handle_msg(struct v_machine *vm)
             ivshmem_handle_ctx_req(vm, msg);
             ivshmem_notify_guest(vm->ifd);
             break;
+        case MSG_TYPE_NEWAPP_REQ:
+            ivshmem_handle_newapp(vm);
+            ivshmem_notify_guest(vm->ifd);
+            break;
         default:
             fprintf(stderr, "ivshmem_uxsocket_handle_msg: unknown message.\n");
     }
@@ -473,6 +483,33 @@ free_msg:
 
     return -1;
 
+}
+
+static int ivshmem_handle_newapp(struct v_machine *vm)
+{
+    int ret, appid;
+    struct newapp_res_msg msg;
+    appid = next_app_id[vm->id];
+    next_app_id[vm->id]++;
+
+    if (flextcp_proxy_newapp(vm->id, appid) < 0) 
+    {
+        fprintf(stderr, "ivshmem_handle_newapp: "
+                "failed to register app with flextcp.\n");
+        return -1;
+    }
+
+    msg.msg_type = MSG_TYPE_NEWAPP_RES;
+    ret = channel_write(vm->chan, &msg, sizeof(msg));
+    
+    if (ret != sizeof(msg))
+    {
+        fprintf(stderr, "ivshmem_handle_newapp: "
+                "failed to write response to channel.\n");
+        return -1;
+    }
+
+    return 0;
 }
 
 static int ivshmem_uxsocket_send_int(int fd, int64_t i)
@@ -617,7 +654,7 @@ static int ivshmem_handle_ctx_req(struct v_machine *vm,
   }
 
   if (flextcp_proxy_context_create(ctx, res_msg.resp, 
-        &res_msg.resp_size, vm->id) == -1) 
+        &res_msg.resp_size, vm->id, msg->app_id) == -1) 
   {
     fprintf(stderr, "ivshmem_handle_ctxreq: "
             "failed to create context request.");
