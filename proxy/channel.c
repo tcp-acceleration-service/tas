@@ -119,6 +119,12 @@ size_t channel_get_type_size(uint8_t type)
     case MSG_TYPE_VPOKE:
       return sizeof(struct vpoke_msg);
       break;
+    case MSG_TYPE_NEWAPP_REQ:
+      return sizeof(struct newapp_req_msg);
+      break;
+    case MSG_TYPE_NEWAPP_RES:
+      return sizeof(struct newapp_res_msg);
+      break;
     default:
       fprintf(stderr, "channel_get_type_size: passed invalid message type.\n");
       return -1;
