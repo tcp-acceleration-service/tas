@@ -359,7 +359,7 @@ static int uxsocket_init_app_uxfd(int vmid, int *fd, int efd)
 
   vm->id = vmid;
 
-  aev->type = EP_LISTEN_VM;
+  aev->type = EP_LISTEN_APP;
   aev->ptr = vm;
 
   ev.events = EPOLLIN;
