@@ -775,6 +775,15 @@ int tas_getsockopt(int sockfd, int level, int optname, void *optval,
     errno = ENOPROTOOPT;
     ret = -1;
     goto out;
+  } else if (level == SOL_TCP && optname == TCP_MAXSEG) {
+    fprintf(stderr, "flextcp getsockopt: warning TCP_MAXSEG hardcoded\n");
+    res = 1460;
+  } else if (level == SOL_TCP && optname == TCP_INFO) {
+    fprintf(stderr, "flextcp getsockopt: warning TCP_INFO hardcoded\n");
+    len = MIN(*optlen, sizeof(struct tcp_info));
+    memset(optval, 0, len);
+    *optlen = len;
+    goto out;
   } else {
     /* unknown option */
     fprintf(stderr, "flextcp getsockopt: unknown level optname combination "
