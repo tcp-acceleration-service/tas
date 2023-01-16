@@ -104,6 +104,7 @@ static pid_t start_tas(void)
         "--fp-no-autoscale", "--fp-no-hugepages", "--dpdk-extra=--vdev",
         "--dpdk-extra=eth_tap0,iface=vethtas1",
         "--dpdk-extra=--no-shconf", "--dpdk-extra=--no-huge",
+        "--dpdk-extra=--no-pci", "--dpdk-extra=--no-telemetry",
         "--ip-addr=192.168.1.1/24", readyfdopt, NULL);
 
     perror("exec failed");
@@ -218,6 +219,12 @@ static int run_child(int (*tas_entry)(void *), int (*linux_entry)(void *),
 
     if (mount("tmpfs", "/dev/shm", "tmpfs", 0, "") != 0) {
       perror("mounting /dev/shm failed");
+      return 1;
+    }
+
+    /* dpdk stores control files/sockets in /var/run */
+    if (mount("tmpfs", "/var/run", "tmpfs", 0, "") != 0) {
+      perror("mounting /var/run failed");
       return 1;
     }
 
