@@ -39,6 +39,9 @@ include $(dir)/rules.mk
 dir := $(d)/lighttpd
 include $(dir)/rules.mk
 
+dir := $(d)/netperf
+include $(dir)/rules.mk
+
 #########################
 
 DEPS += $(FULLTEST_OBJS:.o=.d) $(FTWRAP_OBJS:.o=.d)
