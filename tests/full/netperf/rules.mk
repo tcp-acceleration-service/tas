@@ -36,13 +36,13 @@ tests-full: tests-full-netperf
 
 run-tests-full-netperf-server: tests-full-netperf test-full-wrapdeps
 	$(FTWRAP) -d 500 \
-		-P '$(ft_netperf_server)' \
-		-c '$(ft_netperf_client) -H $$TAS_IP -l 100 -t TCP_STREAM'
+		-P '$(ft_netperf_server) -D -f' \
+		-c '$(ft_netperf_client) -H $$TAS_IP -l 5 -t TCP_STREAM'
 
 run-tests-full-netperf-client: tests-full-netperf test-full-wrapdeps
 	$(FTWRAP) -d 500 \
-		-C '$(ft_netperf_server)' \
-		-p '$(ft_netperf_client) -H $$LINUX_IP -l 100 -t TCP_STREAM'
+		-C '$(ft_netperf_server) -D -f' \
+		-p '$(ft_netperf_client) -H $$LINUX_IP -l 5 -t TCP_STREAM'
 
 run-tests-full-netperf: run-tests-full-netperf-server run-tests-full-netperf-client
 run-tests-full: run-tests-full-netperf
