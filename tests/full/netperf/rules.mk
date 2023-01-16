@@ -10,6 +10,7 @@ ft_netperf_tar := $(ft_netperf_parentdir)/netperf-$(ft_netperf_ver).tar.gz
 ft_netperf_build := $(ft_netperf_parentdir)/netperf-netperf-$(ft_netperf_ver)
 ft_netperf_server := $(ft_netperf_build)/src/netserver
 ft_netperf_client := $(ft_netperf_build)/src/netperf
+ft_netperf_patch := $(d)/netperf-shortsend.patch
 
 # Download netperf tarball
 $(ft_netperf_tar):
@@ -19,6 +20,7 @@ $(ft_netperf_tar):
 # Extract netperf tarball
 $(ft_netperf_build): $(ft_netperf_tar)
 	tar xf $< -C $(ft_netperf_parentdir)
+	patch -d $(ft_netperf_build)  -p1 <$(ft_netperf_patch)
 	touch $(@)
 
 # Build netperf
