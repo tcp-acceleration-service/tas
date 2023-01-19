@@ -42,15 +42,15 @@ struct tasinfo_res_msg {
 
 struct context_req_msg {
   uint8_t msg_type;
-  uint32_t cfd;
-  uint32_t vfd;
+  uint32_t actx_evfd;
+  uint32_t ctxreq_id;
   uint32_t app_id;
   struct proxy_context_req context_req;
 } __attribute__((packed));
 
 struct context_res_msg {
   uint8_t msg_type;
-  uint32_t vfd;
+  uint32_t ctxreq_id;
   uint32_t app_id;
   ssize_t resp_size;
   uint8_t resp[CTX_RESP_MAX_SIZE];
@@ -58,7 +58,7 @@ struct context_res_msg {
 
 struct vpoke_msg {
   uint8_t msg_type;
-  uint32_t vfd;
+  uint32_t ctxreq_id;
 } __attribute__((packed));
 
 struct newapp_req_msg {

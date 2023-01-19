@@ -19,6 +19,8 @@
 
 static int ksock_fd_vm = -1;
 static int ksock_fd_app[FLEXNIC_PL_VMST_NUM][FLEXNIC_PL_APPST_NUM];
+
+/* TODO: Only need one kernel evfd_pxy */
 static int kernel_evfd_pxy[FLEXNIC_PL_VMST_NUM];
 
 int flextcp_vm_kernel_connect(int vmid, int *shmfd, int *flexnic_evfd);

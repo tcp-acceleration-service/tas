@@ -47,7 +47,7 @@ struct guest_proxy {
     /* List of virtual file descriptors and epoll */
     int *vfds;
     int vepfd;
-    int vevfd_next;
+    int ctxreq_id_next;
     /* Notify fd for kernel slowpath */
     int kernel_notifyfd;
     /* Applications */

@@ -9,10 +9,10 @@
 #define HOST_PEERID 255
 
 struct proxy_context_req {
-  int conn_evfd;
-  int virt_evfd;
+  int actx_evfd;
+  int ctxreq_id;
   int app_id;
   struct kernel_uxsock_request req;
-};
+} __attribute((packed))__;
 
 #endif /* ndef PROXY_H_H */

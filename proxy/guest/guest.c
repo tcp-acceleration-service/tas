@@ -36,7 +36,7 @@ struct guest_proxy *guest_init_proxy()
   
   pxy->vfds = NULL;
   pxy->vepfd = -1;
-  pxy->vevfd_next = 0;
+  pxy->ctxreq_id_next = 0;
   
   pxy->kernel_notifyfd = -1;
   pxy->next_app_id = 0;

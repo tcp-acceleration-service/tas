@@ -70,7 +70,7 @@ int ivshmem_init()
         goto close_uxfd;
     }
 
-    /* Create epoll to listen to subscribe to contexts */
+    /* Create epoll to subscribe to contexts */
     if ((ctx_epfd = epoll_create1(0)) == -1) 
     {
         fprintf(stderr, "ivshmem_init: epoll_create1 for ctx epfd failed.");
@@ -616,9 +616,8 @@ static int ivshmem_ctxs_poll()
         {
             vctx = evs[i].data.ptr;
             ivshmem_drain_evfd(vctx->ctx->evfd);
-            
             msg.msg_type = MSG_TYPE_VPOKE;
-            msg.vfd = vctx->vfd;
+            msg.ctxreq_id = vctx->ctxreq_id;
             ret = channel_write(vctx->vm->chan, &msg, sizeof(struct vpoke_msg));
             if (ret < sizeof(struct vpoke_msg))
             {
@@ -672,16 +671,16 @@ static int ivshmem_handle_ctx_req(struct v_machine *vm,
   }
 
   vctx->ctx = ctx;
-  vctx->cfd = msg->cfd;
-  vctx->vfd = msg->vfd;
+  vctx->cfd = msg->actx_evfd;
+  vctx->ctxreq_id = msg->ctxreq_id;
   vctx->app_id = msg->app_id;
   vctx->next = vm->ctxs;
   vctx->vm = vm;
   vm->ctxs = vctx;
 
-  res_msg.msg_type = MSG_TYPE_CONTEXT_RES,
-  res_msg.vfd = msg->vfd,
-  res_msg.app_id = msg->app_id,
+  res_msg.msg_type = MSG_TYPE_CONTEXT_RES;
+  res_msg.ctxreq_id = msg->ctxreq_id;
+  res_msg.app_id = msg->app_id;
 
   ret = channel_write(vm->chan, &res_msg, sizeof(struct context_res_msg));
   if (ret < sizeof(struct context_res_msg))

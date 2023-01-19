@@ -124,7 +124,7 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t vm_id, uint32_t queu
 
     /* enqueue flo state on forwarding queue */
     if (rte_ring_enqueue(ctxs[new_core]->qman_fwd_ring, fs) != 0) {
-      fprintf(stderr, "fast_flows_qman: rte_ring_enqueue failed\n");
+      fprintf(stderr, "fast_flows_qman: rte_ring_enqueue failed: vm_id=%d flow_id=%d\n", vm_id, queue);
       abort();
     }
 
@@ -147,10 +147,10 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t vm_id, uint32_t queu
 
 #ifdef PL_DEBUG_ATX
   fprintf(stderr, "ATX try_sendseg local=%08x:%05u remote=%08x:%05u "
-      "tx_avail=%x tx_next_pos=%x avail=%u\n",
+      "tx_avail=%x tx_next_pos=%x avail=%u core_id=%d\n",
       f_beui32(fs->local_ip), f_beui16(fs->local_port),
       f_beui32(fs->remote_ip), f_beui16(fs->remote_port),
-      fs->tx_avail, fs->tx_next_pos, avail);
+      fs->tx_avail, fs->tx_next_pos, avail, ctx->id);
 #endif
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_afloqman te_afloqman = {

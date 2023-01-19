@@ -136,6 +136,7 @@ static int vflextcp_uxsocket_init(struct guest_proxy *pxy)
   saun.sun_family = AF_UNIX;
   memcpy(saun.sun_path, KERNEL_SOCKET_PATH, sizeof(KERNEL_SOCKET_PATH));
 
+  unlink(saun.sun_path);
   if (bind(fd, (struct sockaddr *) &saun, sizeof(saun))) 
   {
     fprintf(stderr, "vflextcp_uxsocket_init: bind failed.\n");
@@ -343,7 +344,7 @@ static int vflextcp_uxsocket_receive(struct guest_proxy *pxy,
     struct proxy_application* app) 
 {
   ssize_t rx;
-  int evfd = 0;
+  int ctx_evfd = 0;
 
   struct iovec iov = {
     .iov_base = &app->proxy_req.req,
@@ -372,7 +373,7 @@ static int vflextcp_uxsocket_receive(struct guest_proxy *pxy,
     struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
     assert(cmsg->cmsg_len == CMSG_LEN(sizeof(int)));
     int* data = (int*) CMSG_DATA(cmsg);
-    evfd = *data;
+    ctx_evfd = *data;
   }
 
   if (rx < 0) 
@@ -387,10 +388,10 @@ static int vflextcp_uxsocket_receive(struct guest_proxy *pxy,
 
   /* request complete */
   app->req_rx = 0;
-  app->proxy_req.conn_evfd = evfd;
-  app->proxy_req.virt_evfd = pxy->vevfd_next++;
+  app->proxy_req.actx_evfd = ctx_evfd;
+  app->proxy_req.ctxreq_id = pxy->ctxreq_id_next++;
   app->proxy_req.app_id = app->id;
-  pxy->context_reqs[app->proxy_req.virt_evfd] = &app->proxy_req;
+  pxy->context_reqs[app->proxy_req.ctxreq_id] = &app->proxy_req;
 
   return rx;
 
@@ -410,8 +411,8 @@ static int vflextcp_uxsocket_handle_msg(struct guest_proxy *pxy,
 
     msg.msg_type = MSG_TYPE_CONTEXT_REQ;
     msg.app_id = app->proxy_req.app_id;
-    msg.vfd = app->proxy_req.virt_evfd;
-    msg.cfd = app->proxy_req.conn_evfd;
+    msg.ctxreq_id = app->proxy_req.ctxreq_id;
+    msg.actx_evfd = app->proxy_req.actx_evfd;
 
     ret = channel_write(pxy->chan, &msg, sizeof(struct context_req_msg)); 
     if (ret < sizeof(struct context_req_msg))
@@ -621,7 +622,7 @@ int vflextcp_poke(struct guest_proxy *pxy, int virt_fd)
   uint64_t w = 1;
   assert(virt_fd < MAX_CONTEXT_REQ);
 
-  evfd = pxy->context_reqs[virt_fd]->conn_evfd;
+  evfd = pxy->context_reqs[virt_fd]->actx_evfd;
   if (write(evfd, &w, sizeof(uint64_t)) != sizeof(uint64_t)) 
   {
     fprintf(stderr, "vflextcp_poke: write failed.\n");

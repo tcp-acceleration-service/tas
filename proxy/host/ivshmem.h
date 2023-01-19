@@ -28,7 +28,7 @@ struct v_machine {
 
 struct vmcontext_req {
     int app_id;
-    uint32_t vfd;
+    uint32_t ctxreq_id;
     int cfd; 
     struct v_machine *vm;
     struct flextcp_context *ctx;

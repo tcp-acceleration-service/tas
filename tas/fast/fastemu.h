@@ -66,7 +66,7 @@ void fast_flows_qman_pf(struct dataplane_context *ctx, uint32_t *queues,
     uint16_t n);
 void fast_flows_qman_pfbufs(struct dataplane_context *ctx, uint32_t *queues,
     uint16_t n);
-int fast_flows_qman(struct dataplane_context *ctx, uint32_t app_id,
+int fast_flows_qman(struct dataplane_context *ctx, uint32_t vm_id,
     uint32_t queue, struct network_buf_handle *nbh, uint32_t ts);
 int fast_flows_qman_fwd(struct dataplane_context *ctx,
     struct flextcp_pl_flowst *fs);
