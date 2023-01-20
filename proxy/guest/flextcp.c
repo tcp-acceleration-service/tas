@@ -631,8 +631,7 @@ int vflextcp_write_context_res(struct guest_proxy *pxy,
   return 0;
 }
 
-int vflextcp_poke(struct guest_proxy *pxy, int virt_fd,
-        uint64_t eventfd_counter) 
+int vflextcp_poke(struct guest_proxy *pxy, int virt_fd) 
 {
   int evfd;
   uint64_t w = 1;

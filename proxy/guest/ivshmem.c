@@ -208,6 +208,6 @@ int ivshmem_handle_ctx_res(struct guest_proxy *pxy, struct context_res_msg *msg)
 
 int ivshmem_handle_vpoke(struct guest_proxy *pxy, struct vpoke_msg *msg)
 {
-  vflextcp_poke(pxy, msg->ctxreq_id, msg->eventfd_counter);
+  vflextcp_poke(pxy, msg->ctxreq_id);
   return 0;
 }
