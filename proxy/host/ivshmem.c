@@ -135,12 +135,12 @@ int ivshmem_notify_guest(int fd)
 
 /* Clears the interrupt status register. If register is not cleared
    we keep receiving interrupt events from epoll. */
-int ivshmem_drain_evfd(int fd) 
+uint64_t ivshmem_drain_evfd(int fd) 
 {
   int ret;
-  uint8_t buf[8];
-  ret = read(fd, buf, 8);
-  if (ret < 8)
+  uint64_t buf;
+  ret = read(fd, &buf, sizeof(uint64_t));
+  if (ret == 0)
   {
     fprintf(stderr, "ivshmem_drain_evfd: failed to drain evfd.\n");
     return -1;
