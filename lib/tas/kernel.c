@@ -41,11 +41,8 @@ void flextcp_kernel_kick(void)
   static uint64_t __thread last_ts = 0;
   uint64_t now = util_rdtsc();
 
-  /* fprintf(stderr, "kicking kernel?\n"); */
-
   if(now - last_ts > flexnic_info->poll_cycle_tas) {
     // Kick kernel
-    /* fprintf(stderr, "kicking kernel\n"); */
     assert(kernel_evfd != 0);
     uint64_t val = 1;
     int r = write(kernel_evfd, &val, sizeof(uint64_t));

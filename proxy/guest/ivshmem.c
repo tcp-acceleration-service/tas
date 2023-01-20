@@ -62,8 +62,8 @@ int ivshmem_init(struct guest_proxy *pxy)
 int ivshmem_poll(struct guest_proxy *pxy)
 {
   int n, i;
-  struct epoll_event events[2];
-  n = epoll_wait(pxy->epfd, events, 2, 1000); 
+  struct epoll_event events[32];
+  n = epoll_wait(pxy->epfd, events, 32, 0); 
   
   if (n > 0) 
   {
@@ -92,7 +92,7 @@ int ivshmem_drain_evfd(int fd)
   int ret;
   uint8_t buf[8];
   ret = read(fd, buf, 8);
-  if (ret < 8)
+  if (ret == 0)
   {
     fprintf(stderr, "ivshmem_drain_evfd: failed to drain evfd.\n");
     return -1;
@@ -208,6 +208,6 @@ int ivshmem_handle_ctx_res(struct guest_proxy *pxy, struct context_res_msg *msg)
 
 int ivshmem_handle_vpoke(struct guest_proxy *pxy, struct vpoke_msg *msg)
 {
-  vflextcp_poke(pxy, msg->ctxreq_id);
+  vflextcp_poke(pxy, msg->ctxreq_id, msg->eventfd_counter);
   return 0;
 }

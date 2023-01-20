@@ -25,7 +25,7 @@ static int vflextcp_uxsocket_poll(struct guest_proxy *pxy);
 static int vflextcp_uxsocket_accept(struct guest_proxy *pxy);
 static int vflextcp_uxsocket_error(struct proxy_application* app);
 static int vflextcp_uxsocket_receive(struct guest_proxy *pxy, 
-    struct proxy_application* app);
+    struct proxy_application* app, int *actx_id);
 static int vflextcp_uxsocket_handle_msg(struct guest_proxy *pxy,
     struct proxy_application *app);
 static int vflextcp_virtfd_poll(struct guest_proxy *pxy);
@@ -341,14 +341,23 @@ static int vflextcp_uxsocket_error(struct proxy_application* app)
 }
 
 static int vflextcp_uxsocket_receive(struct guest_proxy *pxy, 
-    struct proxy_application* app) 
+    struct proxy_application* app, int *actx_id) 
 {
   ssize_t rx;
   int ctx_evfd = 0;
+  struct proxy_context_req *ctx_req;
+
+  ctx_req = malloc(sizeof(struct proxy_context_req));
+  if (ctx_req == NULL)
+  {
+    fprintf(stderr, "vflextcp_uxsocket_receive: "
+        "failed to malloc context req.\n");
+    goto error_abort_app;
+  }
 
   struct iovec iov = {
-    .iov_base = &app->proxy_req.req,
-    .iov_len = sizeof(app->proxy_req.req) - app->req_rx,
+    .iov_base = &ctx_req->req,
+    .iov_len = sizeof(ctx_req->req) - app->req_rx,
   };
 
   union {
@@ -380,7 +389,7 @@ static int vflextcp_uxsocket_receive(struct guest_proxy *pxy,
   {
     perror("vflextcp_uxsocket_receive: recv failed.");
     goto error_abort_app;
-  } else if (rx + app->req_rx < sizeof(app->proxy_req.req)) 
+  } else if (rx + app->req_rx < sizeof(ctx_req->req)) 
   {
     app->req_rx += rx;
     return -1;
@@ -388,10 +397,13 @@ static int vflextcp_uxsocket_receive(struct guest_proxy *pxy,
 
   /* request complete */
   app->req_rx = 0;
-  app->proxy_req.actx_evfd = ctx_evfd;
-  app->proxy_req.ctxreq_id = pxy->ctxreq_id_next++;
-  app->proxy_req.app_id = app->id;
-  pxy->context_reqs[app->proxy_req.ctxreq_id] = &app->proxy_req;
+  ctx_req->actx_evfd = ctx_evfd;
+  ctx_req->ctxreq_id = pxy->ctxreq_id_next++;
+  ctx_req->app_id = app->id;
+  // TODO: MAKE CTX REQ DEAL PROPERLY WITH MULTIPLE APPS
+  pxy->context_reqs[ctx_req->ctxreq_id] = ctx_req;
+
+  *actx_id = ctx_req->ctxreq_id;
 
   return rx;
 
@@ -403,16 +415,19 @@ error_abort_app:
 static int vflextcp_uxsocket_handle_msg(struct guest_proxy *pxy,
     struct proxy_application *app)
 {
-  int ret;
+  int ret, actx_id;
   struct context_req_msg msg;
-  
-  if (vflextcp_uxsocket_receive(pxy, app) > 0) 
+  struct proxy_context_req *ctx_req;
+
+  if (vflextcp_uxsocket_receive(pxy, app, &actx_id) > 0) 
   {
+    
+    ctx_req = pxy->context_reqs[actx_id];
 
     msg.msg_type = MSG_TYPE_CONTEXT_REQ;
-    msg.app_id = app->proxy_req.app_id;
-    msg.ctxreq_id = app->proxy_req.ctxreq_id;
-    msg.actx_evfd = app->proxy_req.actx_evfd;
+    msg.app_id = app->id;
+    msg.ctxreq_id = ctx_req->ctxreq_id;
+    msg.actx_evfd = ctx_req->actx_evfd;
 
     ret = channel_write(pxy->chan, &msg, sizeof(struct context_req_msg)); 
     if (ret < sizeof(struct context_req_msg))
@@ -616,7 +631,8 @@ int vflextcp_write_context_res(struct guest_proxy *pxy,
   return 0;
 }
 
-int vflextcp_poke(struct guest_proxy *pxy, int virt_fd) 
+int vflextcp_poke(struct guest_proxy *pxy, int virt_fd,
+        uint64_t eventfd_counter) 
 {
   int evfd;
   uint64_t w = 1;
