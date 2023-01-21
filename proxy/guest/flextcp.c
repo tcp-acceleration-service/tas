@@ -443,7 +443,7 @@ static int vflextcp_virtfd_poll(struct guest_proxy *pxy) {
   n = epoll_wait(pxy->vepfd, evs, 32, 0);
   if (n < 0) 
   {
-    perror("vflextcp_virtfd_poll: epoll_wait.");
+    perror("vflextcp_virtfd_poll: epoll_wait");
     return -1;
   }
 
