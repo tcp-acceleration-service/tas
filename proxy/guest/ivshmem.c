@@ -68,7 +68,7 @@ int ivshmem_channel_poll(struct guest_proxy *pxy)
   
   for (i = 0; i < n; i++) 
   {
-    if (evs[i].events & EPOLLIN)
+    if (evs[i].events & EPOLLIN)  
     {
       ivshmem_drain_evfd(pxy->irq_fd);
       ivshmem_handle_msg(pxy);

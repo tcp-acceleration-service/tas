@@ -52,6 +52,8 @@ static int ivshmem_handle_newapp(struct v_machine *vm,
 static int ivshmem_handle_ctx_req(struct v_machine *vm, 
         struct context_req_msg *msg);
 
+int vpoke_count = 0;
+
 int ivshmem_init()
 {
     struct epoll_event ev;
@@ -303,7 +305,7 @@ static int ivshmem_uxsocket_accept()
     }
 
     /* Create and send fd so that vm can interrupt host */
-    if ((nfd = eventfd(0, EFD_NONBLOCK)) < 0)
+    if ((nfd = eventfd(0, EFD_SEMAPHORE | EFD_NONBLOCK)) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_acccept: failed to create"
                 "notify fd.\n");
@@ -321,7 +323,7 @@ static int ivshmem_uxsocket_accept()
         
     }
 
-    /* Create and send fd so that host can interrupt vm */
+    /* Create and send eventfd so that host can interrupt vm */
     if ((ifd = eventfd(0, EFD_SEMAPHORE | EFD_NONBLOCK)) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to create "
@@ -344,7 +346,7 @@ static int ivshmem_uxsocket_accept()
         goto close_ifd;
     }
 
-    /* Add notify fd to the epoll interest list */
+    /* Add notify fd to the chan epoll interest list */
     ev.events = EPOLLIN;
     ev.data.ptr = &vms[next_vm_id];
     if (epoll_ctl(chan_epfd, EPOLL_CTL_ADD, nfd, &ev) < 0)
@@ -650,7 +652,9 @@ static int ivshmem_ctxs_poll()
             {
                 fprintf(stderr, "ivshmem_ctxs_poll: failed to write poke msg.\n");
                 return -1;
-            }            
+            }       
+            vpoke_count++;     
+            printf("VPOKE COUNT=%d N=%d\n", vpoke_count, n);
             ivshmem_notify_guest(vctx->vm->ifd);
         }
     }

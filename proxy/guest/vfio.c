@@ -143,7 +143,6 @@ int vfio_set_irq(struct guest_proxy *pxy)
 
   if (ioctl(pxy->dev, VFIO_DEVICE_SET_IRQS, irq_set) < 0)
   {
-    perror("");
     fprintf(stderr, "vfio_set_irq: failed to set interrupt request.\n");
     goto error_close;
   }
