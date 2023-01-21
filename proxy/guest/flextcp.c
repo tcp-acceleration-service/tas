@@ -107,13 +107,13 @@ int vflextcp_poll(struct guest_proxy *pxy)
 {
   if (vflextcp_uxsocket_poll(pxy) != 0) 
   {
-    fprintf(stderr, "flextcp_poll: uxsocket_poll failed.");
+    fprintf(stderr, "flextcp_poll: uxsocket_poll failed.\n");
     return -1;
   }
 
   if (vflextcp_virtfd_poll(pxy) != 0) 
   {
-    fprintf(stderr, "flextcp_poll: vflextcp_virtfd_poll failed.");
+    fprintf(stderr, "flextcp_poll: vflextcp_virtfd_poll failed.\n");
     return -1;
   }
 
