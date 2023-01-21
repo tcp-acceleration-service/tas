@@ -196,6 +196,13 @@ int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy)
     return -1; 
   }
 
+  /* Initialize vflextcp */
+  if (vflextcp_init(pxy) < 0)
+  {
+    fprintf(stderr, "main: flextcp_init failed.\n");
+    return -1;
+  }
+
   return 0;
 }
 
