@@ -11,14 +11,15 @@
 #include "../proxy.h"
 #include "../channel.h"
 
-int ivshmem_setup(struct guest_proxy *pxy);
-int ivshmem_handle_msg(struct guest_proxy * pxy);
-int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy);
-int ivshmem_handle_newapp_res(struct guest_proxy *pxy,
+static int ivshmem_setup(struct guest_proxy *pxy);
+static int ivshmem_handle_msg(struct guest_proxy * pxy);
+static int ivshmem_handle_hello(struct guest_proxy *pxy);
+static int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy);
+static int ivshmem_handle_newapp_res(struct guest_proxy *pxy,
     struct newapp_res_msg *msg);
-int ivshmem_handle_ctx_res(struct guest_proxy *pxy, 
+static int ivshmem_handle_ctx_res(struct guest_proxy *pxy, 
     struct context_res_msg *msg);
-int ivshmem_handle_vpoke(struct guest_proxy *pxy, struct vpoke_msg *msg);
+static int ivshmem_handle_vpoke(struct guest_proxy *pxy, struct vpoke_msg *msg);
 
 int ivshmem_init(struct guest_proxy *pxy)
 {
@@ -48,34 +49,9 @@ int ivshmem_init(struct guest_proxy *pxy)
       return -1;
   }
 
-  /* Setup guest proxy with host proxy */
-  if (ivshmem_setup(pxy) < 0)
-  {
-    fprintf(stderr, "ivshmem_init: failed handshake with host.\n");
-    return -1;
-  }
-
   // TODO: Add error handling here and close everything
 
   return 0;
-}
-
-int ivshmem_channel_poll(struct guest_proxy *pxy)
-{
-  int n, i;
-  struct epoll_event evs[32];
-  n = epoll_wait(pxy->chan_epfd, evs, 32, 0); 
-  
-  for (i = 0; i < n; i++) 
-  {
-    if (evs[i].events & EPOLLIN)  
-    {
-      ivshmem_drain_evfd(pxy->irq_fd);
-      ivshmem_handle_msg(pxy);
-    }
-  }
-  
-  return n;
 }
 
 void ivshmem_notify_host(struct guest_proxy *pxy)
@@ -102,26 +78,22 @@ int ivshmem_drain_evfd(int fd)
   return 0;
 }
 
-int ivshmem_setup(struct guest_proxy *pxy)
+int ivshmem_channel_poll(struct guest_proxy *pxy)
 {
-  int ret;
-  struct hello_msg h_msg;
-  struct tasinfo_req_msg treq_msg;
-
-  /* Get number of cores from host */
-  ret = channel_read(pxy->chan, &h_msg, sizeof(struct hello_msg));
-  if (ret < sizeof(struct hello_msg))
+  int n, i;
+  struct epoll_event evs[32];
+  n = epoll_wait(pxy->chan_epfd, evs, 32, 0); 
+  
+  for (i = 0; i < n; i++) 
   {
-    fprintf(stderr, "ivshmem_setup: failed to get number of cores.\n");
-    return -1;
+    if (evs[i].events & EPOLLIN)  
+    {
+      ivshmem_drain_evfd(pxy->irq_fd);
+      ivshmem_handle_msg(pxy);
+    }
   }
-
-  /* Send tasinfo request and wait for the response in the channel poll */
-  treq_msg.msg_type = MSG_TYPE_TASINFO_REQ;
-  ret = channel_write(pxy->chan, &treq_msg, sizeof(struct tasinfo_req_msg));
-  ivshmem_notify_host(pxy);
-
-  return 0;
+  
+  return n;
 }
 
 int ivshmem_handle_msg(struct guest_proxy * pxy) {
@@ -143,6 +115,9 @@ int ivshmem_handle_msg(struct guest_proxy * pxy) {
 
   switch(msg_type)
   {
+    case MSG_TYPE_HELLO:
+      ivshmem_handle_hello(pxy);
+      break;
     case MSG_TYPE_TASINFO_RES:
       ivshmem_handle_tasinfo_res(pxy);
       break;
@@ -162,7 +137,19 @@ int ivshmem_handle_msg(struct guest_proxy * pxy) {
   return 0;
 }
 
-int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy)
+static int ivshmem_handle_hello(struct guest_proxy *pxy)
+{
+  /* Setup guest proxy with host proxy */
+  if (ivshmem_setup(pxy) < 0)
+  {
+    fprintf(stderr, "ivshmem_init: failed handshake with host.\n");
+    return -1;
+  }
+
+  return 0;
+}
+
+static int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy)
 {
   int ret;
   struct tasinfo_res_msg msg;
@@ -170,14 +157,14 @@ int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy)
   ret = channel_read(pxy->chan, &msg, sizeof(struct tasinfo_res_msg));
   if (ret < sizeof(struct tasinfo_res_msg))
   {
-    fprintf(stderr, "ivshmem_setup: failed to read tasinfo.\n");
+    fprintf(stderr, "ivshmem_handle_tasinfo_res: failed to read tasinfo.\n");
     return -1;
   }
   
   pxy->flexnic_info = malloc(FLEXNIC_INFO_BYTES);
   if (pxy->flexnic_info == NULL)
   {
-    fprintf(stderr, "ivshmem_setup: failed to allocate flexnic_info.\n");
+    fprintf(stderr, "ivshmem_handle_tasinfo_res: failed to allocate flexnic_info.\n");
     return -1;
   }
 
@@ -192,27 +179,27 @@ int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy)
       FLEXNIC_INFO_BYTES);
   if (ret < 0)
   {
-    fprintf(stderr, "ivshmem_setup: failed to create tas_info shm region.\n");
+    fprintf(stderr, "ivshmem_handle_tasinfo_res: failed to create tas_info shm region.\n");
     return -1; 
   }
 
   if (vflextcp_virtfd_init(pxy) != 0) 
   {
-    fprintf(stderr, "vflextcp_init: "
+    fprintf(stderr, "ivshmem_handle_tasinfo_res: "
             "vflextcp_virtfd_init failed.\n");
   }
 
   return 0;
 }
 
-int ivshmem_handle_newapp_res(struct guest_proxy *pxy,
+static int ivshmem_handle_newapp_res(struct guest_proxy *pxy,
     struct newapp_res_msg *msg)
 {
   vflextcp_handle_newapp_res(pxy, msg);
   return 0;
 }
 
-int ivshmem_handle_ctx_res(struct guest_proxy *pxy, struct context_res_msg *msg)
+static int ivshmem_handle_ctx_res(struct guest_proxy *pxy, struct context_res_msg *msg)
 {
   uint32_t app_id;
 
@@ -222,8 +209,30 @@ int ivshmem_handle_ctx_res(struct guest_proxy *pxy, struct context_res_msg *msg)
   return 0;
 }
 
-int ivshmem_handle_vpoke(struct guest_proxy *pxy, struct vpoke_msg *msg)
+static int ivshmem_handle_vpoke(struct guest_proxy *pxy, struct vpoke_msg *msg)
 {
   vflextcp_poke(pxy, msg->ctxreq_id);
+  return 0;
+}
+
+static int ivshmem_setup(struct guest_proxy *pxy)
+{
+  int ret;
+  struct hello_msg h_msg;
+  struct tasinfo_req_msg treq_msg;
+
+  /* Get number of cores from host */
+  ret = channel_read(pxy->chan, &h_msg, sizeof(struct hello_msg));
+  if (ret < sizeof(struct hello_msg))
+  {
+    fprintf(stderr, "ivshmem_setup: failed to get number of cores.\n");
+    return -1;
+  }
+
+  /* Send tasinfo request and wait for the response in the channel poll */
+  treq_msg.msg_type = MSG_TYPE_TASINFO_REQ;
+  ret = channel_write(pxy->chan, &treq_msg, sizeof(struct tasinfo_req_msg));
+  ivshmem_notify_host(pxy);
+
   return 0;
 }

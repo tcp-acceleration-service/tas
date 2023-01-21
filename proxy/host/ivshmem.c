@@ -468,15 +468,12 @@ static int ivshmem_uxsocket_handle_msg(struct v_machine *vm)
         case MSG_TYPE_TASINFO_REQ:
             /* Send tas info struct to guest */
             ivshmem_handle_tasinforeq_msg(vm);
-            ivshmem_notify_guest(vm->ifd);
             break;
         case MSG_TYPE_CONTEXT_REQ:
             ivshmem_handle_ctx_req(vm, msg);
-            ivshmem_notify_guest(vm->ifd);
             break;
         case MSG_TYPE_NEWAPP_REQ:
             ivshmem_handle_newapp(vm, msg);
-            ivshmem_notify_guest(vm->ifd);
             break;
         default:
             fprintf(stderr, "ivshmem_uxsocket_handle_msg: unknown message.\n");
@@ -515,6 +512,8 @@ static int ivshmem_handle_tasinforeq_msg(struct v_machine *vm)
                 "failed to write to channel.\n");
         goto free_msg;
     }
+
+    ivshmem_notify_guest(vm->ifd);
 
     return 0;
 
@@ -592,6 +591,8 @@ static int ivshmem_handle_ctx_req(struct v_machine *vm,
     return -1;
   }
 
+  ivshmem_notify_guest(vm->ifd);
+
   return 0;
 }
 
@@ -621,6 +622,9 @@ static int ivshmem_handle_newapp(struct v_machine *vm,
                 "failed to write response to channel.\n");
         return -1;
     }
+
+    ivshmem_notify_guest(vm->ifd);
+
 
     return 0;
 }
