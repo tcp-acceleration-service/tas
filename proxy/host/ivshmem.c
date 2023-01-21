@@ -17,11 +17,10 @@
 // #include "../../lib/tas/internal.h"
 #include "ivshmem.h"
 
-/* Epoll that subscribes to:
-   - uxfd
-   - fd from each guest proxy connection
-*/
+/* Epoll fd that subscribes to uxfd */
 static int epfd = -1;
+/* Epoll fd that subscribes to irqfd */
+static int chan_epfd = -1;
 /* Unix socket that connects host proxy to guest proxy */
 static int uxfd = -1;
 /* Epoll for contexsts */
@@ -37,18 +36,19 @@ static int ivshmem_notify_guest(int fd);
 
 static int ivshmem_uxsocket_init();
 static int ivshmem_uxsocket_poll();
+static int ivshmem_chan_poll();
+static int ivshmem_ctxs_poll();
 
 static int ivshmem_uxsocket_accept();
 static int ivshmem_uxsocket_handle_notif();
 static int ivshmem_uxsocket_handle_error();
 static int ivshmem_uxsocket_handle_msg();
-static int ivshmem_handle_tasinforeq_msg(struct v_machine *vm);
-static int ivshmem_handle_newapp(struct v_machine *vm);
-
 static int ivshmem_uxsocket_send_int(int fd, int64_t i);
 static int ivshmem_uxsocket_sendfd(int uxfd, int fd, int64_t i);
 
-static int ivshmem_ctxs_poll();
+static int ivshmem_handle_tasinforeq_msg(struct v_machine *vm);
+static int ivshmem_handle_newapp(struct v_machine *vm,
+        struct newapp_req_msg *req_msg);
 static int ivshmem_handle_ctx_req(struct v_machine *vm, 
         struct context_req_msg *msg);
 
@@ -70,11 +70,18 @@ int ivshmem_init()
         goto close_uxfd;
     }
 
+    /* Create epoll to subscribe to interrupts from guests */
+    if ((chan_epfd = epoll_create1(0)) < -1) 
+    {
+        fprintf(stderr, "ivshmem_init: epoll_create1 for chan_epfd failed.\n"); 
+        goto close_epfd;
+    }
+
     /* Create epoll to subscribe to contexts */
     if ((ctx_epfd = epoll_create1(0)) == -1) 
     {
         fprintf(stderr, "ivshmem_init: epoll_create1 for ctx epfd failed.");
-        goto close_epfd;
+        goto close_chan_epfd;
     }
 
     /* Add unix socket to interest list */
@@ -93,6 +100,8 @@ int ivshmem_init()
 
 close_ctx_epfd:
     close(ctx_epfd);
+close_chan_epfd:
+    close(chan_epfd);
 close_epfd:
     close(epfd);
 close_uxfd:
@@ -106,6 +115,12 @@ int ivshmem_poll()
     if (ivshmem_uxsocket_poll() != 0)
     {
         fprintf(stderr, "ivshmem_poll: failed to poll uxsocket.\n");
+        return -1;
+    }
+
+    if (ivshmem_chan_poll() != 0)
+    {
+        fprintf(stderr, "ivshmem_poll: failed to poll proxy channel.\n");
         return -1;
     }
 
@@ -146,7 +161,7 @@ uint64_t ivshmem_drain_evfd(int fd)
     return -1;
   }
 
-  return 0;
+  return buf;
 }
 
 /*****************************************************************************/
@@ -201,7 +216,6 @@ close_fd:
 static int ivshmem_uxsocket_poll()
 {
     int i, n;
-    struct v_machine *vm;
     struct epoll_event evs[32];
     struct epoll_event ev;
 
@@ -226,12 +240,6 @@ static int ivshmem_uxsocket_poll()
         else if (evs[i].events & (EPOLLHUP | EPOLLRDHUP | EPOLLERR))
         {
             ivshmem_uxsocket_handle_error();
-        }
-        else if (evs[i].events & EPOLLIN)
-        {
-            vm = ev.data.ptr; 
-            ivshmem_drain_evfd(vm->nfd);
-            ivshmem_uxsocket_handle_msg(vm);
         }
     }
 
@@ -314,7 +322,7 @@ static int ivshmem_uxsocket_accept()
     }
 
     /* Create and send fd so that host can interrupt vm */
-    if ((ifd = eventfd(0, EFD_NONBLOCK)) < 0)
+    if ((ifd = eventfd(0, EFD_SEMAPHORE | EFD_NONBLOCK)) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to create "
                 "interrupt fd.\n");
@@ -339,7 +347,7 @@ static int ivshmem_uxsocket_accept()
     /* Add notify fd to the epoll interest list */
     ev.events = EPOLLIN;
     ev.data.ptr = &vms[next_vm_id];
-    if (epoll_ctl(epfd, EPOLL_CTL_ADD, nfd, &ev) < 0)
+    if (epoll_ctl(chan_epfd, EPOLL_CTL_ADD, nfd, &ev) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
                 "nfd to epfd.\n");
@@ -399,6 +407,36 @@ static int ivshmem_uxsocket_handle_error()
     return 0;
 }
 
+static int ivshmem_chan_poll()
+{
+    int i, n;
+    struct v_machine *vm;
+    struct epoll_event evs[32];
+
+    if ((n = epoll_wait(chan_epfd, evs, 32, 0)) < 0)
+    {
+        fprintf(stderr, "ivshmem_uxsocket_poll: epoll_wait failed.\n");
+        return -1;
+    }
+
+    for (i = 0; i < n; i++)
+    {
+        if (n > 0)
+        {
+            vm = evs[i].data.ptr;
+            ivshmem_drain_evfd(vm->nfd);
+
+            if (evs[i].events & EPOLLIN)
+            {
+                ivshmem_uxsocket_handle_msg(vm);
+            }
+        }
+    }
+
+
+    return 0;
+}
+
 static int ivshmem_uxsocket_handle_msg(struct v_machine *vm)
 {
     int ret;
@@ -435,7 +473,7 @@ static int ivshmem_uxsocket_handle_msg(struct v_machine *vm)
             ivshmem_notify_guest(vm->ifd);
             break;
         case MSG_TYPE_NEWAPP_REQ:
-            ivshmem_handle_newapp(vm);
+            ivshmem_handle_newapp(vm, msg);
             ivshmem_notify_guest(vm->ifd);
             break;
         default:
@@ -485,10 +523,81 @@ free_msg:
 
 }
 
-static int ivshmem_handle_newapp(struct v_machine *vm)
+static int ivshmem_handle_ctx_req(struct v_machine *vm, 
+        struct context_req_msg *msg) 
+{
+  int ret;
+  struct context_res_msg res_msg;
+  struct flextcp_context *ctx;
+  struct vmcontext_req *vctx;
+  uint8_t resp_buf[CTX_RESP_MAX_SIZE];
+  struct epoll_event ev;
+
+  /* allocate a flextcp_context and set it up */
+  ctx = malloc(sizeof(struct flextcp_context));
+  memset(resp_buf, 0, sizeof(resp_buf));
+  
+  if (ctx == NULL) 
+  {
+    fprintf(stderr, "ivshmem_handle_ctx_req: " 
+        "failed to allocate memory for context request.\n");
+    return -1;
+  }
+
+  if (flextcp_proxy_context_create(ctx, res_msg.resp, 
+        &res_msg.resp_size, vm->id, msg->app_id) == -1) 
+  {
+    fprintf(stderr, "ivshmem_handle_ctxreq: "
+            "failed to create context request.");
+    return -1;
+  }
+
+  /* allocate memory to keep track of different context queues from 
+   * different applications on the same vm */
+  vctx = malloc(sizeof(struct vmcontext_req));
+  if (vctx == NULL) 
+  {
+    fprintf(stderr, "ivshmem_handle_ctxreq: failed to allocate memory for "
+        "vm_context_req" );
+    return -1;
+  }
+
+  vctx->ctx = ctx;
+  vctx->cfd = msg->actx_evfd;
+  vctx->ctxreq_id = msg->ctxreq_id;
+  vctx->app_id = msg->app_id;
+  vctx->next = vm->ctxs;
+  vctx->vm = vm;
+  vm->ctxs = vctx;
+
+  res_msg.msg_type = MSG_TYPE_CONTEXT_RES;
+  res_msg.ctxreq_id = msg->ctxreq_id;
+  res_msg.app_id = msg->app_id;
+
+  ret = channel_write(vm->chan, &res_msg, sizeof(struct context_res_msg));
+  if (ret < sizeof(struct context_res_msg))
+  {
+    fprintf(stderr, "ivshmem_handle_ctxreq: failed to send ctx res.\n");
+    return -1;
+  }
+
+  /* add vctx to context request epoll */
+  ev.events = EPOLLIN;
+  ev.data.ptr = vctx;
+  if (epoll_ctl(ctx_epfd, EPOLL_CTL_ADD, vctx->ctx->evfd, &ev) != 0) 
+  {
+    fprintf(stderr, "ivshmem_handle_ctxreq: epoll_ctl listen failed."); 
+    return -1;
+  }
+
+  return 0;
+}
+
+static int ivshmem_handle_newapp(struct v_machine *vm, 
+        struct newapp_req_msg *msg_req)
 {
     int ret, appid;
-    struct newapp_res_msg msg;
+    struct newapp_res_msg msg_res;
     appid = next_app_id[vm->id];
     next_app_id[vm->id]++;
 
@@ -499,14 +608,56 @@ static int ivshmem_handle_newapp(struct v_machine *vm)
         return -1;
     }
 
-    msg.msg_type = MSG_TYPE_NEWAPP_RES;
-    ret = channel_write(vm->chan, &msg, sizeof(msg));
+    msg_res.msg_type = MSG_TYPE_NEWAPP_RES;
+    msg_res.cfd = msg_req->cfd;
+
+    ret = channel_write(vm->chan, &msg_res, sizeof(msg_res));
     
-    if (ret != sizeof(msg))
+    if (ret != sizeof(msg_res))
     {
         fprintf(stderr, "ivshmem_handle_newapp: "
                 "failed to write response to channel.\n");
         return -1;
+    }
+
+    return 0;
+}
+
+static int ivshmem_ctxs_poll() 
+{
+    int i, n, ret;
+    struct vmcontext_req *vctx;
+    struct _msg;
+    struct epoll_event evs[32];
+    struct vpoke_msg msg;
+
+    n = epoll_wait(ctx_epfd, evs, 32, 0);
+    if (n < 0) 
+    {
+        fprintf(stderr, "ivshmem_ctxs_poll: epoll_wait failed");
+        if (errno == EINTR) 
+        {
+            return -1; 
+        }
+        
+        return -1;
+    } 
+    else if (n > 0) 
+    {
+        for (i = 0; i < n; i++) 
+        {
+            vctx = evs[i].data.ptr;
+            ivshmem_drain_evfd(vctx->ctx->evfd);
+            msg.msg_type = MSG_TYPE_VPOKE;
+            msg.ctxreq_id = vctx->ctxreq_id;
+            ret = channel_write(vctx->vm->chan, &msg, sizeof(struct vpoke_msg));
+            if (ret < sizeof(struct vpoke_msg))
+            {
+                fprintf(stderr, "ivshmem_ctxs_poll: failed to write poke msg.\n");
+                return -1;
+            }            
+            ivshmem_notify_guest(vctx->vm->ifd);
+        }
     }
 
     return 0;
@@ -585,118 +736,4 @@ static int ivshmem_uxsocket_sendfd(int uxfd, int fd, int64_t i)
     }
 
     return n;
-}
-
-
-/*****************************************************************************/
-/* Contexts */
-
-static int ivshmem_ctxs_poll() 
-{
-    int i, n, ret;
-    struct vmcontext_req *vctx;
-    struct _msg;
-    struct epoll_event evs[32];
-    struct vpoke_msg msg;
-
-    n = epoll_wait(ctx_epfd, evs, 32, 0);
-    if (n < 0) 
-    {
-        fprintf(stderr, "ivshmem_ctxs_poll: epoll_wait failed");
-        if (errno == EINTR) 
-        {
-            return -1; 
-        }
-        
-        return -1;
-    } 
-    else if (n > 0) 
-    {
-        for (i = 0; i < n; i++) 
-        {
-            vctx = evs[i].data.ptr;
-            ivshmem_drain_evfd(vctx->ctx->evfd);
-            msg.msg_type = MSG_TYPE_VPOKE;
-            msg.ctxreq_id = vctx->ctxreq_id;
-            ret = channel_write(vctx->vm->chan, &msg, sizeof(struct vpoke_msg));
-            if (ret < sizeof(struct vpoke_msg))
-            {
-                fprintf(stderr, "ivshmem_ctxs_poll: failed to write poke msg.\n");
-                return -1;
-            }            
-            ivshmem_notify_guest(vctx->vm->ifd);
-        }
-    }
-
-    return 0;
-}
-
-static int ivshmem_handle_ctx_req(struct v_machine *vm, 
-        struct context_req_msg *msg) 
-{
-  int ret;
-  struct context_res_msg res_msg;
-  struct flextcp_context *ctx;
-  struct vmcontext_req *vctx;
-  uint8_t resp_buf[CTX_RESP_MAX_SIZE];
-  struct epoll_event ev;
-
-  /* allocate a flextcp_context and set it up */
-  ctx = malloc(sizeof(struct flextcp_context));
-  memset(resp_buf, 0, sizeof(resp_buf));
-  
-  if (ctx == NULL) 
-  {
-    fprintf(stderr, "ivshmem_handle_ctx_req: " 
-        "failed to allocate memory for context request.\n");
-    return -1;
-  }
-
-  if (flextcp_proxy_context_create(ctx, res_msg.resp, 
-        &res_msg.resp_size, vm->id, msg->app_id) == -1) 
-  {
-    fprintf(stderr, "ivshmem_handle_ctxreq: "
-            "failed to create context request.");
-    return -1;
-  }
-
-  /* allocate memory to keep track of different context queues from 
-   * different applications on the same vm */
-  vctx = malloc(sizeof(struct vmcontext_req));
-  if (vctx == NULL) 
-  {
-    fprintf(stderr, "ivshmem_handle_ctxreq: failed to allocate memory for "
-        "vm_context_req" );
-    return -1;
-  }
-
-  vctx->ctx = ctx;
-  vctx->cfd = msg->actx_evfd;
-  vctx->ctxreq_id = msg->ctxreq_id;
-  vctx->app_id = msg->app_id;
-  vctx->next = vm->ctxs;
-  vctx->vm = vm;
-  vm->ctxs = vctx;
-
-  res_msg.msg_type = MSG_TYPE_CONTEXT_RES;
-  res_msg.ctxreq_id = msg->ctxreq_id;
-  res_msg.app_id = msg->app_id;
-
-  ret = channel_write(vm->chan, &res_msg, sizeof(struct context_res_msg));
-  if (ret < sizeof(struct context_res_msg))
-  {
-    fprintf(stderr, "ivshmem_handle_ctxreq: failed to send ctx res.\n");
-    return -1;
-  }
-
-  /* add vctx to context request epoll */
-  ev.events = EPOLLIN;
-  ev.data.ptr = vctx;
-  if (epoll_ctl(ctx_epfd, EPOLL_CTL_ADD, vctx->ctx->evfd, &ev) != 0) 
-  {
-    fprintf(stderr, "ivshmem_handle_ctxreq: epoll_ctl listen failed."); 
-    return -1;
-  }
-
-  return 0;
 }

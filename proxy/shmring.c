@@ -200,6 +200,7 @@ size_t shmring_push(struct ring_buffer *tx_ring, void *src, size_t size)
   freesz = shmring_get_freesz(tx_ring);
   if (freesz < size)
   {
+    fprintf(stderr, "shmring_push: not enough space in ring.\n");
     return 0;
   }
 

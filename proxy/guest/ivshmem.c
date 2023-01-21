@@ -14,9 +14,10 @@
 int ivshmem_setup(struct guest_proxy *pxy);
 int ivshmem_handle_msg(struct guest_proxy * pxy);
 
+int ivshmem_handle_newapp_res(struct guest_proxy *pxy,
+    struct newapp_res_msg *msg);
 int ivshmem_handle_ctx_res(struct guest_proxy *pxy, 
     struct context_res_msg *msg);
-
 int ivshmem_handle_vpoke(struct guest_proxy *pxy, struct vpoke_msg *msg);
 
 int ivshmem_init(struct guest_proxy *pxy)
@@ -24,7 +25,7 @@ int ivshmem_init(struct guest_proxy *pxy)
   void *tx_addr, *rx_addr;
 
   /* Create epoll that will wait for events from host */
-  if ((pxy->epfd = epoll_create1(0)) < 0)
+  if ((pxy->chan_epfd = epoll_create1(0)) < 0)
   {
     fprintf(stderr, "ivshmem_init: failed to create ivm_epfd.\n");
     return -1;
@@ -63,14 +64,14 @@ int ivshmem_poll(struct guest_proxy *pxy)
 {
   int n, i;
   struct epoll_event events[32];
-  n = epoll_wait(pxy->epfd, events, 32, 0); 
+  n = epoll_wait(pxy->chan_epfd, events, 32, 0); 
   
   if (n > 0) 
   {
     for (i = 0; i < n; i++) 
     {
-        ivshmem_drain_evfd(pxy->irq_fd);
-        ivshmem_handle_msg(pxy);
+      ivshmem_drain_evfd(pxy->irq_fd);
+      ivshmem_handle_msg(pxy);
     }
   }
   
@@ -124,7 +125,7 @@ int ivshmem_setup(struct guest_proxy *pxy)
 
 
   /* Receive tasinfo response */
-  ret = epoll_wait(pxy->epfd, evs, 1, -1);
+  ret = epoll_wait(pxy->chan_epfd, evs, 1, -1);
   if (ret == 0)
   {
     fprintf(stderr, "ivshmem_setup: failed to receive "
@@ -183,6 +184,9 @@ int ivshmem_handle_msg(struct guest_proxy * pxy) {
 
   switch(msg_type)
   {
+    case MSG_TYPE_NEWAPP_RES:
+      ivshmem_handle_newapp_res(pxy, (struct newapp_res_msg *) msg);
+      break;
     case MSG_TYPE_CONTEXT_RES:
       ivshmem_handle_ctx_res(pxy, (struct context_res_msg *) msg);
       break;
@@ -193,6 +197,13 @@ int ivshmem_handle_msg(struct guest_proxy * pxy) {
       fprintf(stderr, "ivshmem_handle_msg: unknown message.\n");
   }
 
+  return 0;
+}
+
+int ivshmem_handle_newapp_res(struct guest_proxy *pxy,
+    struct newapp_res_msg *msg)
+{
+  vflextcp_handle_newapp_res(pxy, msg);
   return 0;
 }
 

@@ -63,10 +63,12 @@ struct vpoke_msg {
 
 struct newapp_req_msg {
   uint8_t msg_type;
+  int cfd;
 } __attribute__((packed));
 
 struct newapp_res_msg {
   uint8_t msg_type;
+  int cfd;
 } __attribute__((packed));
 
 struct channel {

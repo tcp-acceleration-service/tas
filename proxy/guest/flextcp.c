@@ -241,12 +241,8 @@ static int vflextcp_uxsocket_poll(struct guest_proxy *pxy)
 
 static int vflextcp_uxsocket_accept(struct guest_proxy *pxy) 
 {
-  int cfd, n_cores, ret;
-  struct epoll_event ev;
-  struct proxy_application *app;
+  int cfd, ret;
   struct newapp_req_msg req_msg;
-  struct newapp_res_msg res_msg;
-  struct epoll_event evs[1];
 
   if ((cfd  = accept(pxy->flextcp_uxfd, NULL, NULL)) < 0) 
   {
@@ -256,6 +252,7 @@ static int vflextcp_uxsocket_accept(struct guest_proxy *pxy)
 
   /* Register app with host */
   req_msg.msg_type = MSG_TYPE_NEWAPP_REQ;
+  req_msg.cfd = cfd;
   ret = channel_write(pxy->chan, &req_msg, sizeof(req_msg));
   if (ret != sizeof(req_msg))
   {
@@ -263,26 +260,22 @@ static int vflextcp_uxsocket_accept(struct guest_proxy *pxy)
         "failed to write req_msg to chan.\n");
     return -1;
   }
+  /* Notify host and retrieve response from channel to continue
+     registration */
   ivshmem_notify_host(pxy);
 
-  /* Receive tasinfo response */
-  ret = epoll_wait(pxy->epfd, evs, 1, -1);
-  if (ret == 0)
-  {
-    fprintf(stderr, "vflextcp_uxsocket_accept: failed to receive "
-        "newapp_res in epfd.\n");
-  }
+  return 0;
+}
 
-  ivshmem_drain_evfd(pxy->irq_fd);
-  ret = channel_read(pxy->chan, &res_msg, sizeof(res_msg));
-  if (ret != sizeof(res_msg))
-  {
-    fprintf(stderr, "vflextco_uxsocket_accept: "
-        "failed to read res_msg from chan.\n");
-    return -1;
-  }
+int vflextcp_handle_newapp_res(struct guest_proxy *pxy, 
+    struct newapp_res_msg *msg)
+{
+  int n_cores, cfd;
+  struct epoll_event ev;
+  struct proxy_application *app;
 
   n_cores = pxy->flexnic_info->cores_num;
+  cfd = msg->cfd;
   if (vflextcp_send_kernel_notifyfd(cfd, n_cores, pxy->kernel_notifyfd) != 0) 
   {
     fprintf(stderr, "vflextcp_uxsocket_accept: "

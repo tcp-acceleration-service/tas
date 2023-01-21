@@ -23,7 +23,7 @@ struct proxy_application {
 
 struct guest_proxy {
     /* Epoll fd for all guest to host comm */
-    int epfd;
+    int chan_epfd;
     /* Fd for vfio interrupt requests */
     int irq_fd;
     /* VFIO fds */

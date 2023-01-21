@@ -127,7 +127,7 @@ int vfio_set_irq(struct guest_proxy *pxy)
   struct vfio_irq_set *irq_set;
   char buf[sizeof(struct vfio_irq_set) + sizeof(int)];
 
-  if ((fd = eventfd(0, EFD_NONBLOCK)) < 0)
+  if ((fd = eventfd(0, EFD_SEMAPHORE | EFD_NONBLOCK)) < 0)
   {
     fprintf(stderr, "vfio_set_irq: failed to create event fd.\n");
     return -1;
@@ -167,7 +167,7 @@ int vfio_subscribe_irq(struct guest_proxy *pxy)
   ev.data.ptr = EP_NOTIFY;
   ev.data.fd = pxy->irq_fd;
   
-  if (epoll_ctl(pxy->epfd, EPOLL_CTL_ADD, pxy->irq_fd, &ev) != 0)
+  if (epoll_ctl(pxy->chan_epfd, EPOLL_CTL_ADD, pxy->irq_fd, &ev) != 0)
   {
     fprintf(stderr, "vfio_subscribe_irqs: addint irq_fd to epoll failed.\n");
     return -1;

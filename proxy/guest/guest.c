@@ -14,7 +14,7 @@ struct guest_proxy *guest_init_proxy()
 {
   struct guest_proxy *pxy = malloc(sizeof(struct guest_proxy));
   
-  pxy->epfd = -1;
+  pxy->chan_epfd = -1;
   pxy->irq_fd = -1;
   pxy->dev = -1;
   pxy->group = -1;
