@@ -14,7 +14,8 @@
 static int ivshmem_setup(struct guest_proxy *pxy);
 static int ivshmem_handle_msg(struct guest_proxy * pxy);
 static int ivshmem_handle_hello(struct guest_proxy *pxy);
-static int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy);
+static int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy,
+    struct tasinfo_res_msg *msg);
 static int ivshmem_handle_newapp_res(struct guest_proxy *pxy,
     struct newapp_res_msg *msg);
 static int ivshmem_handle_ctx_res(struct guest_proxy *pxy, 
@@ -119,7 +120,7 @@ int ivshmem_handle_msg(struct guest_proxy * pxy) {
       ivshmem_handle_hello(pxy);
       break;
     case MSG_TYPE_TASINFO_RES:
-      ivshmem_handle_tasinfo_res(pxy);
+      ivshmem_handle_tasinfo_res(pxy, (struct tasinfo_res_msg *) msg);
       break;
     case MSG_TYPE_NEWAPP_RES:
       ivshmem_handle_newapp_res(pxy, (struct newapp_res_msg *) msg);
@@ -149,18 +150,10 @@ static int ivshmem_handle_hello(struct guest_proxy *pxy)
   return 0;
 }
 
-static int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy)
+static int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy, struct tasinfo_res_msg *msg)
 {
   int ret;
-  struct tasinfo_res_msg msg;
 
-  ret = channel_read(pxy->chan, &msg, sizeof(struct tasinfo_res_msg));
-  if (ret < sizeof(struct tasinfo_res_msg))
-  {
-    fprintf(stderr, "ivshmem_handle_tasinfo_res: failed to read tasinfo.\n");
-    return -1;
-  }
-  
   pxy->flexnic_info = malloc(FLEXNIC_INFO_BYTES);
   if (pxy->flexnic_info == NULL)
   {
@@ -168,7 +161,7 @@ static int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy)
     return -1;
   }
 
-  memcpy(pxy->flexnic_info, msg.flexnic_info, FLEXNIC_INFO_BYTES);
+  memcpy(pxy->flexnic_info, msg->flexnic_info, FLEXNIC_INFO_BYTES);
 
   /* Set proper offset and size of memory region */
   pxy->flexnic_info->dma_mem_off = pxy->shm_off;
