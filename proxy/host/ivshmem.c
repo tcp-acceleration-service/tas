@@ -423,11 +423,15 @@ static int ivshmem_chan_poll()
 
     for (i = 0; i < n; i++)
     {
-        if (evs[i].events & EPOLLIN)
+        if (n > 0)
         {
             vm = evs[i].data.ptr;
             ivshmem_drain_evfd(vm->nfd);
-            ivshmem_uxsocket_handle_msg(vm);
+
+            if (evs[i].events & EPOLLIN)
+            {
+                ivshmem_uxsocket_handle_msg(vm);
+            }
         }
     }
 
@@ -648,6 +652,7 @@ static int ivshmem_ctxs_poll()
             msg.ctxreq_id = vctx->ctxreq_id;
             ret = channel_write(vctx->vm->chan, &msg, sizeof(struct vpoke_msg));
         
+
             if (ret < sizeof(struct vpoke_msg))
             {
                 fprintf(stderr, "ivshmem_ctxs_poll: failed to write poke msg.\n");

@@ -213,6 +213,13 @@ int ivshmem_handle_newapp_res(struct guest_proxy *pxy,
   return 0;
 }
 
+int ivshmem_handle_newapp_res(struct guest_proxy *pxy,
+    struct newapp_res_msg *msg)
+{
+  vflextcp_handle_newapp_res(pxy, msg);
+  return 0;
+}
+
 int ivshmem_handle_ctx_res(struct guest_proxy *pxy, struct context_res_msg *msg)
 {
   uint32_t app_id;
