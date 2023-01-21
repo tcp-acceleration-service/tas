@@ -19,8 +19,6 @@
    with TAS */
 
 static int vflextcp_uxsocket_init(struct guest_proxy *pxy);
-static int vflextcp_virtfd_init(struct guest_proxy *pxy);
-
 static int vflextcp_uxsocket_poll(struct guest_proxy *pxy);
 static int vflextcp_uxsocket_accept(struct guest_proxy *pxy);
 static int vflextcp_uxsocket_error(struct proxy_application* app);
@@ -57,22 +55,26 @@ int vflextcp_init(struct guest_proxy *pxy)
     goto error_close_nfd;
   }
 
+  if ((pxy->vepfd = epoll_create1(0)) < 0)
+  {
+    fprintf(stderr,
+        "vflextcp_init: failed to create fd for vepfd.\n");
+    goto error_close_epfd;
+    return -1;
+  }
+
   ev.events = EPOLLIN;
   ev.data.ptr = EP_LISTEN;
   if (epoll_ctl(pxy->flextcp_epfd, EPOLL_CTL_ADD, pxy->flextcp_uxfd, &ev) != 0) 
   {
     fprintf(stderr, "vflextcp_init: failed to add fd to epfd.");
-    goto error_close_epfd;
-  }
-
-  if (vflextcp_virtfd_init(pxy) != 0) 
-  {
-    fprintf(stderr, "vflextcp_init: "
-            "vflextcp_virtfd_init failed.\n");
+    goto error_close_vepfd;
   }
 
   return 0;
 
+error_close_vepfd:
+  close(pxy->vepfd);
 error_close_epfd:
   close(pxy->flextcp_epfd);
 error_close_nfd:

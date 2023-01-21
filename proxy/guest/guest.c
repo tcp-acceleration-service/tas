@@ -63,7 +63,6 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  /* Initialize vflextcp */
   if (vflextcp_init(pxy) < 0)
   {
     fprintf(stderr, "main: flextcp_init failed.\n");

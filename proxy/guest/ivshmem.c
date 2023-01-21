@@ -196,6 +196,12 @@ int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy)
     return -1; 
   }
 
+  if (vflextcp_virtfd_init(pxy) != 0) 
+  {
+    fprintf(stderr, "vflextcp_init: "
+            "vflextcp_virtfd_init failed.\n");
+  }
+
   return 0;
 }
 
