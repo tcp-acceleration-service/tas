@@ -449,9 +449,12 @@ static int vflextcp_virtfd_poll(struct guest_proxy *pxy) {
 
   for (i = 0; i < n; i++) 
   {
-    ivshmem_drain_evfd(evs[i].data.fd);
-    fprintf(stderr, "vflextcp_virtfd_poll: "
-        "does not expect notify on core fds.\n");
+    if (evs[i].events & EPOLLIN)
+    {
+      ivshmem_drain_evfd(evs[i].data.fd);
+      fprintf(stderr, "vflextcp_virtfd_poll: "
+          "does not expect notify on core fds.\n");
+    }
   }
   return 0;
 }
@@ -624,13 +627,13 @@ int vflextcp_write_context_res(struct guest_proxy *pxy,
   return 0;
 }
 
-int vflextcp_poke(struct guest_proxy *pxy, int virt_fd) 
+int vflextcp_poke(struct guest_proxy *pxy, int actx_id) 
 {
   int evfd;
   uint64_t w = 1;
-  assert(virt_fd < MAX_CONTEXT_REQ);
+  assert(actx_id < MAX_CONTEXT_REQ);
 
-  evfd = pxy->context_reqs[virt_fd]->actx_evfd;
+  evfd = pxy->context_reqs[actx_id]->actx_evfd;
   if (write(evfd, &w, sizeof(uint64_t)) != sizeof(uint64_t)) 
   {
     fprintf(stderr, "vflextcp_poke: write failed.\n");

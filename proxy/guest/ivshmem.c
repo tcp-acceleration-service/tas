@@ -13,7 +13,7 @@
 
 int ivshmem_setup(struct guest_proxy *pxy);
 int ivshmem_handle_msg(struct guest_proxy * pxy);
-
+int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy);
 int ivshmem_handle_newapp_res(struct guest_proxy *pxy,
     struct newapp_res_msg *msg);
 int ivshmem_handle_ctx_res(struct guest_proxy *pxy, 
@@ -60,15 +60,15 @@ int ivshmem_init(struct guest_proxy *pxy)
   return 0;
 }
 
-int ivshmem_poll(struct guest_proxy *pxy)
+int ivshmem_channel_poll(struct guest_proxy *pxy)
 {
   int n, i;
-  struct epoll_event events[32];
-  n = epoll_wait(pxy->chan_epfd, events, 32, 0); 
+  struct epoll_event evs[32];
+  n = epoll_wait(pxy->chan_epfd, evs, 32, 0); 
   
-  if (n > 0) 
+  for (i = 0; i < n; i++) 
   {
-    for (i = 0; i < n; i++) 
+    if (evs[i].events & EPOLLIN)
     {
       ivshmem_drain_evfd(pxy->irq_fd);
       ivshmem_handle_msg(pxy);
@@ -104,11 +104,9 @@ int ivshmem_drain_evfd(int fd)
 
 int ivshmem_setup(struct guest_proxy *pxy)
 {
-  struct epoll_event evs[1];
   int ret;
   struct hello_msg h_msg;
   struct tasinfo_req_msg treq_msg;
-  struct tasinfo_res_msg tres_msg;
 
   /* Get number of cores from host */
   ret = channel_read(pxy->chan, &h_msg, sizeof(struct hello_msg));
@@ -118,49 +116,10 @@ int ivshmem_setup(struct guest_proxy *pxy)
     return -1;
   }
 
-  /* Send tasinfo request */
+  /* Send tasinfo request and wait for the response in the channel poll */
   treq_msg.msg_type = MSG_TYPE_TASINFO_REQ;
   ret = channel_write(pxy->chan, &treq_msg, sizeof(struct tasinfo_req_msg));
   ivshmem_notify_host(pxy);
-
-
-  /* Receive tasinfo response */
-  ret = epoll_wait(pxy->chan_epfd, evs, 1, -1);
-  if (ret == 0)
-  {
-    fprintf(stderr, "ivshmem_setup: failed to receive "
-        "tasinfo response.\n");
-  }
-  
-  ivshmem_drain_evfd(pxy->irq_fd);
-  ret = channel_read(pxy->chan, &tres_msg,
-      sizeof(struct tasinfo_res_msg));
-  if (ret < sizeof(struct tasinfo_res_msg))
-  {
-    fprintf(stderr, "ivshmem_setup: failed to read tasinfo.\n");
-  }
-  
-  pxy->flexnic_info = malloc(FLEXNIC_INFO_BYTES);
-  if (pxy->flexnic_info == NULL)
-  {
-    fprintf(stderr, "ivshmem_setup: failed to allocate flexnic_info.\n");
-    return -1;
-  }
-
-  memcpy(pxy->flexnic_info, tres_msg.flexnic_info, FLEXNIC_INFO_BYTES);
-
-  /* Set proper offset and size of memory region */
-  pxy->flexnic_info->dma_mem_off = pxy->shm_off;
-  pxy->flexnic_info->dma_mem_size = pxy->shm_size;
-  
-  /* Create shm region */
-  ret = vflextcp_serve_tasinfo((uint8_t *) pxy->flexnic_info, 
-      FLEXNIC_INFO_BYTES);
-  if (ret < 0)
-  {
-    fprintf(stderr, "ivshmem_setup: failed to create tas_info shm region.\n");
-    return -1; 
-  }
 
   return 0;
 }
@@ -184,6 +143,9 @@ int ivshmem_handle_msg(struct guest_proxy * pxy) {
 
   switch(msg_type)
   {
+    case MSG_TYPE_TASINFO_RES:
+      ivshmem_handle_tasinfo_res(pxy);
+      break;
     case MSG_TYPE_NEWAPP_RES:
       ivshmem_handle_newapp_res(pxy, (struct newapp_res_msg *) msg);
       break;
@@ -195,6 +157,43 @@ int ivshmem_handle_msg(struct guest_proxy * pxy) {
       break;
     default:
       fprintf(stderr, "ivshmem_handle_msg: unknown message.\n");
+  }
+
+  return 0;
+}
+
+int ivshmem_handle_tasinfo_res(struct guest_proxy *pxy)
+{
+  int ret;
+  struct tasinfo_res_msg msg;
+
+  ret = channel_read(pxy->chan, &msg, sizeof(struct tasinfo_res_msg));
+  if (ret < sizeof(struct tasinfo_res_msg))
+  {
+    fprintf(stderr, "ivshmem_setup: failed to read tasinfo.\n");
+    return -1;
+  }
+  
+  pxy->flexnic_info = malloc(FLEXNIC_INFO_BYTES);
+  if (pxy->flexnic_info == NULL)
+  {
+    fprintf(stderr, "ivshmem_setup: failed to allocate flexnic_info.\n");
+    return -1;
+  }
+
+  memcpy(pxy->flexnic_info, msg.flexnic_info, FLEXNIC_INFO_BYTES);
+
+  /* Set proper offset and size of memory region */
+  pxy->flexnic_info->dma_mem_off = pxy->shm_off;
+  pxy->flexnic_info->dma_mem_size = pxy->shm_size;
+  
+  /* Create shm region */
+  ret = vflextcp_serve_tasinfo((uint8_t *) pxy->flexnic_info, 
+      FLEXNIC_INFO_BYTES);
+  if (ret < 0)
+  {
+    fprintf(stderr, "ivshmem_setup: failed to create tas_info shm region.\n");
+    return -1; 
   }
 
   return 0;

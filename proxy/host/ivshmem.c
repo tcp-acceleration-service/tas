@@ -421,15 +421,11 @@ static int ivshmem_chan_poll()
 
     for (i = 0; i < n; i++)
     {
-        if (n > 0)
+        if (evs[i].events & EPOLLIN)
         {
             vm = evs[i].data.ptr;
             ivshmem_drain_evfd(vm->nfd);
-
-            if (evs[i].events & EPOLLIN)
-            {
-                ivshmem_uxsocket_handle_msg(vm);
-            }
+            ivshmem_uxsocket_handle_msg(vm);
         }
     }
 
@@ -632,25 +628,24 @@ static int ivshmem_ctxs_poll()
     struct vpoke_msg msg;
 
     n = epoll_wait(ctx_epfd, evs, 32, 0);
-    if (n < 0) 
+
+    if (n < 0)
     {
-        fprintf(stderr, "ivshmem_ctxs_poll: epoll_wait failed");
-        if (errno == EINTR) 
-        {
-            return -1; 
-        }
-        
+        fprintf(stderr, "ivshmem_ctxs_poll: epoll_wait failed\n");
         return -1;
-    } 
-    else if (n > 0) 
+    }
+
+    for (i = 0; i < n; i++) 
     {
-        for (i = 0; i < n; i++) 
+        if (evs[i].events & EPOLLIN) 
         {
             vctx = evs[i].data.ptr;
             ivshmem_drain_evfd(vctx->ctx->evfd);
+
             msg.msg_type = MSG_TYPE_VPOKE;
             msg.ctxreq_id = vctx->ctxreq_id;
             ret = channel_write(vctx->vm->chan, &msg, sizeof(struct vpoke_msg));
+        
             if (ret < sizeof(struct vpoke_msg))
             {
                 fprintf(stderr, "ivshmem_ctxs_poll: failed to write poke msg.\n");

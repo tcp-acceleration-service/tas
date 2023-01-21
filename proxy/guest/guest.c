@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
   while (exited == 0)
   {
     n = 0;
-    n += ivshmem_poll(pxy);
+    n += ivshmem_channel_poll(pxy);
     n += vflextcp_poll(pxy);
   }
 
