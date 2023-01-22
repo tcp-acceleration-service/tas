@@ -132,20 +132,17 @@ int ivshmem_channel_poll(struct guest_proxy *pxy)
 static int channel_handle_hello(struct guest_proxy *pxy)
 {
   int ret;
-  struct hello_msg h_msg;
   struct tasinfo_req_msg treq_msg;
-
-  /* Get number of cores from host */
-  ret = channel_read(pxy->chan, &h_msg, sizeof(struct hello_msg));
-  if (ret < sizeof(struct hello_msg))
-  {
-    fprintf(stderr, "channel_handle_hello: failed to get number of cores.\n");
-    return -1;
-  }
 
   /* Send tasinfo request and wait for the response in the channel poll */
   treq_msg.msg_type = MSG_TYPE_TASINFO_REQ;
   ret = channel_write(pxy->chan, &treq_msg, sizeof(struct tasinfo_req_msg));
+  if (ret != sizeof(struct tasinfo_req_msg))
+  {
+    fprintf(stderr, "channel_handle_hello: failed to write tasinfo req msg.\n");
+    return -1;
+  }
+  
   ivshmem_notify_host(pxy);
 
   return 0;
