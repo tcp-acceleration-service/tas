@@ -417,7 +417,7 @@ static int chanel_poll()
     int i;
     struct v_machine *vm;
 
-    for(i = 0; i < MAX_VMS; i++)
+    for(i = 0; i < next_vm_id; i++)
     {
         vm = &vms[i];
         if (vm != NULL)
@@ -457,13 +457,15 @@ static int channel_poll_vm(struct v_machine *vm)
     {
         case MSG_TYPE_TASINFO_REQ:
             /* Send tas info struct to guest */
-            printf("GOT TASINFO_REQ\n");
+            printf("TASINFO_REQ MSG\n");
             channel_handle_tasinforeq_msg(vm);
             break;
         case MSG_TYPE_CONTEXT_REQ:
+            printf("CONTEXT_REQ MSG\n");
             channel_handle_ctx_req(vm, msg);
             break;
         case MSG_TYPE_NEWAPP_REQ:
+            printf("NEWAPP_REQ MSG\n");
             channel_handle_newapp(vm, msg);
             break;
         default:
