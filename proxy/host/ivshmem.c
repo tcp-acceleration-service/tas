@@ -32,25 +32,27 @@ static int next_app_id[FLEXNIC_PL_VMST_NUM];
 /* List of VMs */
 static struct v_machine vms[MAX_VMS];
 
-static int ivshmem_notify_guest(int fd);
+static int notify_guest(int fd);
 
-static int ivshmem_uxsocket_init();
-static int ivshmem_uxsocket_poll();
-static int ivshmem_chan_poll();
-static int ivshmem_ctxs_poll();
+static int uxsocket_init();
+static int uxsocket_poll();
+static int uxsocket_accept();
+static int uxsocket_handle_notif();
+static int uxsocket_handle_error();
+static int uxsocket_send_int(int fd, int64_t i);
+static int uxsocket_sendfd(int uxfd, int fd, int64_t i);
 
-static int ivshmem_uxsocket_accept();
-static int ivshmem_uxsocket_handle_notif();
-static int ivshmem_uxsocket_handle_error();
-static int ivshmem_uxsocket_handle_msg();
-static int ivshmem_uxsocket_send_int(int fd, int64_t i);
-static int ivshmem_uxsocket_sendfd(int uxfd, int fd, int64_t i);
+static int ctxs_poll();
 
-static int ivshmem_handle_tasinforeq_msg(struct v_machine *vm);
-static int ivshmem_handle_newapp(struct v_machine *vm,
+static int chanel_poll();
+static int channel_poll_vm(struct v_machine *vm);
+static int channel_handle_tasinforeq_msg(struct v_machine *vm);
+static int channel_handle_newapp(struct v_machine *vm,
         struct newapp_req_msg *req_msg);
-static int ivshmem_handle_ctx_req(struct v_machine *vm, 
+static int channel_handle_ctx_req(struct v_machine *vm, 
         struct context_req_msg *msg);
+
+
 
 int vpoke_count = 0;
 
@@ -59,7 +61,7 @@ int ivshmem_init()
     struct epoll_event ev;
 
     /* Create unix socket for comm between guest and host proxies */
-    if ((uxfd = ivshmem_uxsocket_init()) < 0)
+    if ((uxfd = uxsocket_init()) < 0)
     {
         fprintf(stderr,"ivshmem_init: failed to init unix socket.\n");
         return -1;
@@ -114,19 +116,19 @@ close_uxfd:
 
 int ivshmem_poll() 
 {
-    if (ivshmem_uxsocket_poll() != 0)
+    if (uxsocket_poll() != 0)
     {
         fprintf(stderr, "ivshmem_poll: failed to poll uxsocket.\n");
         return -1;
     }
 
-    if (ivshmem_chan_poll() != 0)
+    if (chanel_poll() != 0)
     {
         fprintf(stderr, "ivshmem_poll: failed to poll proxy channel.\n");
         return -1;
     }
 
-    if (ivshmem_ctxs_poll() != 0) 
+    if (ctxs_poll() != 0) 
     {
         fprintf(stderr, "ivshmem_poll: failed to poll ctxs fds.\n");
         return -1;
@@ -135,7 +137,7 @@ int ivshmem_poll()
     return 0;
 }
 
-int ivshmem_notify_guest(int fd)
+int notify_guest(int fd)
 {
   int ret;
   uint64_t buf = 1;
@@ -169,7 +171,7 @@ uint64_t ivshmem_drain_evfd(int fd)
 /*****************************************************************************/
 /* Unix Socket */
 
-static int ivshmem_uxsocket_init()
+static int uxsocket_init()
 {
     int fd;
     struct sockaddr_un saun;
@@ -215,7 +217,7 @@ close_fd:
     return -1;
 }
 
-static int ivshmem_uxsocket_poll()
+static int uxsocket_poll()
 {
     int i, n;
     struct epoll_event evs[32];
@@ -233,15 +235,15 @@ static int ivshmem_uxsocket_poll()
         ev = evs[i];
         if (ev.data.ptr == EP_LISTEN)
         {
-            ivshmem_uxsocket_accept();
+            uxsocket_accept();
         }
         else if (ev.data.ptr == EP_NOTIFY)
         {
-            ivshmem_uxsocket_handle_notif();
+            uxsocket_handle_notif();
         }
         else if (evs[i].events & (EPOLLHUP | EPOLLRDHUP | EPOLLERR))
         {
-            ivshmem_uxsocket_handle_error();
+            uxsocket_handle_error();
         }
     }
 
@@ -250,7 +252,7 @@ static int ivshmem_uxsocket_poll()
 
 /* Accepts connection when a qemu vm starts and uses the
    uxsocket to set up the shared memory region */
-static int ivshmem_uxsocket_accept()
+static int uxsocket_accept()
 {   
     int ret;
     int cfd, ifd, nfd;
@@ -280,7 +282,7 @@ static int ivshmem_uxsocket_accept()
     }
 
     /* Send protocol version as required by qemu ivshmem */
-    ret = ivshmem_uxsocket_send_int(cfd, version);
+    ret = uxsocket_send_int(cfd, version);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
@@ -289,7 +291,7 @@ static int ivshmem_uxsocket_accept()
     }
 
     /* Send vm id to qemu */
-    ret = ivshmem_uxsocket_send_int(cfd, next_vm_id);
+    ret = uxsocket_send_int(cfd, next_vm_id);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send vm id.\n");
@@ -297,7 +299,7 @@ static int ivshmem_uxsocket_accept()
     }
 
     /* Send shared memory fd to qemu */
-    ret = ivshmem_uxsocket_sendfd(cfd, flexnic_shmfds_pxy[next_vm_id], -1);
+    ret = uxsocket_sendfd(cfd, flexnic_shmfds_pxy[next_vm_id], -1);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send shm fd.\n");
@@ -314,7 +316,7 @@ static int ivshmem_uxsocket_accept()
 
     /* Ivshmem protocol requires to send host id
        with the notify fd */
-    ret = ivshmem_uxsocket_sendfd(cfd, nfd, hostid);
+    ret = uxsocket_sendfd(cfd, nfd, hostid);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
@@ -331,7 +333,7 @@ static int ivshmem_uxsocket_accept()
         goto close_nfd;
     }
 
-    ret = ivshmem_uxsocket_sendfd(cfd, ifd, next_vm_id);
+    ret = uxsocket_sendfd(cfd, ifd, next_vm_id);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
@@ -377,7 +379,8 @@ static int ivshmem_uxsocket_accept()
                 "of cores to guest.\n");
         goto close_ifd;
     }
-
+    notify_guest(ifd);
+    
     vms[next_vm_id].ifd = ifd;
     vms[next_vm_id].nfd = nfd;
     vms[next_vm_id].id = next_vm_id;
@@ -398,58 +401,45 @@ close_cfd:
     return -1;
 }
 
-static int ivshmem_uxsocket_handle_notif()
+static int uxsocket_handle_notif()
 {
     return 0;
 }
 
-static int ivshmem_uxsocket_handle_error()
+static int uxsocket_handle_error()
 {
     fprintf(stderr, "ivshmem_uxsocket_error: epoll_wait error.\n");
     return 0;
 }
 
-static int ivshmem_chan_poll()
+static int chanel_poll()
 {
-    int i, n;
+    int i;
     struct v_machine *vm;
-    struct epoll_event evs[32];
 
-    if ((n = epoll_wait(chan_epfd, evs, 32, 0)) < 0)
+    for(i = 0; i < MAX_VMS; i++)
     {
-        fprintf(stderr, "ivshmem_uxsocket_poll: epoll_wait failed.\n");
-        return -1;
-    }
-
-    for (i = 0; i < n; i++)
-    {
-        if (n > 0)
+        vm = &vms[i];
+        if (vm != NULL)
         {
-            vm = evs[i].data.ptr;
-            ivshmem_drain_evfd(vm->nfd);
-
-            if (evs[i].events & EPOLLIN)
-            {
-                ivshmem_uxsocket_handle_msg(vm);
-            }
+            channel_poll_vm(vm);
         }
     }
-
 
     return 0;
 }
 
-static int ivshmem_uxsocket_handle_msg(struct v_machine *vm)
+static int channel_poll_vm(struct v_machine *vm)
 {
     int ret;
     void *msg;
     uint8_t msg_type;
     size_t msg_size;
 
-    if (vm == NULL)
+    /* Move on if rx channel for this vm is empty */
+    if (shmring_is_empty(vm->chan->rx))
     {
-        fprintf(stderr, "ivshmem_uxsocket_handle_msg: vm is NULL.\n");
-        return -1;
+        return 0;
     }
 
     msg_type = channel_get_msg_type(vm->chan);
@@ -467,13 +457,14 @@ static int ivshmem_uxsocket_handle_msg(struct v_machine *vm)
     {
         case MSG_TYPE_TASINFO_REQ:
             /* Send tas info struct to guest */
-            ivshmem_handle_tasinforeq_msg(vm);
+            printf("GOT TASINFO_REQ\n");
+            channel_handle_tasinforeq_msg(vm);
             break;
         case MSG_TYPE_CONTEXT_REQ:
-            ivshmem_handle_ctx_req(vm, msg);
+            channel_handle_ctx_req(vm, msg);
             break;
         case MSG_TYPE_NEWAPP_REQ:
-            ivshmem_handle_newapp(vm, msg);
+            channel_handle_newapp(vm, msg);
             break;
         default:
             fprintf(stderr, "ivshmem_uxsocket_handle_msg: unknown message.\n");
@@ -483,7 +474,7 @@ static int ivshmem_uxsocket_handle_msg(struct v_machine *vm)
 }
 
 /* Handles tasinfo request */
-static int ivshmem_handle_tasinforeq_msg(struct v_machine *vm)
+static int channel_handle_tasinforeq_msg(struct v_machine *vm)
 {
     int ret;
     struct tasinfo_res_msg *msg;
@@ -513,7 +504,7 @@ static int ivshmem_handle_tasinforeq_msg(struct v_machine *vm)
         goto free_msg;
     }
 
-    ivshmem_notify_guest(vm->ifd);
+    notify_guest(vm->ifd);
 
     return 0;
 
@@ -524,7 +515,7 @@ free_msg:
 
 }
 
-static int ivshmem_handle_ctx_req(struct v_machine *vm, 
+static int channel_handle_ctx_req(struct v_machine *vm, 
         struct context_req_msg *msg) 
 {
   int ret;
@@ -591,12 +582,12 @@ static int ivshmem_handle_ctx_req(struct v_machine *vm,
     return -1;
   }
 
-  ivshmem_notify_guest(vm->ifd);
+  notify_guest(vm->ifd);
 
   return 0;
 }
 
-static int ivshmem_handle_newapp(struct v_machine *vm, 
+static int channel_handle_newapp(struct v_machine *vm, 
         struct newapp_req_msg *msg_req)
 {
     int ret, appid;
@@ -623,13 +614,13 @@ static int ivshmem_handle_newapp(struct v_machine *vm,
         return -1;
     }
 
-    ivshmem_notify_guest(vm->ifd);
+    notify_guest(vm->ifd);
 
 
     return 0;
 }
 
-static int ivshmem_ctxs_poll() 
+static int ctxs_poll() 
 {
     int i, n, ret;
     struct vmcontext_req *vctx;
@@ -664,14 +655,14 @@ static int ivshmem_ctxs_poll()
             }       
             vpoke_count++;     
             printf("VPOKE COUNT=%d N=%d\n", vpoke_count, n);
-            ivshmem_notify_guest(vctx->vm->ifd);
+            notify_guest(vctx->vm->ifd);
         }
     }
 
     return 0;
 }
 
-static int ivshmem_uxsocket_send_int(int fd, int64_t i)
+static int uxsocket_send_int(int fd, int64_t i)
 {
     int n;
 
@@ -700,7 +691,7 @@ static int ivshmem_uxsocket_send_int(int fd, int64_t i)
     return n;
 }
 
-static int ivshmem_uxsocket_sendfd(int uxfd, int fd, int64_t i)
+static int uxsocket_sendfd(int uxfd, int fd, int64_t i)
 {
     int n;
     struct cmsghdr *chdr;

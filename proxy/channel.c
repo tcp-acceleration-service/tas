@@ -54,7 +54,10 @@ free_chan:
 size_t channel_write(struct channel *chan, void *buf, size_t size)
 {
   size_t ret;
+
+  shmring_lock(chan->tx);
   ret = shmring_push(chan->tx, buf, size);
+  shmring_unlock(chan->tx);
 
   if (ret == 0)
   {
@@ -69,7 +72,9 @@ size_t channel_read(struct channel *chan, void *buf, size_t size)
 {
   size_t ret;
 
+  shmring_lock(chan->rx);
   ret = shmring_pop(chan->rx, buf, size);
+  shmring_unlock(chan->rx);
 
   if (ret == 0)
   {
@@ -83,11 +88,15 @@ size_t channel_read(struct channel *chan, void *buf, size_t size)
 /* Gets the type of the next message to read */
 uint8_t channel_get_msg_type(struct channel *chan)
 {
+  
   int ret;
   uint8_t type;
 
   /* First byte is always message type */
+  shmring_lock(chan->rx);
   ret = shmring_read(chan->rx, &type, sizeof(uint8_t));
+  shmring_unlock(chan->rx);
+
   if (ret < sizeof(uint8_t))
   {
     fprintf(stderr, "channel_get_msg_type: failed to get msg type.\n");
