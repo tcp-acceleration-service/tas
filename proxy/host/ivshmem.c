@@ -457,15 +457,12 @@ static int channel_poll_vm(struct v_machine *vm)
     {
         case MSG_TYPE_TASINFO_REQ:
             /* Send tas info struct to guest */
-            printf("TASINFO_REQ MSG\n");
             channel_handle_tasinforeq_msg(vm);
             break;
         case MSG_TYPE_CONTEXT_REQ:
-            printf("CONTEXT_REQ MSG\n");
             channel_handle_ctx_req(vm, msg);
             break;
         case MSG_TYPE_NEWAPP_REQ:
-            printf("NEWAPP_REQ MSG\n");
             channel_handle_newapp(vm, msg);
             break;
         default:
@@ -656,7 +653,6 @@ static int ctxs_poll()
                 return -1;
             }       
             vpoke_count++;     
-            printf("VPOKE COUNT=%d N=%d\n", vpoke_count, n);
             notify_guest(vctx->vm->ifd);
         }
     }
