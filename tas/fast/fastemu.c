@@ -417,14 +417,14 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
 {
   unsigned total;
 
-  // if (ctx->poll_rounds % MAX_POLL_ROUNDS == 0 || ctx->act_head == IDXLIST_INVAL)
-  // {
-  total = poll_all_queues(ctx, ts);
-  // }
-  // else
-  // {
-  //   total = poll_active_queues(ctx, ts);
-  // }
+  if (ctx->poll_rounds % MAX_POLL_ROUNDS == 0 || ctx->act_head == IDXLIST_INVAL)
+  {
+    total = poll_all_queues(ctx, ts);
+  }
+  else
+  {
+    total = poll_active_queues(ctx, ts);
+  }
   if (0 == 1){poll_active_queues(ctx, ts);}
   ctx->poll_rounds = (ctx->poll_rounds + 1) % MAX_POLL_ROUNDS;
   return total;
