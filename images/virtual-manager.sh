@@ -27,7 +27,7 @@ if [[ $option == proxy ]]; then
     -nographic -monitor none -serial stdio \
     -machine accel=kvm,type=q35 \
     -cpu host \
-    -smp 16 \
+    -smp 12 \
     -m 12G \
     -snapshot \
     -device virtio-net-pci,netdev=net0 \

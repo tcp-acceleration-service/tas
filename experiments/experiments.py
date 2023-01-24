@@ -87,6 +87,7 @@ class Host(object):
         self.run_benchmark_rpc(
                 pane = pane,
                 stack = self.hstack,
+                tas_dir = self.node_config.project_dir,
                 comp_dir = self.config.benchmark_comp_dir,
                 comp_cmd = self.config.benchmark_comp_cmd,
                 lib_so = self.config.tas_lib_so,
@@ -139,10 +140,10 @@ class Host(object):
         print("logging in. ("+ window_name + ")")
         pane.enter()
         pane.send_keys(suppress_history=False, cmd='tas')
-        time.sleep(3)
+        time.sleep(2)
         pane.send_keys(suppress_history=False, cmd='tas')
         pane.enter()
-        time.sleep(3)
+        time.sleep(2)
 
     def run_vm(self, pane, window_name, exp, num = 0):
         """ Run preboot commands """
@@ -168,7 +169,7 @@ class Host(object):
         pane.send_keys(cmd)
         print("CMD : " + cmd)
         print("Server VM"+ window_name + " started.")
-        time.sleep(23)
+        time.sleep(30)
 
         self.login_vm(pane, window_name)
         pane.send_keys('tmux set-option remain-on-exit on')
@@ -188,10 +189,11 @@ class Host(object):
             pane.send_keys(cmd)
             time.sleep(2)
 
-    def run_benchmark_rpc(self, pane, stack, 
+    def run_benchmark_rpc(self, pane, stack, tas_dir,
             comp_dir, comp_cmd, lib_so, exec_file, out, args):
         pane.send_keys('cd ' + comp_dir)
         pane.send_keys(comp_cmd)
+        pane.send_keys("cd " + tas_dir)
         time.sleep(3)
         cmd = 'sudo '
         if stack == 'tas':
@@ -209,7 +211,7 @@ class Host(object):
         ssh_com = self.get_ssh_command(num)
 
         pane.send_keys(ssh_com)
-        time.sleep(2)
+        time.sleep(3)
         pane.send_keys("tas")
 
         """ Run TAS proxy """
@@ -233,7 +235,7 @@ class Host(object):
         ssh_com = self.get_ssh_command(num)
 
         pane.send_keys(ssh_com)
-        time.sleep(2)
+        time.sleep(3)
         pane.send_keys("tas")
         
         """ Run Benchmark """
@@ -245,6 +247,7 @@ class Host(object):
         self.run_benchmark_rpc(
                 pane = pane,
                 stack = self.hstack,
+                tas_dir = self.node_config.vm_project_dir,
                 comp_dir = self.node_config.benchmark_comp_dir,
                 comp_cmd = self.node_config.benchmark_comp_cmd,
                 lib_so = self.node_config.tas_bench_lib_so,
@@ -386,13 +389,13 @@ class Experiment:
             scp_com = self.client_host.get_scp_command(i, 
                     path, out_dir + "/.")
             pane.send_keys(scp_com)
-            time.sleep(2)
+            time.sleep(3)
             pane.send_keys(suppress_history=False, cmd='tas')
             time.sleep(1)
             
     def save_logs_bare(self, out_dir):
         for path in self.log_paths_client:
-            os.rename(path, out_dir + os.path.basename(path))
+            os.rename(path, out_dir + "/" + os.path.basename(path))
 
     def get_name(self):
         e = self.name + '-' + self.server_host.htype + '-' + \

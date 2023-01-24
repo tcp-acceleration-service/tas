@@ -456,7 +456,6 @@ static int channel_poll_vm(struct v_machine *vm)
     switch(msg_type)
     {
         case MSG_TYPE_TASINFO_REQ:
-            /* Send tas info struct to guest */
             channel_handle_tasinforeq_msg(vm);
             break;
         case MSG_TYPE_CONTEXT_REQ:

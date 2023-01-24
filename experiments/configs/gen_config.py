@@ -3,9 +3,13 @@ class HostConfig:
         # general configurations
         self.is_server = is_server
         self.is_remote = is_remote
-        self.project_dir = '/local/mstolet/projects/tas/'
+        if is_virt:
+            self.project_dir = '/local/mstolet/projects/tas/'
+        else:
+            self.project_dir = '/local/mstolet/projects/o-tas/tas/'
+        self.vtas_project_dir = '/local/mstolet/projects/tas/'
         self.vm_project_dir = '/home/tas/projects/tas/'
-        self.output_dir = self.project_dir + 'experiments/out/'
+        self.output_dir = self.vtas_project_dir + 'experiments/out/'
         self.vm_output_dir = self.vm_project_dir + "experiments/out/"
         self.save_logs_pane = name + '_savelogs'
 
@@ -28,11 +32,12 @@ class HostConfig:
             ' --cc=const-rate --cc-const-rate=0 --fp-no-ints' + \
             ' --fp-no-autoscale --dpdk-extra="-w3b:00.0"'
         if is_server:
-            self.tas_args = ' --ip-addr=192.168.10.14/24' + self.tas_args
+            self.tas_ip = "192.168.10.14/24"
             self.tas_out_file = self.tas_server_out_file
         else:
-            self.tas_args = ' --ip-addr=192.168.10.13/24' + self.tas_args
+            self.tas_ip = "192.168.10.13/24"
             self.tas_out_file = self.tas_client_out_file
+        self.tas_args = ' --ip-addr={}'.format(self.tas_ip) + self.tas_args
 
         # general proxy configurations
         self.proxy_ivshm_socket_path = '/run/tasproxy'
@@ -61,7 +66,7 @@ class HostConfig:
             "exit"
         ]
         self.vm_manager_vmspecific_postboot_cmds = []
-        self.vm_manager_dir = self.project_dir + 'images/'
+        self.vm_manager_dir = self.vtas_project_dir + 'images/'
         self.vm_manager = lambda machine, stack, id, mac: self.vm_manager_dir + \
                 'virtual-manager.sh' + ' ' + str(machine) + \
                 ' ' + str(stack) + ' ' + str(id) + ' ' + str(mac)
@@ -71,7 +76,7 @@ class HostConfig:
         if (is_virt):
             self.benchmark_comp_dir = '/home/tas/projects/benchmarks/micro_rpc/'
         else:
-            self.benchmark_comp_dir = '/local/mstolet/projects/benchmarks/micro_rpc/'
+            self.benchmark_comp_dir = '/local/mstolet/projects/o-benchmarks/' + 'benchmarks/micro_rpc/'
         self.benchmark_comp_cmd = 'make'
         self.benchmark_server_exec_file = self.benchmark_comp_dir + \
             'echoserver_linux'

@@ -48,7 +48,7 @@ def postboot_cmds(num, is_server):
     return postboot_cmds
 
 class Config:
-    def __init__(self, connum):
+    def __init__(self, n_conns):
         self.pane_prefix = 'e_'
         self.remote_connect_cmd = 'ssh swsnetlab04'
         server_ip = "192.168.10.14"
@@ -85,8 +85,7 @@ class Config:
         self.snum = 1
         self.ctype = 'virt'
         self.cstack = 'linux'
-        self.cnum = 2
-        self.connum = [1, connum]
+        self.cnum = 1
         self.msize = 64
 
         # Setup and clean up of tap device
@@ -98,10 +97,8 @@ class Config:
         self.client.cleanup_cmds = cleanup_tap(self.cnum, "ens1f0np0", client_ip)
         self.client.vm_manager_vmspecific_postboot_cmds = postboot_cmds(self.cnum, False)
 
-        self.benchmark_server_args = "1234 1 foo 4096 1024"
+        self.benchmark_server_args = "1234 8 foo 1024 1024"
 
-        c_args0 = "{} 1234 1 foo {} 64 {} 0 0 16".format(
-                server_ip_vm, self.msize, self.connum[0])
-        c_args1 = "{} 1234 1 foo {} 64 {} 0 0 16".format(
-                server_ip_vm, self.msize, self.connum[1])
-        self.benchmark_client_args = [c_args0, c_args1]
+        c_args0 = "{} 1234 8 foo {} 64 {} 30 0 1".format(
+                server_ip_vm, self.msize, n_conns)
+        self.benchmark_client_args = [c_args0]
