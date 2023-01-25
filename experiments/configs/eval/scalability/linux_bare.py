@@ -33,9 +33,11 @@ class Config:
         self.stype = 'bare'
         self.sstack = 'linux'
         self.snum = 1
+        self.snodenum = 1
         self.ctype = 'bare'
         self.cstack = 'linux'
         self.cnum = 1
+        self.cnodenum = 1
         self.msize = 64
 
         self.benchmark_server_args = "1234 8 foo 1024 1024"

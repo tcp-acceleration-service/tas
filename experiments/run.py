@@ -54,6 +54,6 @@ for e in experiments:
     e.reset()
     e.run()
     print(e.get_name()) 
-    time.sleep(60)
+    time.sleep(150)
     e.save_logs()
     e.reset()

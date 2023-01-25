@@ -1,5 +1,9 @@
 from configs.gen_config import HostConfig
 
+# IP tables may drop packets on the bridge so run the following
+# on the host machine if that happens
+# echo 0 > /proc/sys/net/bridge/bridge-nf-call-iptables
+
 def setup_tap(num, intf, ip):
     setup_cmds = ["sudo brctl addbr br0",
             "sudo ip addr flush dev {}".format(intf),
@@ -83,9 +87,11 @@ class Config:
         self.stype = 'virt'
         self.sstack = 'linux'
         self.snum = 1
+        self.snodenum = 1
         self.ctype = 'virt'
         self.cstack = 'linux'
         self.cnum = 1
+        self.cnodenum = 1
         self.msize = 64
 
         # Setup and clean up of tap device

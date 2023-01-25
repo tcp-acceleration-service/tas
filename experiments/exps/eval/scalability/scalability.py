@@ -5,7 +5,7 @@ from configs.eval.scalability.tas_bare import Config as TasBareConf
 from configs.eval.scalability.tas_virt import Config as TasVirtConf
 
 
-num_cons = [100]
+num_cons = [100, 200, 300, 400, 500, 600, 700, 800]
 experiments = []
 for n in num_cons:
   lin_bare_exp = exp.Experiment(LinBareConf(n), name="linux_conn_{}".format(n))

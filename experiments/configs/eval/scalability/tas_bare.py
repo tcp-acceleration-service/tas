@@ -33,13 +33,15 @@ class Config:
         self.stype = 'bare'
         self.sstack = 'tas'
         self.snum = 1
+        self.snodenum = 1
         self.ctype = 'bare'
         self.cstack = 'tas'
         self.cnum = 1
+        self.cnodenum = 1
         self.msize = 64
 
         self.benchmark_server_args = "1234 8 foo 1024 1024"
 
-        c_args0 = "{} 1234 8 foo {} 64 {} 30 0 1".format(
+        c_args_node0 = "{} 1234 8 foo {} 64 {} 30 0 1".format(
                 server_ip, self.msize, n_conns)
-        self.benchmark_client_args = [c_args0]
+        self.benchmark_client_args = [c_args_node0]

@@ -5,14 +5,15 @@ import os
 class Host(object):
 
     def __init__(self, wmanager, gen_config, config, nconfig,
-            htype, hstack, hnum, log_paths):
+            htype, hstack, nnum, anum, log_paths):
         self.htype = htype
         self.hstack = hstack
         self.wmanager = wmanager
         self.gen_config = gen_config
         self.config = config
         self.node_config = nconfig
-        self.node_num = hnum
+        self.node_num = nnum
+        self.app_num = anum
         self.log_paths = log_paths
 
     def run_tas(self):
@@ -70,7 +71,7 @@ class Host(object):
                 exp=exp,
                 num=num)
 
-    def run_benchmark(self, num, exp):
+    def run_benchmark(self, n_id, a_id, exp):
         print("benchmark", end = " ")
         if self.config.is_server:
             print("server :", end = " ")
@@ -82,7 +83,7 @@ class Host(object):
         if self.node_config.is_server:
             benchmark_args = self.gen_config.benchmark_server_args
         else:
-            benchmark_args = self.gen_config.benchmark_client_args[num]
+            benchmark_args = self.gen_config.benchmark_client_args[n_id]
  
         self.run_benchmark_rpc(
                 pane = pane,
@@ -92,7 +93,7 @@ class Host(object):
                 comp_cmd = self.config.benchmark_comp_cmd,
                 lib_so = self.config.tas_lib_so,
                 exec_file = self.config.benchmark_exec_file,
-                out = self.config.benchmark_out + '_' + exp + '_' + str(num),
+                out = self.config.benchmark_out + '_' + exp + '_node' + str(n_id) + '_app' + str(a_id),
                 args=benchmark_args)
 
     @staticmethod
@@ -130,9 +131,11 @@ class Host(object):
             if self.htype == 'virt':
                 self.run_vms(i, exp=exp)
                 self.run_guest_proxy(i)
-                self.run_guest_benchmark(exp, i)
+                for j in range(self.app_num):
+                    self.run_guest_benchmark(exp, i, j)
             else:
-                self.run_benchmark(num=i, exp=exp)
+                for j in range(self.app_num):
+                    self.run_benchmark(n_id=i, a_id=j, exp=exp)
 
         print()
 
@@ -228,11 +231,11 @@ class Host(object):
             time.sleep(3)
             
     
-    def run_guest_benchmark(self, exp, num):
+    def run_guest_benchmark(self, exp, n_id, a_id):
         pane = self.wmanager.add_new_pane(self.config.benchmark_pane,
                 self.config.is_remote)
 
-        ssh_com = self.get_ssh_command(num)
+        ssh_com = self.get_ssh_command(n_id)
 
         pane.send_keys(ssh_com)
         time.sleep(3)
@@ -242,7 +245,7 @@ class Host(object):
         if self.node_config.is_server:
             benchmark_args = self.gen_config.benchmark_server_args
         else:
-            benchmark_args = self.gen_config.benchmark_client_args[num]
+            benchmark_args = self.gen_config.benchmark_client_args[n_id]
 
         self.run_benchmark_rpc(
                 pane = pane,
@@ -252,7 +255,7 @@ class Host(object):
                 comp_cmd = self.node_config.benchmark_comp_cmd,
                 lib_so = self.node_config.tas_bench_lib_so,
                 exec_file = self.node_config.benchmark_exec_file,
-                out = self.node_config.benchmark_out + '_' + exp + '_' + str(num),
+                out = self.node_config.benchmark_out + '_' + exp + '_node' + str(n_id) + '_app' + str(a_id),
                 args=benchmark_args)
 
     def get_ssh_command(self, num):
@@ -284,19 +287,20 @@ class Server(Host):
 
     def __init__(self, wmanager, config, log_paths):
         Host.__init__(self, wmanager, config, config.server, config.snode, 
-            config.stype, config.sstack, config.snum, log_paths)
+            config.stype, config.sstack, config.snodenum, config.snum, log_paths)
 
 
 class Client(Host):
     def __init__(self, wmanager, config, log_paths):
         Host.__init__(self, wmanager, config, config.client, config.cnode, 
-                config.ctype, config.cstack, config.cnum, log_paths)
+                config.ctype, config.cstack, config.cnodenum, config.cnum, log_paths)
         self.message_size = config.msize
         self.client_num = config.cnum
 
-    def run_benchmark(self, num, exp):
+    def run_benchmark(self, n_id, a_id, exp):
         Host.run_benchmark(self, 
-                num=num, 
+                n_id=n_id,
+                a_id=a_id, 
                 exp=exp)
 
 

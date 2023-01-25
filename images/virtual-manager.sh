@@ -44,7 +44,6 @@ elif [[ $option == tap ]]; then
     -cpu host \
     -smp 16 \
     -m 12G \
-    -snapshot \
     -netdev tap,ifname=tap${num},script=no,downscript=no,vhost=on,id=net0 \
     -device virtio-net-pci,mac=52:54:00:12:34:${mac},netdev=net0 \
     -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \

@@ -28,7 +28,7 @@ class HostConfig:
         self.tas_client_out_file = self.output_dir + 'tas_c'
         self.tas_out_file = ''
         self.tas_lib_so = self.tas_comp_dir + 'lib/libtas_interpose.so'
-        self.tas_args = ' --fp-cores-max=1' + \
+        self.tas_args = ' --fp-cores-max=12' + \
             ' --cc=const-rate --cc-const-rate=0 --fp-no-ints' + \
             ' --fp-no-autoscale --dpdk-extra="-w3b:00.0"'
         if is_server:
