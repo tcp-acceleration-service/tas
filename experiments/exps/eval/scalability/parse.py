@@ -1,18 +1,20 @@
 import os
 import re
 
+NUM_CORES = 8
+
 def get_stack(line):
   stack_regex = "[a-z]+-[a-z]+"
   stack = re.search(stack_regex, line).group(0)
   return stack
 
 def get_client_id(line):
-  cid_regex = "(?<=64_app)[0-9]*"
+  cid_regex = "(?<=_app)[0-9]*"
   cid = re.search(cid_regex, line).group(0)
   return cid
 
 def get_node_id(line):
-  nid_regex = "(?<=64_node)[0-9]*"
+  nid_regex = "(?<=_node)[0-9]*"
   nid = re.search(nid_regex, line).group(0)
 
 def get_tp(line):
@@ -28,7 +30,7 @@ def get_ts(line):
 def get_nconns(fname):
   nconns_regex = "(?<=(conn_))(.*?)(?=\-)"
   num = re.search(nconns_regex, fname).group(0)
-  return num
+  return str(int(num) * 8)
 
 def get_avg_tp(fname):
   tp_sum = 0
@@ -37,12 +39,12 @@ def get_avg_tp(fname):
   f = open(fname)
   lines = f.readlines()
 
-  for l in lines:
+  for l in lines[:60]:
     tp = get_tp(l)
     tp_sum += float(tp)
     n += 1
 
-  return str(tp_sum / n)
+  return tp_sum / n
 
 def check_nconns(data, nconns):
   if nconns not in data:
@@ -54,7 +56,7 @@ def check_stack(data, nconns, stack):
 
 def check_nid(data, nconns, stack, nid):
   if nid not in data[nconns][stack]:
-    data[nconns][stack][nid] = ""
+    data[nconns][stack][nid] = {}
 
 def check_cid(data, nconns, stack, nid, cid):
   if cid not in data[nconns][stack][nid]:
@@ -76,7 +78,7 @@ def parse_metadata():
     check_nid(data, nconns, stack, nid)
     check_cid(data, nconns, stack, nid, cid)
 
-    data[nconns][stack][cid] = fname
+    data[nconns][stack][nid][cid] = fname
 
   return data
 
@@ -88,7 +90,7 @@ def parse_data(parsed_md):
     for stack in parsed_md[nconns]:
       agg_tp = 0
       for node in parsed_md[nconns][stack]:
-        for client in parsed_md[nconns][stack][node][client]:
+        for client in parsed_md[nconns][stack][node]:
           fname = out_dir + parsed_md[nconns][stack][node][client]
           avt_tp = get_avg_tp(fname)
           agg_tp += avt_tp
@@ -102,14 +104,13 @@ def parse_data(parsed_md):
 
 def save_dat_file(avg_tps, fpath):
   f = open(fpath, "w+")
-  header = "nconns linux virt-linux tas virt-tas\n"
+  header = "nconns bare-linux virt-linux bare-tas virt-tas\n"
   f.write(header)
-
   for tp in avg_tps:
     f.write("{} {} {} {} {}\n".format(
         tp["nconns"], 
-        tp["linux"], tp["virt-linux"], 
-        tp["tas"], tp["virt-tas"]))
+        tp["bare-linux"], tp["virt-linux"], 
+        tp["bare-tas"], tp["virt-tas"]))
 
 def main():
   parsed_md = parse_metadata()
