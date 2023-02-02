@@ -38,11 +38,10 @@ static void slowpath_block(uint32_t cur_ts);
 static void timeout_trigger(struct timeout *to, uint8_t type, void *opaque);
 static void signal_tas_ready(void);
 void flexnic_loadmon(uint32_t cur_ts);
-void update_budget(int vmid, int ctxid, struct total_budget *t_budget);
 
-static int budget_init(struct total_budget *budg);
-static void accumulate_budget(int threads_launched,
-    struct total_budget *total_budget);
+static void init_vm_weights(double *vm_weights);
+void boost_budget(int vmid, int ctxid, int64_t incr);
+static void update_budget(int threads_launched);
     
 struct timeout_manager timeout_mgr;
 static int exited = 0;
@@ -51,9 +50,11 @@ uint32_t cur_ts;
 int kernel_notifyfd = 0;
 static int epfd;
 
+double vm_weights[FLEXNIC_PL_VMST_NUM];
+uint64_t last_bu_update_ts = 0;
+
 int slowpath_main(int threads_launched)
 {
-  struct total_budget total_budget;
   struct notify_blockstate nbs;
   uint32_t last_print = 0;
   uint32_t last_baccum = 0;
@@ -120,17 +121,13 @@ int slowpath_main(int threads_launched)
     return EXIT_FAILURE;
   }
 
-  if (budget_init(&total_budget)) {
-    fprintf(stderr, "budget_init failed\n");
-    return EXIT_FAILURE;
-  }
+  init_vm_weights(vm_weights);
 
   signal_tas_ready();
 
   notify_canblock_reset(&nbs);
   while (exited == 0) {
     unsigned n = 0;
-
     cur_ts = util_timeout_time_us();
     n += nicif_poll();
     n += cc_poll(cur_ts);
@@ -151,7 +148,7 @@ int slowpath_main(int threads_launched)
 
     /* Accumulate per context VM budget and update total budget */
     if (cur_ts - last_baccum >= 1000000) {
-      accumulate_budget(threads_launched, &total_budget);
+      update_budget(threads_launched);
       last_baccum = cur_ts;
     }
 
@@ -170,31 +167,51 @@ int slowpath_main(int threads_launched)
   return EXIT_SUCCESS;
 }
 
-static int budget_init(struct total_budget *budg)
+static void init_vm_weights(double *vm_weights)
 {
-  int i;
+  int vmid;
 
-  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
   {
-    budg->cycles[i] = 0;
-    budg->bandwidth[i] = 0;
+    vm_weights[vmid] = 1;
   }
-
-  return 0;
 }
 
-static void accumulate_budget(int threads_launched,
-    struct total_budget *total_budget)
+static double sum_weights(double *vm_weights)
 {
-  int ctxid, vmid;
+  int vmid;
+  double sum = 0;
 
-  for (ctxid = 0;  ctxid < threads_launched; ctxid++)
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
   {
-    for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
+    sum += vm_weights[vmid];
+  }
+
+  return sum;
+}
+
+static void update_budget(int threads_launched)
+{
+  int vmid, ctxid;
+  int64_t total_budget, incr;
+  uint64_t cur_ts;
+  double total_weight;
+
+  cur_ts = util_rdtsc();
+
+  total_budget = config.bu_boost * (cur_ts - last_bu_update_ts);
+  total_weight = sum_weights(vm_weights);
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
+  {
+    incr = ((total_budget * vm_weights[vmid]) / total_weight);
+    incr /= threads_launched;
+    for (ctxid = 0; ctxid < threads_launched; ctxid++)
     {
-      update_budget(vmid, ctxid, total_budget);
+      boost_budget(vmid, ctxid, incr);
     }
   }
+
+  last_bu_update_ts = cur_ts;
 }
 
 static void slowpath_block(uint32_t cur_ts)

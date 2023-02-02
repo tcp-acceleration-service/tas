@@ -139,6 +139,10 @@ struct configuration {
   uint32_t fp_poll_interval_app;
   /** Packet scheduling algorithm */
   enum config_ps_algorithm ps_algorithm;
+  /** Max budget */
+  uint64_t bu_max_budget;
+  /** Boost for the budget */
+  double bu_boost;
   /** SP: kni interface name */
   char *kni_name;
   /** Ready signal fd */

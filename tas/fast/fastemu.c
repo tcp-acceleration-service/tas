@@ -154,18 +154,16 @@ int dataplane_context_init(struct dataplane_context *ctx)
     return -1;
   }
 
-  /* Initialize polled apps and contexts */
   for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
   {
+    /* Initialize budget for each VM */
+    ctx->budgets[i].vmid = i;
+    ctx->budgets[i].cycles = config.bu_max_budget;
+    ctx->budgets[i].bandwidth = 0;
+    
+    /* Initialized polled apps and polled vms*/
     p_vm = &ctx->polled_vms[i];
     polled_vm_init(p_vm, i);
-
-    /* Initialize budget for TX, RX and Poll phases */
-    ctx->budgets[i].vmid = i;
-    ctx->budgets[i].cycles = 0;
-    ctx->budgets[i].bandwidth = 0;
-    ctx->budgets[i].lock = 0;
-
     for (j = 0; j < FLEXNIC_PL_APPCTX_NUM; j++)
     {
       p_ctx = &p_vm->ctxs[j];
@@ -339,8 +337,10 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
 {
   int ret;
   unsigned i, n;
+  struct flextcp_pl_flowst *fs;
   uint8_t freebuf[BATCH_SIZE] = {0};
   void *fss[BATCH_SIZE];
+  uint64_t s_cyc, e_cyc;
   struct tcp_opts tcpopts[BATCH_SIZE];
   struct network_buf_handle *bhs[BATCH_SIZE];
 
@@ -384,7 +384,12 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
     /* run fast-path for flows with flow state */
     if (fss[i] != NULL)
     {
+      s_cyc = util_rdtsc();
       ret = fast_flows_packet(ctx, bhs[i], fss[i], &tcpopts[i], ts);
+      e_cyc = util_rdtsc();
+      /* at this point we know fss[i] is a flow state struct */
+      fs = fss[i];
+      __sync_fetch_and_sub(&ctx->budgets[fs->vm_id].cycles, e_cyc - s_cyc);
     }
     else
     {
@@ -434,11 +439,13 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
 static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
 {
   int ret, n_rem = 0;
+  uint8_t out_of_budget[FLEXNIC_PL_VMST_NUM];
   struct network_buf_handle **handles;
   void *aqes[BATCH_SIZE];
   struct polled_context *rem_ctxs[BATCH_SIZE];
   unsigned total = 0;
   uint16_t max, i, k = 0, num_bufs = 0;
+  memset(out_of_budget, 0, sizeof(*out_of_budget) * FLEXNIC_PL_VMST_NUM);
 
   STATS_ADD(ctx, qs_poll, 1);
 
@@ -450,10 +457,11 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
   max = bufcache_prealloc(ctx, max, &handles);
 
   /* prefetch all active contexts */
-  fast_appctx_poll_pf_active(ctx);
+  fast_appctx_poll_pf_active(ctx, out_of_budget);
 
   /* fetch packets from active contexts */
-  k = fast_appctx_poll_fetch_active(ctx, max, &total, &n_rem, rem_ctxs, aqes);
+  k = fast_appctx_poll_fetch_active(ctx, max, &total, &n_rem, rem_ctxs,
+      aqes, out_of_budget);
 
   for (i = 0; i < k; i++)
   {
@@ -466,7 +474,7 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
   bufcache_alloc(ctx, num_bufs);
 
   /* probe receive queue on all active contexts */
-  fast_actx_rxq_probe_active(ctx);
+  fast_actx_rxq_probe_active(ctx, out_of_budget);
 
   /* update round */
   ctx->act_head = ctx->polled_vms[ctx->act_head].next;
@@ -487,10 +495,12 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
 static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts)
 {
   int ret;
+  uint8_t out_of_budget[FLEXNIC_PL_VMST_NUM];
   struct network_buf_handle **handles;
   void *aqes[BATCH_SIZE];
   unsigned total = 0;
   uint16_t max, k, i, num_bufs = 0;
+  memset(out_of_budget, 0, sizeof(*out_of_budget) * FLEXNIC_PL_VMST_NUM);
 
   STATS_ADD(ctx, qs_poll, 1);
 
@@ -502,10 +512,10 @@ static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts)
   max = bufcache_prealloc(ctx, max, &handles);
 
   /* prefetch every ctx from every app */
-  fast_appctx_poll_pf_all(ctx);
+  fast_appctx_poll_pf_all(ctx, out_of_budget);
 
   /* prefetch up to max pkts from apps in round robin fashion */
-  k = fast_appctx_poll_fetch_all(ctx, max, &total, aqes);
+  k = fast_appctx_poll_fetch_all(ctx, max, &total, aqes, out_of_budget);
 
   for (i = 0; i < k; i++)
   {
@@ -518,7 +528,7 @@ static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts)
   bufcache_alloc(ctx, num_bufs);
 
   /* probe every ctx from every app */
-  fast_actx_rxq_probe_all(ctx);
+  fast_actx_rxq_probe_all(ctx, out_of_budget);
 
   STATS_ADD(ctx, qs_total, total);
   if (total == 0)

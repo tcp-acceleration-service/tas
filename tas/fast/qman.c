@@ -410,10 +410,7 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
     vq->dc += QUANTA;  
     e_cycs = util_rdtsc();
 
-    util_spin_lock(&budgets[idx].lock);
-    budgets[idx].cycles += e_cycs - s_cycs;
-    util_spin_unlock(&budgets[idx].lock);
-
+    __sync_fetch_and_sub(&budgets[idx].cycles, e_cycs - s_cycs);
   }
 
 

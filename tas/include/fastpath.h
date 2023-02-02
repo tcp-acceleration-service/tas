@@ -82,10 +82,8 @@ struct polled_vm {
 
 struct vm_budget {
   uint16_t vmid;
-  uint64_t cycles;
-  uint64_t bandwidth;
-  /** spin lock */
-  volatile uint32_t lock;
+  volatile uint64_t cycles;
+  volatile uint64_t bandwidth;
 };
 
 struct dataplane_context {

@@ -56,11 +56,6 @@ struct nicif_completion {
   void *ptr;
 };
 
-struct total_budget {
-  uint64_t cycles[FLEXNIC_PL_VMST_NUM];
-  uint64_t bandwidth[FLEXNIC_PL_VMST_NUM];
-};
-
 struct kernel_statistics {
   /** drops detected by flextcp on NIC */
   uint64_t drops;

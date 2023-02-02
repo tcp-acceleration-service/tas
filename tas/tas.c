@@ -253,12 +253,14 @@ int flexnic_scale_to(uint32_t cores)
   return 0;
 }
 
-void update_budget(int vmid, int ctxid, struct total_budget *t_budget)
+void boost_budget(int vmid, int ctxid, int64_t incr)
 {
-  util_spin_lock(&ctxs[ctxid]->budgets[vmid].lock);
-  t_budget->cycles[vmid] += ctxs[ctxid]->budgets[vmid].cycles;
-  t_budget->bandwidth[vmid] += ctxs[ctxid]->budgets[vmid].bandwidth;
-  util_spin_unlock(&ctxs[ctxid]->budgets[vmid].lock);
+  int64_t old_budget, new_budget;
+
+  old_budget = ctxs[ctxid]->budgets[vmid].cycles;
+  new_budget = old_budget + incr;
+  new_budget = MIN(new_budget, config.bu_max_budget);
+  ctxs[ctxid]->budgets[vmid].cycles = new_budget;
 }
 
 void flexnic_loadmon(uint32_t ts)

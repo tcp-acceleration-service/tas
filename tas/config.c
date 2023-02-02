@@ -78,6 +78,8 @@ enum cfg_params {
   CP_FP_VLAN_STRIP,
   CP_FP_POLL_INTERVAL_TAS,
   CP_FP_POLL_INTERVAL_APP,
+  CP_BU_MAX_BUDGET,
+  CP_BU_BUDGET_BOOST,
   CP_PS,
   CP_KNI_NAME,
   CP_READY_FD,
@@ -215,6 +217,12 @@ static struct option opts[] = {
     { .name = "fp-poll-interval-app",
       .has_arg = required_argument,
       .val = CP_FP_POLL_INTERVAL_APP },
+    { .name = "bu-max-budget",
+      .has_arg = required_argument,
+      .val = CP_BU_MAX_BUDGET },
+    { .name = "bu-budget-boost",
+      .has_arg = required_argument,
+      .val = CP_BU_BUDGET_BOOST },
     { .name = "ps",
       .has_arg = required_argument,
       .val = CP_PS},
@@ -513,6 +521,18 @@ int config_parse(struct configuration *c, int argc, char *argv[])
         }
         break;
        break;
+      case CP_BU_MAX_BUDGET:
+        if (parse_int64(optarg, &c->bu_max_budget) != 0) {
+          fprintf(stderr, "max budget failed parsing\n");
+          goto failed;
+        }
+        break;
+      case CP_BU_BUDGET_BOOST:
+        if (parse_double(optarg, &c->bu_boost) != 0) {
+          fprintf(stderr, "budget boost failed parsing\n");
+          goto failed;
+        }
+        break;
       case CP_PS:
         if (!strcmp(optarg, "default")) {
           c->ps_algorithm = CONFIG_PS_DEFAULT;
@@ -617,6 +637,8 @@ static int config_defaults(struct configuration *c, char *progname)
   c->fp_vlan_strip = 0;
   c->fp_poll_interval_tas = 10000;
   c->fp_poll_interval_app = 10000;
+  c->bu_max_budget = 800000000;
+  c->bu_boost = 1.2;
   c->ps_algorithm = CONFIG_PS_DEFAULT;
   c->kni_name = NULL;
   c->ready_fd = -1;
@@ -728,6 +750,12 @@ static void print_usage(struct configuration *c, char *progname)
           "in us [default: %"PRIu32"]\n"
       "  --dpdk-extra=ARG            Add extra DPDK argument\n"
       "\n"
+      "Budget:\n"
+      "  --bu-max-budget             Max budget for a VM"
+          "[default: %"PRIu64"]\n"
+      "  --bu-boost                  Boost for VM budget"
+          "[default: %lf]\n"
+      "\n"
       "Packet scheduling:\n"
       "   --ps=ALGORITHM             Packet scheduling algorithm "
            "[default: default]\n"
@@ -755,7 +783,8 @@ static void print_usage(struct configuration *c, char *progname)
       (double) c->cc_timely_alpha / UINT32_MAX,
       (double) c->cc_timely_beta / UINT32_MAX, c->cc_timely_min_rtt,
       c->cc_timely_min_rate, c->arp_to, c->arp_to_max,
-      c->fp_cores_max, c->fp_poll_interval_tas, c->fp_poll_interval_app);
+      c->fp_cores_max, c->fp_poll_interval_tas, c->fp_poll_interval_app,
+      c->bu_max_budget, c->bu_boost);
 }
 
 static inline int parse_int64(const char *s, uint64_t *pi)
