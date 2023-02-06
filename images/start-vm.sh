@@ -62,7 +62,7 @@ elif [[ "$stack" == 'tap-tas' ]]; then
     -device virtio-net-pci,netdev=net0 \
     -netdev tap,ifname=$tap,script=no,downscript=no,vhost=on,id=net1 \
     -device virtio-net-pci,mac=$mac,netdev=net1 \
-    -netdev tap,ifname=$tastap,script=no,downscript=no,vhost=on,queues=8,id=net2 \
+    -netdev tap,ifname=$tastap,script=no,downscript=no,vhost=on,queues=16,id=net2 \
     -device virtio-net-pci,mac=$tas_mac,vectors=18,mq=on,netdev=net2 \
     -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
     -drive if=virtio,format=raw,file="seed.img" \

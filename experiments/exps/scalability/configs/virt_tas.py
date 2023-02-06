@@ -31,7 +31,7 @@ class Config:
                 machine_config=self.s_machine_config,
                 project_dir=self.defaults.default_vtas_dir_bare,
                 ip=self.s_machine_config.ip,
-                n_cores=12)
+                n_cores=16)
         self.s_tas_configs.append(tas_config)
 
         self.s_proxyh_config = HostProxyConfig(pane=self.defaults.s_proxyh_pane,
@@ -78,7 +78,7 @@ class Config:
                 machine_config=self.c_machine_config,
                 project_dir=self.defaults.default_vtas_dir_bare,
                 ip=self.c_machine_config.ip,
-                n_cores=8)
+                n_cores=16)
         self.c_tas_configs.append(tas_config)
 
         self.c_proxyh_config = HostProxyConfig(pane=self.defaults.c_proxyh_pane,
