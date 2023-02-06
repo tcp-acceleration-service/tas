@@ -52,7 +52,7 @@ void flextcp_kernel_kick(void)
   last_ts = now;
 }
 
-int flextcp_kernel_connect(int *shmfd)
+int flextcp_kernel_connect(int *shmfd, int groupid)
 {
   int fd, *pfd;
   uint8_t b;
@@ -64,7 +64,8 @@ int flextcp_kernel_connect(int *shmfd)
   /* prepare socket address */
   memset(&saun, 0, sizeof(saun));
   saun.sun_family = AF_UNIX;
-  memcpy(saun.sun_path, KERNEL_SOCKET_PATH, sizeof(KERNEL_SOCKET_PATH));
+  snprintf(saun.sun_path, sizeof(saun.sun_path), 
+      "%s_vm_%d", KERNEL_SOCKET_PATH, groupid);
 
   if ((fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) == -1) {
     perror("flextcp_kernel_connect: socket failed");

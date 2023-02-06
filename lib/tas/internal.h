@@ -64,7 +64,7 @@ extern int flexnic_shmfd;
 extern struct flexnic_info *flexnic_info;
 extern int flexnic_evfd[FLEXTCP_MAX_FTCPCORES];
 
-int flextcp_kernel_connect(int *shmfd);
+int flextcp_kernel_connect(int *shmfd, int groupid);
 int flextcp_proxy_kernel_connect(int *shmfds, int *flexnic_evfd);
 int flextcp_kernel_newctx(struct flextcp_context *ctx,
     uint8_t *presp, ssize_t *presp_sz);

@@ -1,105 +1,192 @@
-class HostConfig:
-    def __init__(self, name, is_server, is_remote, is_virt):
-        # general configurations
+""" IP tables may drop packets on the bridge so run the following
+    on the host machine if that happens
+    echo 0 > /proc/sys/net/bridge/bridge-nf-call-iptables """
+
+class Defaults:
+    def __init__(self):
+        self.client_ip = '192.168.10.13'
+        self.server_ip = '192.168.10.14'
+
+        self.pane_prefix = 'e_'
+        self.server_pane_prefix = '{}server'.format(self.pane_prefix)
+        self.client_pane_prefix = '{}client'.format(self.pane_prefix)
+
+        # Pane names
+        self.s_tas_pane = "{}_tas".format(self.server_pane_prefix)
+        self.s_vm_pane = "{}_vm".format(self.server_pane_prefix)
+        self.s_proxyg_pane = "{}_proxyg".format(self.server_pane_prefix)
+        self.s_proxyh_pane = "{}_proxy_h".format(self.server_pane_prefix)
+        self.s_server_pane = "{}".format(self.server_pane_prefix)
+        self.s_savelogs_pane = "{}_savelogs".format(self.server_pane_prefix)
+        self.s_setup_pane = "{}_setup".format(self.server_pane_prefix)
+        self.s_cleanup_pane = "{}_cleanup".format(self.server_pane_prefix)
+
+        self.c_tas_pane = "{}_tas".format(self.client_pane_prefix)
+        self.c_vm_pane = "{}_vm".format(self.client_pane_prefix)
+        self.c_proxyg_pane = "{}_proxyg".format(self.client_pane_prefix)
+        self.c_proxyh_pane = "{}_proxyh".format(self.client_pane_prefix)
+        self.c_client_pane = "{}".format(self.client_pane_prefix)
+        self.c_savelogs_pane = "{}_savelogs".format(self.client_pane_prefix)
+        self.c_setup_pane = "{}_setup".format(self.client_pane_prefix)
+        self.c_cleanup_pane = "{}_cleanup".format(self.client_pane_prefix)
+
+        # Mellanox interfaces on client and server machine
+        self.client_interface = 'ens1f0np0'
+        self.server_interface = 'ens1f0'
+
+        # Network interface used to set ip for a VM
+        self.vm_interface = "enp0s3"
+        # Network interface used to bind TAS in tap VM
+        self.tas_interface = "enp0s4"
+        # PCI Id of tas interface
+        self.pci_id = "0000:00:04.0"
+
+        self.remote_connect_cmd = 'ssh swsnetlab04'
+
+        self.home_dir = '/local/mstolet'
+        self.home_dir_virt = '/home/tas'
+
+        self.default_vtas_dir_bare = '{}/projects/tas'.format(self.home_dir)
+        self.default_vtas_dir_virt = '{}/projects/tas'.format(self.home_dir_virt)
+        self.default_otas_dir_bare = '{}/projects/o-tas/tas'.format(self.home_dir)
+        self.default_otas_dir_virt = '{}/projects/o-tas/tas'.format(self.home_dir_virt)
+
+        self.default_vbenchmark_dir_bare = '{}/projects/benchmarks'.format(self.home_dir)
+        self.default_vbenchmark_dir_virt = '{}/projects/benchmarks'.format(self.home_dir_virt)
+        self.default_obenchmark_dir_bare = '{}/projects/o-benchmarks/benchmarks'.format(self.home_dir)
+        self.default_obenchmark_dir_virt = '{}/projects/o-benchmarks/benchmarks'.format(self.home_dir_virt)
+
+class MachineConfig:
+    def __init__(self, ip, interface, stack, is_remote, is_server):
         self.is_server = is_server
         self.is_remote = is_remote
-        if is_virt:
-            self.project_dir = '/local/mstolet/projects/tas/'
-        else:
-            self.project_dir = '/local/mstolet/projects/o-tas/tas/'
-        self.vtas_project_dir = '/local/mstolet/projects/tas/'
-        self.vm_project_dir = '/home/tas/projects/tas/'
-        self.output_dir = self.vtas_project_dir + 'experiments/out/'
-        self.vm_output_dir = self.vm_project_dir + "experiments/out/"
-        self.save_logs_pane = name + '_savelogs'
+        self.interface = interface
+        self.ip = ip
+        self.stack = stack
 
-        # pre-start commands
-        self.setup_cmds = []
-        self.cleanup_cmds = []
-        self.setup_pane = name + '_setup'
-        self.cleanup_pane = name + '_cleanup'
-
-        # tas configurations
-        self.tas_pane = name + '_tas'
-        self.tas_comp_dir = self.project_dir
-        self.tas_comp_cmd = 'make'
-        self.tas_exec_file = self.tas_comp_dir + 'tas/tas'
-        self.tas_server_out_file = self.output_dir + 'tas_s'
-        self.tas_client_out_file = self.output_dir + 'tas_c'
-        self.tas_out_file = ''
-        self.tas_lib_so = self.tas_comp_dir + 'lib/libtas_interpose.so'
-        self.tas_args = ' --fp-cores-max=12' + \
-            ' --cc=const-rate --cc-const-rate=0 --fp-no-ints' + \
-            ' --fp-no-autoscale --dpdk-extra="-w3b:00.0"'
-        if is_server:
-            self.tas_ip = "192.168.10.14/24"
-            self.tas_out_file = self.tas_server_out_file
-        else:
-            self.tas_ip = "192.168.10.13/24"
-            self.tas_out_file = self.tas_client_out_file
-        self.tas_args = ' --ip-addr={}'.format(self.tas_ip) + self.tas_args
-
-        # general proxy configurations
-        self.proxy_ivshm_socket_path = '/run/tasproxy'
-        self.proxy_pane = name + '_proxy'
-        self.proxy_guest_pane = name + '_proxy_guest'
-
-        # host proxy configurations
-        self.host_proxy_comp_dir = self.project_dir
-        self.host_proxy_comp_cmd = 'make'
-        self.host_proxy_exec_file = self.host_proxy_comp_dir + 'proxy/host/host'
-        self.host_proxy_out_file = self.output_dir + 'proxy_h'
+class TasConfig:
+    def __init__(self, pane, machine_config, project_dir, ip, n_cores, 
+            dpdk_extra="3b:00.0"):
+        self.name = "server" if machine_config. is_server else "client"
         
-        # guest proxy configurations
-        self.guest_proxy_comp_dir = self.vm_project_dir
-        self.guest_proxy_comp_cmd = 'make'
-        self.guest_proxy_exec_file = self.guest_proxy_comp_dir + 'proxy/guest/guest'
-        self.guest_proxy_out_file = self.vm_output_dir + 'proxy_g'
+        self.project_dir = project_dir
+        
+        self.out_dir = self.project_dir + '/out'
+        self.out_file = ''
+        if machine_config.is_server:
+            self.out_file = 'tas_s'
+        else:
+            self.out_file = 'tas_c'
+        self.out = self.out_dir + '/' + self.out_file
+        
+        self.comp_dir = self.project_dir
+        self.comp_cmd = 'make'
+        self.lib_so = self.comp_dir + 'lib/libtas_interpose.so'
+        self.exec_file = self.comp_dir + '/tas/tas'
+        self.args = '--ip-addr={}/24 --fp-cores-max={}'.format(ip, n_cores) + \
+            ' --cc=const-rate --cc-const-rate=0 --fp-no-ints' + \
+            ' --fp-no-autoscale --fp-no-xsumoffload' + \
+            ' --dpdk-extra="-w{}"'.format(dpdk_extra)
+        
+        self.pane = pane
+        self.ip = ip
+        self.n_cores = n_cores
 
-        # vm manager configurations
-        self.node_pane = name + '_node'
-        self.vm_manager_preboot_cmds = []
-        self.vm_manager_postboot_cmds = [
-            "sudo su -",
-            "sudo echo 1 > /sys/module/vfio/parameters/enable_unsafe_noiommu_mode",
-            "sudo echo 1af4 1110 > /sys/bus/pci/drivers/vfio-pci/new_id",
-            "exit"
-        ]
-        self.vm_manager_vmspecific_postboot_cmds = []
-        self.vm_manager_dir = self.vtas_project_dir + 'images/'
-        self.vm_manager = lambda machine, stack, id, mac: self.vm_manager_dir + \
-                'virtual-manager.sh' + ' ' + str(machine) + \
-                ' ' + str(stack) + ' ' + str(id) + ' ' + str(mac)
+class VMConfig:
+    def __init__(self, pane, machine_config, tas_dir, tas_dir_virt, idx):
+        self.name = "server" if machine_config.is_server else "client"
+        
+        self.manager_dir = tas_dir + '/images'
+        self.manager_dir_virt = tas_dir_virt + '/images'
+        
+        self.pane = pane
+        self.id = idx
+        if machine_config.is_server:
+            self.vm_ip = '192.168.10.{}'.format(20 + idx)
+            self.tas_tap_ip = '192.168.10.{}'.format(120 + idx)
+        else:
+            self.vm_ip = '192.168.10.{}'.format(40 + idx)
+            self.tas_tap_ip = '192.168.10.{}'.format(140 + idx)
 
-        # benchmark configurations
-        self.benchmark_pane = 'benchmark_' + name
-        if (is_virt):
-            self.benchmark_comp_dir = '/home/tas/projects/benchmarks/micro_rpc/'
-        else:
-            self.benchmark_comp_dir = '/local/mstolet/projects/o-benchmarks/' + 'benchmarks/micro_rpc/'
-        self.benchmark_comp_cmd = 'make'
-        self.benchmark_server_exec_file = self.benchmark_comp_dir + \
-            'echoserver_linux'
-        if (is_virt):
-            self.benchmark_server_out = self.vm_output_dir + 'rpc_s'
-        else:
-            self.benchmark_server_out = self.output_dir + 'rpc_s'
-        self.benchmark_client_exec_file = self.benchmark_comp_dir + \
-            'testclient_linux'
-        if (is_virt):
-            self.benchmark_client_out = self.vm_output_dir + 'rpc_c'
-        else:
-            self.benchmark_client_out = self.output_dir + 'rpc_c'
-        if (is_virt):
-            self.tas_bench_lib_so = self.vm_project_dir + 'lib/libtas_interpose.so'
-        else:
-            self.tas_bench_lib_so = self.tas_comp_dir + 'lib/libtas_interpose.so'
+class ProxyConfig:
+    def __init__(self, machine_config, comp_dir):
+        self.name = "server" if machine_config.is_server else "client"
+        
+        self.out_dir = comp_dir + "/out"
+        
+        self.ivshm_socket_path = '/run/tasproxy'
+        
+        self.comp_dir = comp_dir
+        self.comp_cmd = 'make'
 
-        self.benchmark_exec_file = ''
-        self.benchmark_out = ''
-        if (is_server):
-            self.benchmark_exec_file = self.benchmark_server_exec_file
-            self.benchmark_out = self.benchmark_server_out
-        else:
-            self.benchmark_exec_file = self.benchmark_client_exec_file
-            self.benchmark_out = self.benchmark_client_out
+class HostProxyConfig(ProxyConfig):
+    def __init__(self, pane, machine_config, comp_dir):
+        ProxyConfig.__init__(self, machine_config, comp_dir)
+        self.exec_file = self.comp_dir + '/proxy/host/host'
+        
+        self.out_file = 'proxy_h'
+        self.out = self.out_dir + '/' + self.out_file
+        
+        self.pane = pane
+
+class GuestProxyConfig(ProxyConfig):
+    def __init__(self, pane, machine_config, comp_dir):
+        ProxyConfig.__init__(self, machine_config, comp_dir)
+        self.exec_file = self.comp_dir + '/proxy/guest/guest'
+       
+        self.out_file = 'proxy_g'
+        self.out = self.out_dir + '/' + self.out_file
+       
+        self.pane = pane
+
+class ClientConfig:
+    def __init__(self, pane, idx, vmid,
+            ip, port, ncores, msize, mpending,
+            nconns, open_delay, max_msgs_conn, max_pend_conns, 
+            bench_dir, tas_dir, stack, exp_name):
+        self.name = "client"
+        self.exp_name = exp_name
+        self.exp_name = ""
+        self.tas_dir = tas_dir
+       
+        self.comp_dir = bench_dir + "/micro_rpc"
+        self.comp_cmd = 'make'
+       
+        self.bench_dir = bench_dir
+        self.lib_so = tas_dir + '/lib/libtas_interpose.so'
+        self.exec_file = self.comp_dir + '/testclient_linux'
+        self.args = '{} {} {} foo {} {} {} {} {} {}'.format(ip, port, ncores, \
+                msize, mpending, nconns, open_delay, \
+                max_msgs_conn, max_pend_conns)
+       
+        self.out_dir = tas_dir + "/out"
+        self.out_file = "{}_{}_client{}_node{}_nconns{}_ncores{}_msize{}".format(
+                exp_name, stack, idx, vmid, nconns, ncores, msize)
+        self.out = self.out_dir + '/' + self.out_file
+       
+        self.pane = pane
+        self.id = idx
+        self.stack = stack
+
+class ServerConfig:
+    def __init__(self, pane, idx, vmid,
+            port, ncores, max_flows, max_bytes,
+            bench_dir, tas_dir):
+        self.name = "server"
+        self.tas_dir = tas_dir
+        
+        self.bench_dir = bench_dir
+        self.comp_dir = bench_dir + "/micro_rpc"
+        self.comp_cmd = 'make'
+        self.lib_so = tas_dir + '/lib/libtas_interpose.so'
+        self.exec_file = self.comp_dir + '/echoserver_linux'
+        self.args = '{} {} foo {} {}'.format(port, ncores, \
+                max_flows, max_bytes)
+        
+        self.out_dir = tas_dir + "/out"
+        self.out_file = 'rpc_s'
+        self.out = self.out_dir + '/' + self.out_file
+        
+        self.pane = pane
+        self.id = idx
+        self.vmid = vmid

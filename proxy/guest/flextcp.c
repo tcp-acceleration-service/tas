@@ -124,7 +124,7 @@ int vflextcp_poll(struct guest_proxy *pxy)
 
 static int vflextcp_uxsocket_init(struct guest_proxy *pxy) 
 {
-  int fd;
+  int fd, groupid;
   struct sockaddr_un saun;
 
   if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) 
@@ -133,10 +133,13 @@ static int vflextcp_uxsocket_init(struct guest_proxy *pxy)
     return -1;
   }
 
+  /* Use groupid 0 as default */
+  groupid = 0;
   /* create sockaddr */
   memset(&saun, 0, sizeof(saun));
   saun.sun_family = AF_UNIX;
-  memcpy(saun.sun_path, KERNEL_SOCKET_PATH, sizeof(KERNEL_SOCKET_PATH));
+  snprintf(saun.sun_path, sizeof(saun.sun_path), 
+      "%s_vm_%d", KERNEL_SOCKET_PATH, groupid);
 
   unlink(saun.sun_path);
   if (bind(fd, (struct sockaddr *) &saun, sizeof(saun))) 

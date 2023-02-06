@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     }
 
     /* Poll ivshmem */
-    fprintf(stdout, "running host proxy.\n");
+    printf("running host proxy.\n");
     while(exited == 0)
     {
         ivshmem_poll();

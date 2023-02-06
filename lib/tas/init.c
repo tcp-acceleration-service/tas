@@ -73,9 +73,9 @@ static int fastpath_poll_vec(struct flextcp_context *ctx, int num,
 static void conns_bump(struct flextcp_context *ctx) __attribute__((noinline));
 static void txq_probe(struct flextcp_context *ctx, unsigned n) __attribute__((noinline));
 
-int flextcp_init()
+int flextcp_init(int groupid)
 {
-  if ((flextcp_kernel_connect(&flexnic_shmfd)) < 0) 
+  if ((flextcp_kernel_connect(&flexnic_shmfd, groupid)) < 0) 
   {
     fprintf(stderr, "flextcp_init: connecting to kernel failed\n");
     return -1;

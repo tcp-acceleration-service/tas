@@ -45,7 +45,7 @@ static int test_1_tas(void *data)
   int nret;
 
   /* connect to tas */
-  if (flextcp_init() != 0) {
+  if (flextcp_init(0) != 0) {
     fprintf(stderr, "flextcp_init failed\n");
     return 1;
   }

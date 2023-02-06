@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  fprintf(stdout, "running guest proxy.\n");  
+  printf("running guest proxy.\n");  
   while (exited == 0)
   {
     n = 0;

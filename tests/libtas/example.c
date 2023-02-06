@@ -19,7 +19,7 @@ static void test_poll_empty(void *p)
   struct flextcp_event evs[4];
   int num;
 
-  if (flextcp_init() != 0)
+  if (flextcp_init(0) != 0)
     test_error("flextcp_init failed");
 
   test_randinit(&ctx, sizeof(ctx));
@@ -43,7 +43,7 @@ static void test_connect_success(void *p)
   void *rxbuf, *txbuf, *buf;
   ssize_t res;
 
-  if (flextcp_init() != 0)
+  if (flextcp_init(0) != 0)
     test_error("flextcp_init failed");
 
   test_randinit(&ctx, sizeof(ctx));
@@ -103,7 +103,7 @@ static void test_connect_fail(void *p)
   int num;
   int n;
 
-  if (flextcp_init() != 0)
+  if (flextcp_init(0) != 0)
     test_error("flextcp_init failed");
 
   test_randinit(&ctx, sizeof(ctx));
@@ -144,7 +144,7 @@ static void test_full_rxbuf(void *p)
   int n;
   void *rxbuf, *txbuf;
 
-  if (flextcp_init() != 0)
+  if (flextcp_init(0) != 0)
     test_error("flextcp_init failed");
 
   test_randinit(&ctx, sizeof(ctx));
@@ -245,7 +245,7 @@ static void test_full_txbuf(void *p)
   int n;
   void *rxbuf, *txbuf, *buf;
 
-  if (flextcp_init() != 0)
+  if (flextcp_init(0) != 0)
     test_error("flextcp_init failed");
 
   test_randinit(&ctx, sizeof(ctx));

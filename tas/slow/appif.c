@@ -452,16 +452,6 @@ static void uxsocket_accept_vm()
     return;
   }
 
-  // sz = sizeof(*vm->resp) +
-  //   tas_info->cores_num * sizeof(vm->resp->flexnic_qs[0]);
-  // vm->resp_sz = sz;
-  // if ((vm->resp = malloc(sz)) == NULL) {
-  //   fprintf(stderr, "uxsocket_accept: malloc of app resp struct failed\n");
-  //   free(vm);
-  //   close(cfd);
-  //   return;
-  // }
-
   if ((aev = malloc(sizeof(struct appif_event))) == NULL)
   {
     perror("uxsocket_accept_vm: malloc appif_event failed");
@@ -473,14 +463,6 @@ static void uxsocket_accept_vm()
   vm->id = vmid;
   vm->closed = false;
   vm_id_next++;
-  // vm->fd = cfd;
-  // vm->contexts = NULL;
-  // vm->need_reg_ctx = NULL;
-  // vm->closed = false;
-  // vm->conns = NULL;
-  // vm->listeners = NULL;
-  // vm->id = app_id_next++;
-  // vm->vm_id = vm_id;
 
   aev->type = EP_VM;
   aev->ptr = vm;
@@ -511,11 +493,15 @@ static void uxsocket_accept_app(int vm_id)
     return;
   }
 
-  // if (appif_connect_accept(cfd, tas_info->cores_num,
-  //     kernel_notifyfd, core_evfds, vm_shm_fd[vm_id]) != 0) {
-  //   fprintf(stderr, "uxsocket_accept: appif_connect_accept failed.\n");
-  //   return;
-  // }
+  /* If this is an application running on a VM this is extra
+     work because the proxy has already connected, but we keep
+     this redundant step so that we don't break compatibility 
+     with regular applications */
+  if (appif_connect_accept(cfd, tas_info->cores_num,
+      kernel_notifyfd, core_evfds, vm_shm_fd[vm_id]) != 0) {
+    fprintf(stderr, "uxsocket_accept_vm: appif_connect_accept failed.\n");
+    return;
+  }
 
   /* allocate application struct */
   if ((app = malloc(sizeof(*app))) == NULL) {

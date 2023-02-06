@@ -26,7 +26,7 @@ static int uxfd = -1;
 /* Epoll for contexsts */
 static int ctx_epfd = -1;
 /* ID of next virtual machine to connect */
-static int next_vm_id = 0;
+static int next_vm_id = 1;
 /* ID of next app for each vm */
 static int next_app_id[FLEXNIC_PL_VMST_NUM];
 /* List of VMs */
@@ -412,12 +412,14 @@ static int uxsocket_handle_error()
     return 0;
 }
 
+
+
 static int chanel_poll()
 {
     int i;
     struct v_machine *vm;
 
-    for(i = 0; i < next_vm_id; i++)
+    for(i = 1; i < next_vm_id; i++)
     {
         vm = &vms[i];
         if (vm != NULL)
@@ -428,6 +430,9 @@ static int chanel_poll()
 
     return 0;
 }
+
+/*****************************************************************************/
+/* Channel */
 
 static int channel_poll_vm(struct v_machine *vm)
 {

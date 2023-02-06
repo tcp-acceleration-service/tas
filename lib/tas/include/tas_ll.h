@@ -229,7 +229,7 @@ struct flextcp_event {
  * Initializes global flextcp state, must only be called once.
  * @return 0 on success, < 0 on failure
  */
-int flextcp_init(void);
+int flextcp_init(int groupid);
 
 /**
  * Create a flextcp context.

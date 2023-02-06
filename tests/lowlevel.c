@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
   }
   port = atoi(argv[argc - 1]);
 
-  if (flextcp_init()) {
+  if (flextcp_init(0)) {
     fprintf(stderr, "flextcp_init failed\n");
     return -1;
   }

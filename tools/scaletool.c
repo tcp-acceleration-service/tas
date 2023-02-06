@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 
     cores = atoi(argv[1]);
 
-    if (flextcp_init() != 0) {
+    if (flextcp_init(0) != 0) {
         fprintf(stderr, "flextcp_init failed\n");
         return EXIT_FAILURE;
     }

@@ -140,8 +140,11 @@ int flextcp_vm_kernel_connect(int vmid, int *shmfd, int *flexnic_evfd)
 
 int flextcp_proxy_kernel_newapp(int vmid, int appid)
 {
-  int fd;
+  int fd, n, i, temp_kernel_evfd, temp_shmfd;
   struct sockaddr_un saun;
+  uint8_t b;
+  ssize_t r;
+  uint32_t num_fds, off;
 
   /* prepare socket address */
   memset(&saun, 0, sizeof(saun));
@@ -159,8 +162,65 @@ int flextcp_proxy_kernel_newapp(int vmid, int appid)
     return -1;
   }
 
-  ksock_fd_app[vmid][appid] = fd;
+  /* This work is discarded. It's kept here for compatibility.
+     vm_kernel_connect already has this info. */
+   struct iovec iov = {
+    .iov_base = &num_fds,
+    .iov_len = sizeof(uint32_t),
+  };
+  union {
+    char buf[CMSG_SPACE(sizeof(int) * 4)];
+    struct cmsghdr align;
+  } u;
+  struct msghdr msg = {
+    .msg_name = NULL,
+    .msg_namelen = 0,
+    .msg_iov = &iov,
+    .msg_iovlen = 1,
+    .msg_control = u.buf,
+    .msg_controllen = sizeof(u.buf),
+    .msg_flags = 0,
+  };
 
+  if (flextcp_kernel_get_notifyfd(fd, &num_fds, &temp_kernel_evfd) != 0)
+  {
+    fprintf(stderr, "flextcp_kernel_connect: failed to receive notify fd.\n");
+    return -1;
+  }
+  
+  if (flextcp_kernel_get_shmfd(fd, &temp_shmfd) != 0)
+  {
+    fprintf(stderr, "flextcp_kernel_connect: failed to receive shm fd.\n");
+    return -1;
+  }
+
+  /* receive fast path fds in batches of 4 */
+  off = 0;
+  for (off = 0 ; off < num_fds; ) {
+    iov.iov_base = &b;
+    iov.iov_len = 1;
+
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = u.buf;
+    msg.msg_controllen = sizeof(u);
+
+    /* receive fd message (up to 4 fds at once) */
+    if ((r = recvmsg(fd, &msg, 0)) != 1) {
+      fprintf(stderr, "flextcp_kernel_connect: recvmsg fd failed (%zd)\n", r);
+      abort();
+    }
+
+    n = (num_fds - off >= 4 ? 4 : num_fds - off);
+
+    for (i = 0; i < n; i++) {
+      off++;
+    }
+  }
+  /* End of discarded work */
+
+  ksock_fd_app[vmid][appid] = fd;
   return 0;
 }
 
