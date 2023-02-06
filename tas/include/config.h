@@ -139,7 +139,9 @@ struct configuration {
   uint32_t fp_poll_interval_app;
   /** Packet scheduling algorithm */
   enum config_ps_algorithm ps_algorithm;
-  /** Max budget */
+  /** Max budget. This gets divided by the max 
+      number of VMs and threads launched to get
+      a per context max budget */
   uint64_t bu_max_budget;
   /** Budget update frequency in microseconds */
   uint64_t bu_update_freq;

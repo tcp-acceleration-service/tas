@@ -255,11 +255,12 @@ int flexnic_scale_to(uint32_t cores)
 
 void boost_budget(int vmid, int ctxid, int64_t incr)
 {
-  int64_t old_budget, new_budget;
+  int64_t old_budget, new_budget, max_budget;
 
   old_budget = ctxs[ctxid]->budgets[vmid].cycles;
   new_budget = old_budget + incr;
-  new_budget = MIN(new_budget, config.bu_max_budget);
+  max_budget = config.bu_max_budget / threads_launched;
+  new_budget = MIN(new_budget, max_budget);
   ctxs[ctxid]->budgets[vmid].cycles = new_budget;
 }
 

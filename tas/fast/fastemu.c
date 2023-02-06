@@ -158,7 +158,8 @@ int dataplane_context_init(struct dataplane_context *ctx)
   {
     /* Initialize budget for each VM */
     ctx->budgets[i].vmid = i;
-    ctx->budgets[i].cycles = config.bu_max_budget;
+    ctx->budgets[i].cycles = (config.bu_max_budget / FLEXNIC_PL_VMST_NUM) /
+        config.fp_cores_max;
     ctx->budgets[i].bandwidth = 0;
     
     /* Initialized polled apps and polled vms*/
