@@ -147,7 +147,7 @@ int slowpath_main(int threads_launched)
     }
 
     /* Accumulate per context VM budget and update total budget */
-    if (cur_ts - last_baccum >= 1000000) {
+    if (cur_ts - last_baccum >= config.bu_update_freq) {
       update_budget(threads_launched);
       last_baccum = cur_ts;
     }

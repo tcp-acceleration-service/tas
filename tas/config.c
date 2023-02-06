@@ -80,6 +80,7 @@ enum cfg_params {
   CP_FP_POLL_INTERVAL_APP,
   CP_BU_MAX_BUDGET,
   CP_BU_BUDGET_BOOST,
+  CP_BU_UPDATE_FREQ,
   CP_PS,
   CP_KNI_NAME,
   CP_READY_FD,
@@ -220,6 +221,9 @@ static struct option opts[] = {
     { .name = "bu-max-budget",
       .has_arg = required_argument,
       .val = CP_BU_MAX_BUDGET },
+    { .name = "bu-update-freq",
+      .has_arg = required_argument,
+      .val = CP_BU_UPDATE_FREQ },
     { .name = "bu-budget-boost",
       .has_arg = required_argument,
       .val = CP_BU_BUDGET_BOOST },
@@ -527,6 +531,12 @@ int config_parse(struct configuration *c, int argc, char *argv[])
           goto failed;
         }
         break;
+      case CP_BU_UPDATE_FREQ:
+        if (parse_int64(optarg, &c->bu_update_freq) != 0) {
+          fprintf(stderr, "budget update frequency failed parsing\n");
+          goto failed;
+        }
+        break;
       case CP_BU_BUDGET_BOOST:
         if (parse_double(optarg, &c->bu_boost) != 0) {
           fprintf(stderr, "budget boost failed parsing\n");
@@ -638,6 +648,7 @@ static int config_defaults(struct configuration *c, char *progname)
   c->fp_poll_interval_tas = 10000;
   c->fp_poll_interval_app = 10000;
   c->bu_max_budget = 800000000;
+  c->bu_update_freq = 100000;
   c->bu_boost = 1.2;
   c->ps_algorithm = CONFIG_PS_DEFAULT;
   c->kni_name = NULL;
@@ -753,6 +764,8 @@ static void print_usage(struct configuration *c, char *progname)
       "Budget:\n"
       "  --bu-max-budget             Max budget for a VM"
           "[default: %"PRIu64"]\n"
+      "  --bu-update-freq            Budget update freq"
+          "[default: %"PRIu64"]\n"
       "  --bu-boost                  Boost for VM budget"
           "[default: %lf]\n"
       "\n"
@@ -784,7 +797,7 @@ static void print_usage(struct configuration *c, char *progname)
       (double) c->cc_timely_beta / UINT32_MAX, c->cc_timely_min_rtt,
       c->cc_timely_min_rate, c->arp_to, c->arp_to_max,
       c->fp_cores_max, c->fp_poll_interval_tas, c->fp_poll_interval_app,
-      c->bu_max_budget, c->bu_boost);
+      c->bu_max_budget, c->bu_update_freq, c->bu_boost);
 }
 
 static inline int parse_int64(const char *s, uint64_t *pi)

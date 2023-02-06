@@ -141,6 +141,8 @@ struct configuration {
   enum config_ps_algorithm ps_algorithm;
   /** Max budget */
   uint64_t bu_max_budget;
+  /** Budget update frequency in microseconds */
+  uint64_t bu_update_freq;
   /** Boost for the budget */
   double bu_boost;
   /** SP: kni interface name */
