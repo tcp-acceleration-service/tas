@@ -1,8 +1,6 @@
 import os
 import experiments.plot_utils as putils
 
-NUM_CORES = 8
-
 def get_avg_tp(fname):
   tp_sum = 0
   n = 0

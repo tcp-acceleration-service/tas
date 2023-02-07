@@ -1,12 +1,12 @@
 import re
 
 def get_stack(line):
-  stack_regex = "[a-z]+-[a-z]+"
+  stack_regex = "(?<=_)([a-z]+-[a-z]+)(?=_)"
   stack = re.search(stack_regex, line).group(0)
   return stack
 
 def get_client_id(line):
-  cid_regex = "(?<=_app)[0-9]*"
+  cid_regex = "(?<=_client)[0-9]*"
   cid = re.search(cid_regex, line).group(0)
   return cid
 
@@ -14,6 +14,11 @@ def get_node_id(line):
   nid_regex = "(?<=_node)[0-9]*"
   nid = re.search(nid_regex, line).group(0)
   return nid
+
+def get_nconns(line):
+  nconns_regex = "(?<=_nconns)[0-9]*"
+  num = re.search(nconns_regex, line).group(0)
+  return num
 
 def get_n_messages(line):
   nmessages_regex = "(?<=(n_messages=))(.*?)(?=\ )"
@@ -59,11 +64,6 @@ def get_ts(line):
   ts_regex = "(?<=(ts=))(.*?)(?=\ )"
   ts = re.search(ts_regex, line).group(0)
   return ts
-
-def get_nconns(fname):
-  nconns_regex = "(?<=(conn_))(.*?)(?=\-)"
-  num = re.search(nconns_regex, fname).group(0)
-  return str(int(num) * 8)
 
 def get_first_ts(fname):
   f = open(fname)

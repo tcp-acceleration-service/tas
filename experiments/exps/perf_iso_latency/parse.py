@@ -1,6 +1,19 @@
+import sys
+sys.path.append("../../../")
+
 import os
+import re
+import functools
 import experiments.plot_utils as putils
 
+
+# For this experiment get the number of connections
+# from the experiment name, since client 0 and client 1
+# have a different number of connections
+def get_conns(fname):
+  regex = "(?<=_conns)[0-9]*"
+  nconns = re.search(regex, fname).group(0)
+  return nconns
 
 def check_nconns(data, nconns):
   if nconns not in data:
@@ -18,16 +31,13 @@ def check_cid(data, nconns, stack, nid, cid):
   if cid not in data[nconns][stack][nid]:
     data[nconns][stack][nid][cid] = ""
 
-def get_latencies(fname_c0, fname_c1):
+def get_latencies(fname_c0):
   f = open(fname_c0)
   lines = f.readlines()
 
-  c1_first_ts = putils.get_last_ts(fname_c1)
-  idx, _ = putils.get_min_idx(fname_c0, c1_first_ts)
-
   # Latencies are already accumulated over all time
   # period in the logs
-  line = lines[idx]
+  line = lines[len(lines) - 1]
   latencies = {}
   latencies["50p"] = putils.get_50p_lat(line)
   latencies["90p"] = putils.get_90p_lat(line)
@@ -43,56 +53,59 @@ def parse_metadata():
 
   for f in os.listdir(dir_path):
     fname = os.fsdecode(f)
-    nconns = putils.get_nconns(fname)
+    nconns = get_conns(fname)
     cid = putils.get_client_id(fname)
     nid = putils.get_node_id(fname)
     stack = putils.get_stack(fname)
 
     check_nconns(data, nconns)
     check_stack(data, nconns, stack)
-    check_nid(data, stack, nid)
-    check_cid(data, stack, nid, cid)
+    check_nid(data, nconns, stack, nid)
+    check_cid(data, nconns, stack, nid, cid)
 
     data[nconns][stack][nid][cid] = fname
 
   return data
 
 def parse_data(parsed_md):
-  lat_list = []
+  lat_list = {}
   out_dir = "./out/"
   for nconns in parsed_md:
-    data_point = {"nconns": nconns}
+    data_point = {}
     for stack in parsed_md[nconns]:
-      
-      if stack == "virt-tas":
-        fname_c0 = out_dir + parsed_md[nconns][stack][0][0]
-        fname_c1 = out_dir + parsed_md[nconns][stack][1][0]
-      else:
-        fname_c0 = out_dir + parsed_md[nconns][stack][0][0]
-        fname_c1 = out_dir + parsed_md[nconns][stack][0][1]
-
-      latencies = get_latencies(fname_c0, fname_c1)
+      fname_c0 = out_dir + parsed_md[nconns][stack]['0']['0']
+      latencies = get_latencies(fname_c0)
       data_point[stack] = latencies
-    
-    lat_list.append(data_point)
   
-  lat_list = sorted(lat_list, key=lambda d: int(d['nconns']))
+    lat_list[nconns] = data_point
+  
   return lat_list
 
-def save_dat_file(avg_tps, fpath):
-  f = open(fpath, "w+")
+def save_dat_file(exp_lats, fname):
   header = "nconns bare-tas bare-vtas virt-tas\n"
-  f.write(header)
-  for tp in avg_tps:
-    f.write("{} {} {} {}\n".format(
-        tp["nconns"], 
-        tp["bare-tas"], tp["bare-vtas"], 
-        tp["virt-tas"]))
+  
+  nconns = list(exp_lats.keys())
+  nconns = sorted(nconns) 
+  stacks =  list(exp_lats[nconns[0]].keys())
+  percentiles =  list(exp_lats[nconns[0]][stacks[0]].keys())
 
+  for percentile in percentiles:
+      fname = "./lat_{}.dat".format(percentile)
+      f = open(fname, "w+")
+      f.write(header)
+
+      for nconn in nconns:
+        f.write("{} {} {} {}\n".format(
+          nconn,
+          exp_lats[nconn]['bare-tas'][percentile],
+          exp_lats[nconn]['bare-vtas'][percentile],
+          exp_lats[nconn]['virt-tas'][percentile])
+        )
+        
 def main():
   parsed_md = parse_metadata()
   latencies = parse_data(parsed_md)
-  save_dat_file(latencies, "./tp.dat")
+  save_dat_file(latencies, "./lat.dat")
 
 if __name__ == '__main__':
   main()
