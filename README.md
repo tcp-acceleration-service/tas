@@ -135,7 +135,7 @@ qemu-img resize ubuntu-20.04-server-cloudimg-amd64.img +15G
 After downloading an image, set it up by writing a user-data
 and metadata that creates a user and configures your image.
 Sample .yaml files that create a user named `tas` with password
-tas` can be found in the images directory. Afterwards use `cloud-localds`
+`tas` can be found in the images directory. Afterwards use `cloud-localds`
 to create a seed.img that sets up the initial config for your base image.
 
 ```
