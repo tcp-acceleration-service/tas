@@ -5,7 +5,7 @@ from configs.gen_config import ClientConfig
 from configs.gen_config import ServerConfig
 
 class Config:
-    def __init__(self, exp_name):
+    def __init__(self, exp_name, nconns):
         self.exp_name = exp_name
         self.defaults = Defaults()
         
@@ -79,7 +79,7 @@ class Config:
                 pane=self.defaults.c_client_pane,
                 idx=1, vmid=0, groupid=1, stack=self.cstack,
                 ip=self.defaults.server_ip, port=1235, ncores=1,
-                msize=64, mpending=64, nconns=1,
+                msize=64, mpending=64, nconns=nconns,
                 open_delay=5, max_msgs_conn=0, max_pend_conns=1,
                 bench_dir=self.defaults.default_vbenchmark_dir_bare,
                 tas_dir=self.defaults.default_vtas_dir_bare)

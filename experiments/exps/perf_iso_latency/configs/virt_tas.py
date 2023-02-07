@@ -8,14 +8,14 @@ from configs.gen_config import ClientConfig
 from configs.gen_config import ServerConfig
 
 class Config:
-    def __init__(self, exp_name):
+    def __init__(self, exp_name, nconns):
         self.exp_name = exp_name
         self.defaults = Defaults()
         
         # Server Machine
         self.sstack = 'virt-tas'
         self.snum = 1
-        self.snodenum = 1
+        self.snodenum = 2
         self.s_tas_configs = []
         self.s_vm_configs = []
         self.s_proxyg_configs = []
@@ -38,31 +38,48 @@ class Config:
                 machine_config=self.s_machine_config,
                 comp_dir=self.defaults.default_vtas_dir_bare)
         
-        for i in range(self.snodenum):
-            vm_config = VMConfig(pane=self.defaults.s_vm_pane,
-                    machine_config=self.s_machine_config,
-                    tas_dir=self.defaults.default_vtas_dir_bare,
-                    tas_dir_virt=self.defaults.default_vtas_dir_virt,
-                    idx=i)
-            self.s_vm_configs.append(vm_config)
+        vm0_config = VMConfig(pane=self.defaults.s_vm_pane,
+                machine_config=self.s_machine_config,
+                tas_dir=self.defaults.default_vtas_dir_bare,
+                tas_dir_virt=self.defaults.default_vtas_dir_virt,
+                idx=0)
+        vm1_config = VMConfig(pane=self.defaults.s_vm_pane,
+                machine_config=self.s_machine_config,
+                tas_dir=self.defaults.default_vtas_dir_bare,
+                tas_dir_virt=self.defaults.default_vtas_dir_virt,
+                idx=1)
+        
+        self.s_vm_configs.append(vm0_config)
+        self.s_vm_configs.append(vm1_config)
 
-            proxyg_config = GuestProxyConfig(pane=self.defaults.s_proxyg_pane,
-                     machine_config=self.s_machine_config,
-                     comp_dir=self.defaults.default_vtas_dir_virt)
-            self.s_proxyg_configs.append(proxyg_config)
+        proxyg0_config = GuestProxyConfig(pane=self.defaults.s_proxyg_pane,
+                machine_config=self.s_machine_config,
+                comp_dir=self.defaults.default_vtas_dir_virt)
+        proxyg1_config = GuestProxyConfig(pane=self.defaults.s_proxyg_pane,
+                machine_config=self.s_machine_config,
+                comp_dir=self.defaults.default_vtas_dir_virt)
+        
+        self.s_proxyg_configs.append(proxyg0_config)
+        self.s_proxyg_configs.append(proxyg1_config)
 
-            for j in range(self.snum):
-                server_config = ServerConfig(pane=self.defaults.s_server_pane,
-                        idx=j, vmid=i,
-                        port=1234, ncores=1, max_flows=1024, max_bytes=1024,
-                        bench_dir=self.defaults.default_vbenchmark_dir_virt,
-                        tas_dir=self.defaults.default_vtas_dir_virt)
-                self.server_configs.append(server_config)
+        server0_config = ServerConfig(pane=self.defaults.s_server_pane,
+                idx=0, vmid=0,
+                port=1234, ncores=1, max_flows=1024, max_bytes=1024,
+                bench_dir=self.defaults.default_vbenchmark_dir_virt,
+                tas_dir=self.defaults.default_vtas_dir_virt)
+        server1_config = ServerConfig(pane=self.defaults.s_server_pane,
+                idx=0, vmid=1,
+                port=1235, ncores=1, max_flows=1024, max_bytes=1024,
+                bench_dir=self.defaults.default_vbenchmark_dir_virt,
+                tas_dir=self.defaults.default_vtas_dir_virt)
+
+        self.server_configs.append(server0_config)
+        self.server_configs.append(server1_config)
 
         # Client Machine
         self.cstack = 'virt-tas'
         self.cnum = 1
-        self.cnodenum = 1
+        self.cnodenum = 2
         self.c_tas_configs = []
         self.c_vm_configs = []
         self.c_proxyg_configs = []
@@ -85,26 +102,46 @@ class Config:
                 machine_config=self.c_machine_config,
                 comp_dir=self.defaults.default_vtas_dir_bare)
         
-        for i in range(self.cnodenum):
-            vm_config = VMConfig(pane=self.defaults.c_vm_pane,
-                    machine_config=self.c_machine_config,
-                    tas_dir=self.defaults.default_vtas_dir_bare,
-                    tas_dir_virt=self.defaults.default_vtas_dir_virt,
-                    idx=i)
-            self.c_vm_configs.append(vm_config)
+        vm0_config = VMConfig(pane=self.defaults.c_vm_pane,
+                machine_config=self.c_machine_config,
+                tas_dir=self.defaults.default_vtas_dir_bare,
+                tas_dir_virt=self.defaults.default_vtas_dir_virt,
+                idx=0)
+        vm1_config = VMConfig(pane=self.defaults.c_vm_pane,
+                machine_config=self.c_machine_config,
+                tas_dir=self.defaults.default_vtas_dir_bare,
+                tas_dir_virt=self.defaults.default_vtas_dir_virt,
+                idx=1)
 
-            proxyg_config = GuestProxyConfig(pane=self.defaults.c_proxyg_pane,
+        self.c_vm_configs.append(vm0_config)
+        self.c_vm_configs.append(vm1_config)
+
+        proxyg0_config = GuestProxyConfig(pane=self.defaults.c_proxyg_pane,
                     machine_config=self.c_machine_config,
                     comp_dir=self.defaults.default_vtas_dir_virt)
-            self.c_proxyg_configs.append(proxyg_config)
+        proxyg1_config = GuestProxyConfig(pane=self.defaults.c_proxyg_pane,
+                    machine_config=self.c_machine_config,
+                    comp_dir=self.defaults.default_vtas_dir_virt)
+        
+        self.c_proxyg_configs.append(proxyg0_config)
+        self.c_proxyg_configs.append(proxyg1_config)
 
-            for j in range(self.cnum):
-                client_config = ClientConfig(exp_name=exp_name, 
-                        pane=self.defaults.c_client_pane,
-                        idx=j, vmid=i, stack=self.cstack,
-                        ip=self.defaults.server_ip, port=1234, ncores=1,
-                        msize=64, mpending=64, nconns=1,
-                        open_delay=5, max_msgs_conn=0, max_pend_conns=1,
-                        bench_dir=self.defaults.default_vbenchmark_dir_virt,
-                        tas_dir=self.defaults.default_vtas_dir_virt)
-                self.client_configs.append(client_config)
+        client0_config = ClientConfig(exp_name=exp_name, 
+                pane=self.defaults.c_client_pane,
+                idx=0, vmid=0, stack=self.cstack,
+                ip=self.defaults.server_ip, port=1234, ncores=1,
+                msize=64, mpending=64, nconns=1,
+                open_delay=5, max_msgs_conn=0, max_pend_conns=1,
+                bench_dir=self.defaults.default_vbenchmark_dir_virt,
+                tas_dir=self.defaults.default_vtas_dir_virt)
+        client1_config = ClientConfig(exp_name=exp_name, 
+                pane=self.defaults.c_client_pane,
+                idx=0, vmid=1, stack=self.cstack,
+                ip=self.defaults.server_ip, port=1235, ncores=1,
+                msize=64, mpending=64, nconns=nconns,
+                open_delay=5, max_msgs_conn=0, max_pend_conns=1,
+                bench_dir=self.defaults.default_vbenchmark_dir_virt,
+                tas_dir=self.defaults.default_vtas_dir_virt)
+
+        self.client_configs.append(client0_config)
+        self.client_configs.append(client1_config)

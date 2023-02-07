@@ -6,12 +6,15 @@ from exps.perf_iso_latency.configs.virt_tas import Config as TasVirtConf
 
 experiments = []
 
-exp_name = "perf_iso_latency-"
-# tas_bare_exp = exp.Experiment(TasBareConf(exp_name), name=exp_name)
-vtas_bare_exp = exp.Experiment(VTasBareConf(exp_name + "bare-vtas"), name=exp_name)
-# tas_virt_exp = exp.Experiment(TasVirtConf(exp_name), name=exp_name)
+n_conns = [100, 200]
 
-# experiments.append(tas_bare_exp)
-experiments.append(vtas_bare_exp)
-# experiments.append(tas_virt_exp)
+for n in n_conns:
+  exp_name = "perf-iso-latency_conns{}_".format(n)
+  tas_bare_exp = exp.Experiment(TasBareConf(exp_name + "bare-tas", n), name=exp_name)
+  vtas_bare_exp = exp.Experiment(VTasBareConf(exp_name + "bare-vtas", n), name=exp_name)
+  tas_virt_exp = exp.Experiment(TasVirtConf(exp_name + "virt-tas", n), name=exp_name)
+
+  experiments.append(tas_bare_exp)
+  experiments.append(vtas_bare_exp)
+  experiments.append(tas_virt_exp)
   

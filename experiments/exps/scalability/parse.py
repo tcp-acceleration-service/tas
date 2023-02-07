@@ -1,36 +1,7 @@
 import os
-import re
+import experiments.plot_utils as putils
 
 NUM_CORES = 8
-
-def get_stack(line):
-  stack_regex = "[a-z]+-[a-z]+"
-  stack = re.search(stack_regex, line).group(0)
-  return stack
-
-def get_client_id(line):
-  cid_regex = "(?<=_app)[0-9]*"
-  cid = re.search(cid_regex, line).group(0)
-  return cid
-
-def get_node_id(line):
-  nid_regex = "(?<=_node)[0-9]*"
-  nid = re.search(nid_regex, line).group(0)
-
-def get_tp(line):
-  tp_regex = "(?<=(total=))(.*?)(?=\ )"
-  tp = re.search(tp_regex, line).group(0)
-  return tp
-
-def get_ts(line):
-  ts_regex = "(?<=(ts=))(.*?)(?=\,)"
-  ts = re.search(ts_regex, line).group(0)
-  return ts
-
-def get_nconns(fname):
-  nconns_regex = "(?<=(conn_))(.*?)(?=\-)"
-  num = re.search(nconns_regex, fname).group(0)
-  return str(int(num) * 8)
 
 def get_avg_tp(fname):
   tp_sum = 0
@@ -40,7 +11,7 @@ def get_avg_tp(fname):
   lines = f.readlines()
 
   for l in lines[:60]:
-    tp = get_tp(l)
+    tp = putils.get_tp(l)
     tp_sum += float(tp)
     n += 1
 
@@ -68,10 +39,10 @@ def parse_metadata():
 
   for f in os.listdir(dir_path):
     fname = os.fsdecode(f)
-    nconns = get_nconns(fname)
-    cid = get_client_id(fname)
-    nid = get_node_id(fname)
-    stack = get_stack(fname)
+    nconns = putils.get_nconns(fname)
+    cid = putils.get_client_id(fname)
+    nid = putils.get_node_id(fname)
+    stack = putils.get_stack(fname)
 
     check_nconns(data, nconns)
     check_stack(data, nconns, stack)

@@ -33,7 +33,11 @@ class Client:
         time.sleep(3)
 
         cmd = ''
-        stack = self.client_config.stack
+        stack = self.machine_config.stack
+        
+        if stack == 'virt-tas' or stack == 'bare-tas':
+            cmd = 'sudo '
+
         if stack == 'bare-tas' or stack == 'tap-tas' or stack == 'virt-tas' or stack == 'bare-vtas':
             cmd += 'LD_PRELOAD=' + self.client_config.lib_so + ' '
        
