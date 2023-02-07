@@ -45,17 +45,23 @@ static void conn_close(struct flextcp_context *ctx, struct socket *s);
 int tas_init(void)
 {
   int groupid;
-  const char *groupidstr;
+  char *groupidstr;
   
+
   groupidstr = getenv("TAS_GROUP");
-  groupid = atoi(groupidstr);
 
   if (flextcp_fd_init() != 0) {
     fprintf(stderr, "flextcp_fd_init failed\n");
     return -1;
   }
 
-  if (!groupid) groupid = 0;
+  if (groupidstr == NULL) 
+  {
+    groupid = 0;
+  } else
+  {
+    groupid = atoi(groupidstr);
+  }
 
   if (flextcp_init(groupid) != 0) {
     fprintf(stderr, "flextcp_init failed\n");
