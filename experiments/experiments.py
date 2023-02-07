@@ -11,6 +11,8 @@ from nodes.bare_linux.blinux_server import BareLinuxServer
 from nodes.bare_linux.blinux_client import BareLinuxClient
 from nodes.tap_tas.ttas_server import TapTasServer
 from nodes.tap_tas.ttas_client import TapTasClient
+from nodes.vtas_bare.vtasbare_server import VTasBareServer
+from nodes.vtas_bare.vtasbare_client import VTasBareClient
 
 class Experiment:
 
@@ -33,20 +35,24 @@ class Experiment:
             node = BareLinuxServer(self.config, self.wmanager)
         elif stack == "tap-tas":
             node = TapTasServer(self.config, self.wmanager)
+        elif stack == "bare-vtas":
+            node = VTasBareServer(self.config, self.wmanager)
 
         return node
 
     def init_client_node(self, stack):
         if stack == "virt-tas":
             node = VirtTasClient(self.config, self.wmanager)
-        if stack == "bare-tas":
+        elif stack == "bare-tas":
             node = BareTasClient(self.config, self.wmanager)
-        if stack == "virt-linux":
+        elif stack == "virt-linux":
             node = VirtLinuxClient(self.config, self.wmanager)
-        if stack == "bare-linux":
+        elif stack == "bare-linux":
             node = BareLinuxClient(self.config, self.wmanager)
-        if stack == "tap-tas":
+        elif stack == "tap-tas":
             node = TapTasClient(self.config, self.wmanager)
+        elif stack == "bare-vtas":
+            node = VTasBareClient(self.config, self.wmanager)
 
         return node
 

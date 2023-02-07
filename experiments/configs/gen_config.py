@@ -142,8 +142,8 @@ class GuestProxyConfig(ProxyConfig):
 class ClientConfig:
     def __init__(self, pane, idx, vmid,
             ip, port, ncores, msize, mpending,
-            nconns, open_delay, max_msgs_conn, max_pend_conns, 
-            bench_dir, tas_dir, stack, exp_name):
+            nconns, open_delay, max_msgs_conn, max_pend_conns,
+            groupid, bench_dir, tas_dir, stack, exp_name):
         self.name = "client"
         self.exp_name = exp_name
         self.exp_name = ""
@@ -164,13 +164,14 @@ class ClientConfig:
                 exp_name, stack, idx, vmid, nconns, ncores, msize)
         self.out = self.out_dir + '/' + self.out_file
        
+        self.groupid = groupid
         self.pane = pane
         self.id = idx
         self.stack = stack
 
 class ServerConfig:
     def __init__(self, pane, idx, vmid,
-            port, ncores, max_flows, max_bytes,
+            port, ncores, max_flows, max_bytes, groupid,
             bench_dir, tas_dir):
         self.name = "server"
         self.tas_dir = tas_dir
@@ -187,6 +188,7 @@ class ServerConfig:
         self.out_file = 'rpc_s'
         self.out = self.out_dir + '/' + self.out_file
         
+        self.groupid = groupid
         self.pane = pane
         self.id = idx
         self.vmid = vmid

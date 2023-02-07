@@ -1,0 +1,12 @@
+#!/usr/bin/gnuplot -persist
+set terminal pdf
+set output "plot.pdf"
+set colorsequence podo
+set key autotitle columnhead
+set xlabel "# Connections"
+set ylabel "Throughput (Mbps)"
+
+plot 'tp.dat' using 1:2 title 'linux' linetype 2 w lp, \
+     'tp.dat' using 1:3 title 'virt-linux' linetype 3 w lp, \
+     'tp.dat' using 1:4 title 'tas' linetype 4 w lp, \
+     'tp.dat' using 1:5 title 'virt-tas' linetype 5 w lp 
