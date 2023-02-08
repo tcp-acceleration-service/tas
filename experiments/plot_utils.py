@@ -20,6 +20,11 @@ def get_nconns(line):
   num = re.search(nconns_regex, line).group(0)
   return num
 
+def get_msize(line):
+  msize_regex = "(?<=_msize)[0-9]*"
+  msize = re.search(msize_regex, line).group(0)
+  return msize
+
 def get_n_messages(line):
   nmessages_regex = "(?<=(n_messages=))(.*?)(?=\ )"
   n_messages = re.search(nmessages_regex, line).group(0)
@@ -81,3 +86,13 @@ def get_last_ts(fname):
   last_ts = get_ts(l)
   return last_ts
 
+def get_min_idx(path, c1_first_ts):
+  f = open(path)
+
+  for idx, l in enumerate(f):
+    ts = get_ts(l)
+
+    if int(ts) > int(c1_first_ts):
+      return idx, ts
+
+  return -1, -1

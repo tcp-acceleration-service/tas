@@ -11,8 +11,8 @@ set multiplot layout 2,2 \
               margins 0.1,0.95,0.15,0.90 \
               spacing 0.1,0.07
               
-set label 1 "# Connections" at screen 0.5, 0.03 center
-set label 2 "Latency (µs)" at screen 0.01, 0.5 rotate by 90 center
+set label 1 "Aggressor Client Message Size (Bytes)" at screen 0.5, 0.03 center
+set label 2 "Victim Client Latency (µs)" at screen 0.01, 0.5 rotate by 90 center
 
 set title offset 0,-0.6
 

@@ -31,7 +31,7 @@ class Config:
                 machine_config=self.s_machine_config,
                 project_dir=self.defaults.default_vtas_dir_bare,
                 ip=self.s_machine_config.ip,
-                n_cores=1)
+                n_cores=8)
         self.s_tas_configs.append(tas_config)
 
         self.s_proxyh_config = HostProxyConfig(pane=self.defaults.s_proxyh_pane,
@@ -64,12 +64,12 @@ class Config:
 
         server0_config = ServerConfig(pane=self.defaults.s_server_pane,
                 idx=0, vmid=0,
-                port=1234, ncores=1, max_flows=1024, max_bytes=1024,
+                port=1234, ncores=8, max_flows=4096, max_bytes=1024,
                 bench_dir=self.defaults.default_vbenchmark_dir_virt,
                 tas_dir=self.defaults.default_vtas_dir_virt)
         server1_config = ServerConfig(pane=self.defaults.s_server_pane,
                 idx=0, vmid=1,
-                port=1235, ncores=1, max_flows=1024, max_bytes=1024,
+                port=1235, ncores=8, max_flows=4096, max_bytes=1024,
                 bench_dir=self.defaults.default_vbenchmark_dir_virt,
                 tas_dir=self.defaults.default_vtas_dir_virt)
 
@@ -130,16 +130,16 @@ class Config:
                 pane=self.defaults.c_client_pane,
                 idx=0, vmid=0, stack=self.cstack,
                 ip=self.defaults.server_ip, port=1234, ncores=1,
-                msize=64, mpending=64, nconns=1,
-                open_delay=5, max_msgs_conn=0, max_pend_conns=1,
+                msize=1024, mpending=64, nconns=1024,
+                open_delay=15, max_msgs_conn=0, max_pend_conns=1,
                 bench_dir=self.defaults.default_vbenchmark_dir_virt,
                 tas_dir=self.defaults.default_vtas_dir_virt)
         client1_config = ClientConfig(exp_name=exp_name, 
                 pane=self.defaults.c_client_pane,
                 idx=0, vmid=1, stack=self.cstack,
                 ip=self.defaults.server_ip, port=1235, ncores=1,
-                msize=64, mpending=64, nconns=nconns,
-                open_delay=5, max_msgs_conn=0, max_pend_conns=1,
+                msize=1024, mpending=64, nconns=nconns,
+                open_delay=15, max_msgs_conn=0, max_pend_conns=1,
                 bench_dir=self.defaults.default_vbenchmark_dir_virt,
                 tas_dir=self.defaults.default_vtas_dir_virt)
 

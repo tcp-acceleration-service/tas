@@ -3,7 +3,6 @@ sys.path.append("../../../")
 
 import os
 import re
-import functools
 import experiments.plot_utils as putils
 
 
@@ -31,21 +30,22 @@ def check_cid(data, nconns, stack, nid, cid):
   if cid not in data[nconns][stack][nid]:
     data[nconns][stack][nid][cid] = ""
 
-def get_latencies(fname_c0):
+def get_avg_tp(fname_c0, fname_c1):
+  n_messages = 0
+  n = 0
+
   f = open(fname_c0)
   lines = f.readlines()
 
-  # Latencies are already accumulated over all time
-  # period in the logs
-  line = lines[len(lines) - 1]
-  latencies = {}
-  latencies["50p"] = putils.get_50p_lat(line)
-  latencies["90p"] = putils.get_90p_lat(line)
-  latencies["99p"] = putils.get_99p_lat(line)
-  latencies["99.9p"] = putils.get_99_9p_lat(line)
-  latencies["99.99p"] = putils.get_99_99p_lat(line)
+  c1_first_ts = putils.get_last_ts(fname_c1)
+  idx, _ = putils.get_min_idx(fname_c0, c1_first_ts)
 
-  return latencies
+  msize = int(putils.get_msize(fname_c0))
+  for l in lines[idx:]:
+    n_messages += int(putils.get_n_messages(l))
+    n += 1
+
+  return str((n_messages * msize / n) / 1000000)
 
 def parse_metadata():
   dir_path = "./out/"
@@ -68,44 +68,44 @@ def parse_metadata():
   return data
 
 def parse_data(parsed_md):
-  lat_list = {}
+  tp = []
   out_dir = "./out/"
   for nconns in parsed_md:
-    data_point = {}
+    data_point = {"nconns": nconns}
     for stack in parsed_md[nconns]:
-      fname_c0 = out_dir + parsed_md[nconns][stack]['0']['0']
-      latencies = get_latencies(fname_c0)
-      data_point[stack] = latencies
-  
-    lat_list[nconns] = data_point
-  
-  return lat_list
+      if stack == "virt-tas":
+        c0_fname = out_dir + parsed_md[nconns][stack]["0"]["0"]
+        c1_fname = out_dir + parsed_md[nconns][stack]["1"]["0"]
+      else:
+        c0_fname = out_dir + parsed_md[nconns][stack]["0"]["0"]
+        c1_fname = out_dir + parsed_md[nconns][stack]["0"]["1"]
 
-def save_dat_file(exp_lats, fname):
+      avg_tp = get_avg_tp(c0_fname, c1_fname)
+
+      data_point[stack] = avg_tp
+  
+    tp.append(data_point)
+  
+  tp = sorted(tp, key=lambda d: int(d['nconns']))
+  return tp
+
+def save_dat_file(avg_tps, fname):
+  f = open(fname, "w+")
   header = "nconns bare-tas bare-vtas virt-tas\n"
-  
-  nconns = list(exp_lats.keys())
-  nconns = sorted(nconns) 
-  stacks =  list(exp_lats[nconns[0]].keys())
-  percentiles =  list(exp_lats[nconns[0]][stacks[0]].keys())
+  f.write(header)
 
-  for percentile in percentiles:
-      fname = "./lat_{}.dat".format(percentile)
-      f = open(fname, "w+")
-      f.write(header)
-
-      for nconn in nconns:
-        f.write("{} {} {} {}\n".format(
-          nconn,
-          exp_lats[nconn]['bare-tas'][percentile],
-          exp_lats[nconn]['bare-vtas'][percentile],
-          exp_lats[nconn]['virt-tas'][percentile])
-        )
+  for tp in avg_tps:
+    f.write("{} {} {} {}\n".format(
+      tp["nconns"],
+      tp["bare-tas"],
+      tp["bare-vtas"],
+      tp["virt-tas"]
+    ))
         
 def main():
   parsed_md = parse_metadata()
-  latencies = parse_data(parsed_md)
-  save_dat_file(latencies, "./lat.dat")
+  avg_tps = parse_data(parsed_md)
+  save_dat_file(avg_tps, "./tp.dat")
 
 if __name__ == '__main__':
   main()
