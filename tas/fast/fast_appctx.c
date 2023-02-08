@@ -90,6 +90,9 @@ void fast_appctx_poll_pf_all(struct dataplane_context *ctx, uint8_t *out_of_budg
       e_cycs = util_rdtsc();
 
       __sync_fetch_and_sub(&ctx->budgets[vmid].cycles, e_cycs - s_cycs);
+    } else
+    {
+      out_of_budget[vmid] = 1;
     }
   }
 }

@@ -376,41 +376,53 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
   int i, cnt, x;
   uint32_t idx;
   uint64_t s_cycs, e_cycs;
+  uint16_t out_of_budget[FLEXNIC_PL_VMST_NUM];
+  memset(out_of_budget, 0, sizeof(*out_of_budget) * FLEXNIC_PL_VMST_NUM);
 
   for (cnt = 0; cnt < num && vqman->head_idx != IDXLIST_INVAL;)
   {
-    s_cycs = util_rdtsc();
     idx = vqman->head_idx;
     struct vm_queue *vq = &vqman->queues[idx];
-    struct flow_qman *fqman = vq->fqman;
-
     vqman->head_idx = vq->next_idx;
-    if (vq->next_idx == IDXLIST_INVAL)
+
+    if (budgets[idx].cycles > 0)
     {
-      vqman->tail_idx = IDXLIST_INVAL;
+      s_cycs = util_rdtsc();
+      struct flow_qman *fqman = vq->fqman;
+
+      if (vq->next_idx == IDXLIST_INVAL)
+      {
+        vqman->tail_idx = IDXLIST_INVAL;
+      }
+
+      vq->flags &= ~FLAG_INNOLIMITL;
+
+      x = flow_qman_poll(t, vq, fqman, num - cnt, q_ids + cnt, q_bytes + cnt);
+
+      cnt += x;
+
+      // Update vm_id list
+      for (i = cnt - x; i < cnt; i++)
+      {
+        vm_ids[i] = idx;
+      }
+
+      if (vq->avail > 0)
+      {
+        vm_queue_fire(vqman, vq, idx, q_bytes, cnt - x, cnt);
+      }
+      vq->dc += QUANTA;
+      e_cycs = util_rdtsc();
+      __sync_fetch_and_sub(&budgets[idx].cycles, e_cycs - s_cycs);
+    } else 
+    {
+      out_of_budget[idx] = 1;
+      if (vq->avail > 0)
+      {
+        vm_queue_activate(vqman, vq, idx);
+      }
     }
 
-    vq->flags &= ~FLAG_INNOLIMITL;
-
-    x = flow_qman_poll(t, vq, fqman, num - cnt, q_ids + cnt, q_bytes + cnt);
-
-    cnt += x;
-
-    // Update vm_id list
-    for (i = cnt - x; i < cnt; i++)
-    {
-      vm_ids[i] = idx;
-    }
-
-    if (vq->avail > 0)
-    {
-      vm_queue_fire(vqman, vq, idx, q_bytes, cnt - x, cnt);
-    }
-
-    vq->dc += QUANTA;  
-    e_cycs = util_rdtsc();
-
-    __sync_fetch_and_sub(&budgets[idx].cycles, e_cycs - s_cycs);
   }
 
 

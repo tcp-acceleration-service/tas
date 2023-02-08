@@ -204,7 +204,6 @@ static void update_budget(int threads_launched)
   for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
   {
     incr = ((total_budget * vm_weights[vmid]) / total_weight);
-    incr /= threads_launched;
     for (ctxid = 0; ctxid < threads_launched; ctxid++)
     {
       boost_budget(vmid, ctxid, incr);

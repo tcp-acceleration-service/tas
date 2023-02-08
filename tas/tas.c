@@ -259,7 +259,7 @@ void boost_budget(int vmid, int ctxid, int64_t incr)
 
   old_budget = ctxs[ctxid]->budgets[vmid].cycles;
   new_budget = old_budget + incr;
-  max_budget = config.bu_max_budget / threads_launched;
+  max_budget = config.bu_max_budget;
   new_budget = MIN(new_budget, max_budget);
   ctxs[ctxid]->budgets[vmid].cycles = new_budget;
 }
