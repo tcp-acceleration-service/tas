@@ -259,10 +259,13 @@ void boost_budget(int vmid, int ctxid, int64_t incr)
 
   old_budget = ctxs[ctxid]->budgets[vmid].cycles;
   new_budget = old_budget + incr;
-  max_budget = config.bu_max_budget;
-  new_budget = MIN(new_budget, max_budget);
+  max_budget = config.bu_max_budget;  
+  if (new_budget > max_budget)
+  {
+    incr = max_budget - old_budget;
+  }
   // printf("VMID=%d OLD_BUDGET=%ld NEW_BUDGET=%ld\n", vmid, old_budget, new_budget);
-  ctxs[ctxid]->budgets[vmid].cycles = new_budget;
+  __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].cycles, incr);
 }
 
 void flexnic_loadmon(uint32_t ts)
