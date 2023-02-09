@@ -1,30 +1,28 @@
-# TCP Acceleration Service
+# Virtualized TCP Acceleration Service
 
 [![Build Status](https://travis-ci.org/tcp-acceleration-service/tas.svg?branch=master)](https://travis-ci.org/tcp-acceleration-service/tas)
 [![Documentation Status](https://readthedocs.org/projects/tas/badge/?version=latest)](https://tas.readthedocs.io/en/latest/?badge=latest)
 
 
-TAS is a drop-in highly CPU efficient and scalable TCP acceleration service.
-
-Our [EuroSys2019 Paper](https://dl.acm.org/authorize?N678517) describes the TAS
-design and its rationale.
+TAS is a drop-in highly CPU efficient and scalable TCP acceleration service for
+virtualized environments.
 
 ## Building
 Requirements:
-  * TAS is built on top of Intel DPDK for direct access to the NIC. We have
+  * Virt TAS is built on top of Intel DPDK for direct access to the NIC. We have
     tested this version with dpdk versions (17.11.9, 18.11.5, 19.11).
 
-Assuming that dpdk is installed in `~/dpdk-inst` TAS can be built as follows:
+Assuming that dpdk is installed in `~/dpdk-inst` Virt TAS can be built as follows:
 ```
 make RTE_SDK=~/dpdk-inst
 ```
 
-This will build the TAS service (binary `tas/tas`), client libraries (in
+This will build the Virt TAS service (binary `tas/tas`), client libraries (in
 `lib/`), and a few debugging tools (in `tools/`).
 
 ## Running
 
-Before running TAS the following steps are necessary:
+Before running Virt TAS the following steps are necessary:
    * Make sure `hugetlbfs` is mounted on `/dev/hugepages` and enough huge pages are
      allocated for TAS and dpdk.
    * Binding the NIC to the dpdk driver, as with any other dpdk application (for
@@ -37,13 +35,51 @@ echo 1024 | sudo tee /sys/devices/system/node/node*/hugepages/hugepages-2048kB/n
 sudo ~/dpdk-inst/sbin/dpdk-devbind  -b vfio-pci 0000:08:00.0
 ```
 
-To run (`--ip-addr` and `--fp-cores-max` are the minimum arguments typically
-needed to run tas, for more see `--help`):
+To run Virt-TAS you need to start 4 different components:
+Virt-TAS, the host proxy, a VM using QEMU's ivshmem and the guest proxy.
+
+First start Virt-TAS on the host with the following command:
 ```
-sudo code/tas/tas --ip-addr=10.0.0.1/24 --fp-cores-max=2
+sudo code/tas/tas --ip-addr=10.0.0.1/24 --fp-cores-max=1 --fp-no-ints --fp-no-autoscale --dpdk-extra="-w08:00.0"
 ```
 
-Once tas is running, applications that directly link to `libtas` or
+After TAS starts run the host proxy:
+```
+sudo code/proxy/host/host
+```
+
+With the host proxy up and running you can start QEMU with ivshmem. 
+QEMU will grab the shared memory region opened by Virt-TAS from the host proxy. 
+You need a configured VM image before you can start QEMU. If you don't have one,
+follow the steps in the [Building Images for QEMU](#building-images-for-qemu)
+section. If you already have set up an image, start a VM with the command below:
+
+```
+sudo qemu-system-x86_64 \
+  -nographic -monitor none -serial stdio \
+  -machine accel=kvm,type=q35 \
+  -cpu host \
+  -smp 12 \
+  -m 12G \
+  -device virtio-net-pci,netdev=net0 \
+  -netdev user,id=net0,hostfwd=tcp::222${vm_id}-:22 \
+  -chardev socket,path="/run/tasproxy",id="tas" \
+  -device ivshmem-doorbell,vectors=1,chardev="tas" \
+  -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
+  -drive if=virtio,format=raw,file="seed.img" \
+  ;
+```
+
+After the VM boots, from another terminal window ssh into your VM.
+Inside the VM start the guest proxy:
+```
+ssh -p 2222 tas@localhost
+...login to VM
+sudo code/tas/proxy/guest/guest
+```
+
+After the guest proxy is running you can run applications that use Virt TAS
+inside the VM. Applications that directly link to `libtas` or
 `libtas_sockets` can be run directly. To run an unmodified application with
 sockets interposition run as follows (for example):
 ```
@@ -119,7 +155,7 @@ sudo code/tas/tas --ip-addr=10.0.0.1/24 --kni-name=tas0
 sudo ifconfig tas0 10.0.0.1/24 up
 ```
 
-### Building Images from QEMU
+### Building Images for QEMU
 
 You can find cloud images from the Ubuntu website. In this example we get
 the cloud image for Ubuntu 20.04:
@@ -194,6 +230,9 @@ modprobe vfio_pci
 echo 1 > /sys/module/vfio/parameters/enable_unsafe_noiommu_mode
 echo 1af4 1110 > /sys/bus/pci/drivers/vfio-pci/new_id
 ```
+
+To be able to run TAS applications in a VM you need to install DPDK inside
+the VM. After DPDK is installed, clone the TAS repo and build it.
 
 ## Code Structure
   * `tas/`: service implementation
