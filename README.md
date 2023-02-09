@@ -4,27 +4,27 @@
 [![Documentation Status](https://readthedocs.org/projects/tas/badge/?version=latest)](https://tas.readthedocs.io/en/latest/?badge=latest)
 
 
-TAS is a drop-in highly CPU efficient and scalable TCP acceleration service for
+vTAS is a drop-in highly CPU efficient and scalable TCP acceleration service for
 virtualized environments.
 
 ## Building
 Requirements:
-  * Virt TAS is built on top of Intel DPDK for direct access to the NIC. We have
+  * vTAS is built on top of Intel DPDK for direct access to the NIC. We have
     tested this version with dpdk versions (17.11.9, 18.11.5, 19.11).
 
-Assuming that dpdk is installed in `~/dpdk-inst` Virt TAS can be built as follows:
+Assuming that dpdk is installed in `~/dpdk-inst` vTAS can be built as follows:
 ```
 make RTE_SDK=~/dpdk-inst
 ```
 
-This will build the Virt TAS service (binary `tas/tas`), client libraries (in
+This will build the vTAS service (binary `tas/tas`), client libraries (in
 `lib/`), and a few debugging tools (in `tools/`).
 
 ## Running
 
-Before running Virt TAS the following steps are necessary:
+Before running vTAS the following steps are necessary:
    * Make sure `hugetlbfs` is mounted on `/dev/hugepages` and enough huge pages are
-     allocated for TAS and dpdk.
+     allocated for vTAS and dpdk.
    * Binding the NIC to the dpdk driver, as with any other dpdk application (for
      Intel NICs use `vfio` because `uio` does not support multiple interrupts).
 
@@ -35,21 +35,21 @@ echo 1024 | sudo tee /sys/devices/system/node/node*/hugepages/hugepages-2048kB/n
 sudo ~/dpdk-inst/sbin/dpdk-devbind  -b vfio-pci 0000:08:00.0
 ```
 
-To run Virt-TAS you need to start 4 different components:
-Virt-TAS, the host proxy, a VM using QEMU's ivshmem and the guest proxy.
+To run vTAS you need to start 4 different components:
+vTAS, the host proxy, a VM using QEMU's ivshmem and the guest proxy.
 
-First start Virt-TAS on the host with the following command:
+First start vTAS on the host with the following command:
 ```
 sudo code/tas/tas --ip-addr=10.0.0.1/24 --fp-cores-max=1 --fp-no-ints --fp-no-autoscale --dpdk-extra="-w08:00.0"
 ```
 
-After TAS starts run the host proxy:
+After vTAS starts run the host proxy:
 ```
 sudo code/proxy/host/host
 ```
 
 With the host proxy up and running you can start QEMU with ivshmem. 
-QEMU will grab the shared memory region opened by Virt-TAS from the host proxy. 
+QEMU will grab the shared memory region opened by vTAS from the host proxy. 
 You need a configured VM image before you can start QEMU. If you don't have one,
 follow the steps in the [Building Images for QEMU](#building-images-for-qemu)
 section. If you already have set up an image, start a VM with the command below:
@@ -78,60 +78,12 @@ ssh -p 2222 tas@localhost
 sudo code/tas/proxy/guest/guest
 ```
 
-After the guest proxy is running you can run applications that use Virt TAS
+After the guest proxy is running you can run applications that use vTAS
 inside the VM. Applications that directly link to `libtas` or
 `libtas_sockets` can be run directly. To run an unmodified application with
 sockets interposition run as follows (for example):
 ```
 sudo LD_PRELOAD=lib/libtas_interpose.so ../benchmarks/micro_rpc/echoserver_linux 1234 1 foo 8192 1
-```
-
-### In Qemu/KVM
-
-For functional testing and development TAS can run in Qemu (with or without
-acceleration through KVM). We have tested this with the `virtio` dpdk driver.
-By default, the qemu virtio device only provides a single queue, and thus only
-allows TAS to run on a single core. To run a virtual machine with support for
-multiple queue, qemu requires a tap device with multi-queue support enabled.
-
-Here is an example sequence of commands to create a tap device with multi queue
-support and then start a qemu instance that binds this tap device to a
-multi-queue virtio device:
-
-```
-sudo ip link add tastap0 type tuntap
-sudo ip tuntap add mode tap multi_queue name tastap0
-sudo ip link set dev tastap0 up
-qemu-system-x86_64 \
-    -machine q35 -cpu host \
-    -drive file=vm1.qcow2,if=virtio \
-    -netdev tap,ifname=tastap0,script=no,downscript=no,vhost=on,queues=8,id=nInt\
-    -device virtio-net-pci,mac=52:54:00:12:34:56,vectors=18,mq=on,netdev=nInt \
-    -serial mon:stdio -m 8192 -smp 16 -display none -enable-kvm
-
-```
-
-Inside the virtual machine, the following sequence of commands first takes the
-linux network interface down, binds it to the `uio_pci_generic` driver that
-the dpdk virtio PMD supports, and then reserves huge pages:
-```
-sudo ifconfig enp0s2 down
-sudo modprobe uio
-sudo modprobe uio_pci_generic
-sudo dpdk-devbind.py -b uio_pci_generic 0000:00:02.0
-echo 1024 | sudo tee /sys/devices/system/node/node*/hugepages/hugepages-2048kB/nr_hugepages
-```
-
-Virtio does not support all the NIC features that we depend on in physical NICs.
-In particular virtio does not support transmit checksum offload or the RSS
-redirection table TAS uses for scaling up and down. The dpdk virtio PMD also
-does not support multiple MSI-X interrupts.  To run TAS given these constraints,
-the following command line parameters disable the use of these features (note
-that this implies busy polling and no autoscaling):
-
-```
-sudo code/tas/tas --ip-addr=10.0.0.1/24 --fp-cores-max=8 \
-    --fp-no-xsumoffload --fp-no-ints --fp-no-autoscale
 ```
 
 ### Kernel NIC Interface
@@ -238,6 +190,9 @@ the VM. After DPDK is installed, clone the TAS repo and build it.
   * `tas/`: service implementation
     * `tas/fast`: TAS fast path
     * `tas/slow`: TAS slow path
+  * `proxy`: proxy implementation
+    * `proxy/host`: proxy on host
+    * `proxy/guest`: proxy on guest  
   * `lib/`: client libraries
     * `lib/tas`: lowlevel TAS client library (interface:
       `lib/tas/include/tas_ll.h`)
