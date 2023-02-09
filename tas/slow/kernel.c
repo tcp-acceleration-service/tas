@@ -199,11 +199,13 @@ static void update_budget(int threads_launched)
 
   cur_ts = util_rdtsc();
 
+  // printf("TOTAL BUDGET=%ld\n", cur_ts - last_bu_update_ts);
   total_budget = config.bu_boost * (cur_ts - last_bu_update_ts);
   total_weight = sum_weights(vm_weights);
   for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
   {
     incr = ((total_budget * vm_weights[vmid]) / total_weight);
+    // printf("INCR=%ld\n", incr);
     for (ctxid = 0; ctxid < threads_launched; ctxid++)
     {
       boost_budget(vmid, ctxid, incr);

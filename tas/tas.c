@@ -261,6 +261,7 @@ void boost_budget(int vmid, int ctxid, int64_t incr)
   new_budget = old_budget + incr;
   max_budget = config.bu_max_budget;
   new_budget = MIN(new_budget, max_budget);
+  // printf("VMID=%d OLD_BUDGET=%ld NEW_BUDGET=%ld\n", vmid, old_budget, new_budget);
   ctxs[ctxid]->budgets[vmid].cycles = new_budget;
 }
 

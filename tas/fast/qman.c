@@ -93,7 +93,7 @@ struct vm_queue {
   /** Flags: FLAG_INNOLIMITL */
   uint16_t flags;
   /* Deficit counter */
-  uint16_t dc;
+  uint32_t dc;
   /* Bytes sent in this round for this VM. Reset every round. */
   uint16_t bytes;
   /* Assigned rate in cpu cycles per second */
@@ -407,9 +407,9 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
       if (vq->avail > 0)
       {
         vm_queue_fire(vqman, vq, idx, q_bytes, cnt - x, cnt);
-      } // TODO: ADD QUANTA AS ELSE HERE
+      }
 
-      vq->dc += QUANTA;  
+      vq->dc += QUANTA;
 
     } else
     {
@@ -487,6 +487,7 @@ static inline void vm_set_impl(struct vm_qman *vqman, uint32_t v_idx,
 
   if (new_avail && vq->avail > 0 && ((vq->flags & (FLAG_INNOLIMITL)) == 0)) 
   {
+    vq->dc = QUANTA;
     vm_queue_activate(vqman, vq, v_idx);
   }
 
@@ -510,7 +511,6 @@ static inline void vm_queue_activate(struct vm_qman *vqman,
   q_tail = &vqman->queues[vqman->tail_idx];
   q_tail->next_idx = idx;
   vqman->tail_idx = idx;
-  vqman->queues[idx].dc = QUANTA;
 }
 
 static inline uint32_t sum_bytes(uint16_t *q_bytes, unsigned start, unsigned end)
