@@ -33,7 +33,7 @@ def compile_and_run(pane, comp_dir, comp_cmd,
         cmd = 'sudo gdb --args ' + exec_file + ' ' + args
     else:
         cmd = 'sudo ' + exec_file + ' ' + args
-        # cmd += ' | tee ' + out
+        cmd += ' | tee ' + out
 
     if bg : 
         cmd += ' &  '

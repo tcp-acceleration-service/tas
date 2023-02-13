@@ -30,6 +30,16 @@ def get_n_messages(line):
   n_messages = re.search(nmessages_regex, line).group(0)
   return n_messages
 
+def get_cycles_total(line, vmid):
+  regex = "(?<=(TVM{}=))(.*?)(?=[\ \n])".format(vmid)
+  cycles = re.search(regex, line).group(0)
+  return cycles
+
+def get_cycles_rate(line, vmid):
+  regex = "(?<=(RVM{}=))(.*?)(?=[\ \n])".format(vmid)
+  cycles = re.search(regex, line).group(0)
+  return cycles
+
 def get_50p_lat(line):
   regex = "(?<=(50p=))(.*?)(?=\ )"
   lat = re.search(regex, line).group(0)

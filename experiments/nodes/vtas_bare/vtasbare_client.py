@@ -31,13 +31,15 @@ class VTasBareClient(VTasBare):
 
   def run(self):
     self.setup()
-    tas = TAS(self.defaults, self.machine_config, 
+    self.tas = TAS(self.defaults, self.machine_config, 
         self.tas_config, self.wmanager)
     
-    tas.run_bare()
+    self.tas.run_bare()
     time.sleep(5)
     self.start_clients()
 
   def save_logs(self, exp_path):
     for client in self.clients:
       client.save_log_bare(exp_path)
+
+    self.tas.save_log_bare(exp_path)
