@@ -62,7 +62,7 @@ sudo qemu-system-x86_64 \
   -smp 12 \
   -m 12G \
   -device virtio-net-pci,netdev=net0 \
-  -netdev user,id=net0,hostfwd=tcp::222${vm_id}-:22 \
+  -netdev user,id=net0,hostfwd=tcp::2220-:22 \
   -chardev socket,path="/run/tasproxy",id="tas" \
   -device ivshmem-doorbell,vectors=1,chardev="tas" \
   -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
