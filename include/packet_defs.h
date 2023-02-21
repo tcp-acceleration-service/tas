@@ -169,6 +169,7 @@ struct tcp_hdr {
 #define TCP_OPT_END_OF_OPTIONS 0
 #define TCP_OPT_NO_OP 1
 #define TCP_OPT_MSS 2
+#define TCP_OPT_WS 3
 #define TCP_OPT_TIMESTAMP 8
 struct tcp_mss_opt {
   uint8_t kind;
@@ -176,6 +177,11 @@ struct tcp_mss_opt {
   beui16_t mss;
 } __attribute__((packed));
 
+struct tcp_ws_opt {
+  uint8_t kind;
+  uint8_t length;
+  uint8_t scale;
+} __attribute__((packed));
 
 struct tcp_timestamp_opt {
   uint8_t kind;

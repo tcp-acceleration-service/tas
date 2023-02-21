@@ -262,13 +262,17 @@ struct flextcp_pl_flowst {
   /** Sequence number of queue pointer bumps */
   uint16_t bump_seq;
 
-  // 56
+  /** TX Window scale factor */
+  uint8_t tx_window_scale;
+  /** RX Window scale factor */
+  uint8_t rx_window_scale;
+  // 58
 
   /********************************************************/
   /* read-write fields */
 
-  /** spin lock */
-  volatile uint32_t lock;
+  /** Duplicate ack count */
+  uint16_t rx_dupack_cnt;
 
   /** Bytes available for received segments at next position */
   uint32_t rx_avail;
@@ -279,8 +283,9 @@ struct flextcp_pl_flowst {
   uint32_t rx_next_seq;
   /** Bytes available in remote end for received segments */
   uint32_t rx_remote_avail;
-  /** Duplicate ack count */
-  uint32_t rx_dupack_cnt;
+
+  /** spin lock */
+  volatile uint32_t lock;
 
 #ifdef FLEXNIC_PL_OOO_RECV
   /* Start of interval of out-of-order received data */
