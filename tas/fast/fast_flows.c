@@ -66,10 +66,11 @@ static void flow_rx_seq_write(struct flextcp_pl_flowst *fs, uint32_t seq,
 static void flow_tx_segment(struct dataplane_context *ctx,
     struct network_buf_handle *nbh, struct flextcp_pl_flowst *fs,
     uint32_t seq, uint32_t ack, uint32_t rxwnd, uint16_t payload,
-    uint32_t payload_pos, uint32_t ts_echo, uint32_t ts_my, uint8_t fin);
+    uint32_t payload_pos, uint32_t ts_echo, uint32_t ts_my,
+    uint8_t window_scale, uint8_t fin);
 static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
     uint32_t ack, uint32_t rxwnd, uint32_t echo_ts, uint32_t my_ts,
-    struct network_buf_handle *nbh, struct tcp_timestamp_opt *ts_opt);
+    uint8_t window_scale, struct network_buf_handle *nbh, struct tcp_timestamp_opt *ts_opt);
 static void flow_reset_retransmit(struct flextcp_pl_flowst *fs);
 
 static inline void tcp_checksums(struct network_buf_handle *nbh,
@@ -195,7 +196,7 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t queue,
 
   /* send out segment */
   flow_tx_segment(ctx, nbh, fs, tx_seq, ack, rx_wnd, len, tx_pos,
-      fs->tx_next_ts, ts, fin);
+      fs->tx_next_ts, ts, fs->rx_window_scale, fin);
 unlock:
   fs_unlock(fs);
   return ret;
@@ -499,7 +500,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
     }
   }
 
-  fs->rx_remote_avail = f_beui16(p->tcp.wnd);
+  fs->rx_remote_avail = f_beui16(p->tcp.wnd) << fs->tx_window_scale;
 
   /* make sure we don't receive anymore payload after FIN */
   if ((fs->rx_base_sp & FLEXNIC_PL_FLOWST_RXFIN) == FLEXNIC_PL_FLOWST_RXFIN &&
@@ -631,7 +632,7 @@ unlock:
   /* if we need to send an ack, also send packet to TX pipeline to do so */
   if (trigger_ack) {
     flow_tx_ack(ctx, fs->tx_next_seq, fs->rx_next_seq, fs->rx_avail,
-        fs->tx_next_ts, ts, nbh, opts->ts);
+        fs->tx_next_ts, ts, fs->rx_window_scale, nbh, opts->ts);
   }
 
   fs_unlock(fs);
@@ -758,7 +759,7 @@ int fast_flows_bump(struct dataplane_context *ctx, uint32_t flow_id,
    * we're not sending anyways. */
   if (new_avail == 0 && rx_avail_prev == 0 && fs->rx_avail != 0) {
     flow_tx_segment(ctx, nbh, fs, fs->tx_next_seq, fs->rx_next_seq,
-        fs->rx_avail, 0, 0, fs->tx_next_ts, ts, 0);
+        fs->rx_avail, 0, 0, fs->tx_next_ts, ts, fs->rx_window_scale, 0);
     ret = 0;
   }
 
@@ -877,7 +878,8 @@ static void flow_rx_seq_write(struct flextcp_pl_flowst *fs, uint32_t seq,
 static void flow_tx_segment(struct dataplane_context *ctx,
     struct network_buf_handle *nbh, struct flextcp_pl_flowst *fs,
     uint32_t seq, uint32_t ack, uint32_t rxwnd, uint16_t payload,
-    uint32_t payload_pos, uint32_t ts_echo, uint32_t ts_my, uint8_t fin)
+    uint32_t payload_pos, uint32_t ts_echo, uint32_t ts_my,
+    uint8_t window_scale, uint8_t fin)
 {
   uint16_t hdrs_len, optlen, fin_fl;
   struct pkt_tcp *p = network_buf_buf(nbh);
@@ -915,7 +917,7 @@ static void flow_tx_segment(struct dataplane_context *ctx,
   p->tcp.seqno = t_beui32(seq);
   p->tcp.ackno = t_beui32(ack);
   TCPH_HDRLEN_FLAGS_SET(&p->tcp, 5 + optlen / 4, TCP_PSH | TCP_ACK | fin_fl);
-  p->tcp.wnd = t_beui16(MIN(0xFFFF, rxwnd));
+  p->tcp.wnd = t_beui16(MIN(0xFFFF, rxwnd >> window_scale));
   p->tcp.chksum = 0;
   p->tcp.urgp = t_beui16(0);
 
@@ -955,7 +957,7 @@ static void flow_tx_segment(struct dataplane_context *ctx,
 }
 
 static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
-    uint32_t ack, uint32_t rxwnd, uint32_t echots, uint32_t myts,
+    uint32_t ack, uint32_t rxwnd, uint32_t echots, uint32_t myts, uint8_t window_scale,
     struct network_buf_handle *nbh, struct tcp_timestamp_opt *ts_opt)
 {
   struct pkt_tcp *p;
@@ -998,7 +1000,7 @@ static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
   p->tcp.seqno = t_beui32(seq);
   p->tcp.ackno = t_beui32(ack);
   TCPH_HDRLEN_FLAGS_SET(&p->tcp, TCPH_HDRLEN(&p->tcp), TCP_ACK | ecn_flags);
-  p->tcp.wnd = t_beui16(MIN(0xFFFF, rxwnd));
+  p->tcp.wnd = t_beui16(MIN(0xFFFF, rxwnd >> window_scale));
   p->tcp.urgp = t_beui16(0);
 
   /* fill in timestamp option */

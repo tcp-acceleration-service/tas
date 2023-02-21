@@ -48,6 +48,7 @@ enum cfg_params {
   CP_TCP_TXBUF_LEN,
   CP_TCP_HANDSHAKE_TO,
   CP_TCP_HANDSHAKE_RETRIES,
+  CP_TCP_WINDOW_SCALE,
   CP_CC,
   CP_CC_CONTROL_GRANULARITY,
   CP_CC_CONTROL_INTERVAL,
@@ -123,6 +124,9 @@ static struct option opts[] = {
     { .name = "tcp-handshake-retries",
       .has_arg = required_argument,
       .val = CP_TCP_HANDSHAKE_RETRIES },
+    { .name = "tcp-window-scale",
+      .has_arg = required_argument,
+      .val = CP_TCP_WINDOW_SCALE },
     { .name = "cc",
       .has_arg = required_argument,
       .val = CP_CC },
@@ -324,6 +328,12 @@ int config_parse(struct configuration *c, int argc, char *argv[])
       case CP_TCP_HANDSHAKE_RETRIES:
         if (parse_int32(optarg, &c->tcp_handshake_retries) != 0) {
           fprintf(stderr, "tcp handshake retries parsing failed\n");
+          goto failed;
+        }
+        break;
+      case CP_TCP_WINDOW_SCALE:
+        if (parse_int8(optarg, &c->tcp_window_scale) != 0) {
+          fprintf(stderr, "tcp window scale parsing failed\n");
           goto failed;
         }
         break;
@@ -565,6 +575,7 @@ static int config_defaults(struct configuration *c, char *progname)
   c->tcp_txbuf_len = 8192;
   c->tcp_handshake_to = 10000;
   c->tcp_handshake_retries = 10;
+  c->tcp_window_scale = 0;
   c->cc_algorithm = CONFIG_CC_DCTCP_RATE;
   c->cc_control_granularity = 50;
   c->cc_control_interval = 2;
@@ -635,6 +646,8 @@ static void print_usage(struct configuration *c, char *progname)
           "[default: %"PRIu32"]\n"
       "  --tcp-handshake-retries=RETRIES  Handshake retries "
           "[default: %"PRIu32"]\n"
+      "  --tcp-window-scale=SCALE    Window scale factor "
+          "[default: %"PRIu8"]\n"
       "\n"
       "Congestion control parameters:\n"
       "  --cc=ALGORITHM              Congestion-control algorithm "
@@ -711,7 +724,7 @@ static void print_usage(struct configuration *c, char *progname)
       progname, c->shm_len,
       c->nic_rx_len, c->nic_tx_len, c->app_kin_len, c->app_kout_len,
       c->tcp_rtt_init, c->tcp_link_bw, c->tcp_rxbuf_len, c->tcp_txbuf_len,
-      c->tcp_handshake_to, c->tcp_handshake_retries,
+      c->tcp_handshake_to, c->tcp_handshake_retries, c->tcp_window_scale,
       c->cc_control_granularity, c->cc_control_interval, c->cc_rexmit_ints,
       (double) c->cc_dctcp_weight / UINT32_MAX, c->cc_dctcp_min,
       c->cc_const_rate, c->cc_timely_tlow, c->cc_timely_thigh,

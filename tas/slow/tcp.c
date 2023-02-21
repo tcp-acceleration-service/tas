@@ -70,6 +70,7 @@ struct backlog_slot {
 
 struct tcp_opts {
   struct tcp_mss_opt *mss;
+  struct tcp_ws_opt *ws;
   struct tcp_timestamp_opt *ts;
 };
 
@@ -96,7 +97,7 @@ static void listener_accept(struct listener *l);
 
 static inline uint16_t port_alloc(void);
 static inline int send_control(const struct connection *conn, uint16_t flags,
-    int ts_opt, uint32_t ts_echo, uint16_t mss_opt);
+    int ts_opt, uint32_t ts_echo, uint16_t mss_opt, uint8_t ws_opt);
 static inline int send_reset(const struct pkt_tcp *p,
     const struct tcp_opts *opts);
 static inline int parse_options(const struct pkt_tcp *p, uint16_t len,
@@ -411,7 +412,7 @@ int tcp_close(struct connection *conn)
   conn->local_seq = tx_seq;
 
   if (!tx_c || !rx_c) {
-    send_control(conn, TCP_RST, 0, 0, 0);
+    send_control(conn, TCP_RST, 0, 0, 0, 0);
   }
 
   cc_conn_remove(conn);
@@ -464,7 +465,7 @@ void tcp_timeout(struct timeout *to, enum timeout_type type)
   conn_timeout_arm(c, TO_TCP_HANDSHAKE);
 
   /* re-send SYN packet */
-  send_control(c, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS);
+  send_control(c, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS, c->rx_window_scale);
 }
 
 static void conn_packet(struct connection *c, const struct pkt_tcp *p,
@@ -499,7 +500,7 @@ static void conn_packet(struct connection *c, const struct pkt_tcp *p,
     }
 
     send_control(c, TCP_SYN | TCP_ACK | ecn_flags, 1,
-        f_beui32(opts->ts->ts_val), TCP_MSS);
+        f_beui32(opts->ts->ts_val), TCP_MSS, c->rx_window_scale);
   } else if (c->status == CONN_OPEN &&
       (TCPH_FLAGS(&p->tcp) & TCP_SYN) == TCP_SYN)
   {
@@ -509,7 +510,7 @@ static void conn_packet(struct connection *c, const struct pkt_tcp *p,
   {
    /* silently ignore a FIN for an already closed connection: TODO figure out
     * why necessary*/
-    send_control(c, TCP_ACK, 1, 0, 0);
+    send_control(c, TCP_ACK, 1, 0, 0, 0);
   } else {
     fprintf(stderr, "tcp_packet: unexpected connection state %u\n", c->status);
   }
@@ -527,7 +528,7 @@ static int conn_arp_done(struct connection *conn)
   conn_timeout_arm(conn, TO_TCP_HANDSHAKE);
 
   /* send SYN */
-  send_control(conn, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS);
+  send_control(conn, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS, conn->rx_window_scale);
 
   CONN_DEBUG0(conn, "SYN SENT\n");
   return 0;
@@ -557,6 +558,11 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
   c->local_seq = f_beui32(p->tcp.ackno);
   c->syn_ts = f_beui32(opts->ts->ts_val);
 
+  if (opts->ws == NULL)
+    c->tx_window_scale = 0;
+  else
+    c->tx_window_scale = opts->ws->scale;
+
   /* enable ECN if SYN-ACK confirms */
   if (ecn_flags == TCP_ECE) {
     c->flags |= NICIF_CONN_ECN;
@@ -572,6 +578,7 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
         c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) tas_shm,
         c->rx_len, c->tx_buf - (uint8_t *) tas_shm, c->tx_len,
         c->remote_seq, c->local_seq, c->opaque, c->flags, c->cc_rate,
+        c->rx_window_scale, c->tx_window_scale,
         c->fn_core, c->flow_group, &c->flow_id)
       != 0)
   {
@@ -584,7 +591,7 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
   c->status = CONN_OPEN;
 
   /* send ACK */
-  send_control(c, TCP_ACK, 1, c->syn_ts, 0);
+  send_control(c, TCP_ACK, 1, c->syn_ts, 0, 0);
 
   CONN_DEBUG0(c, "conn_syn_sent_packet: ACK sent\n");
 
@@ -604,7 +611,7 @@ static int conn_reg_synack(struct connection *c)
   }
 
   /* send ACK */
-  send_control(c, TCP_SYN | TCP_ACK | ecn_flags, 1, c->syn_ts, TCP_MSS);
+  send_control(c, TCP_SYN | TCP_ACK | ecn_flags, 1, c->syn_ts, TCP_MSS, c->rx_window_scale);
 
   appif_accept_conn(c, 0);
 
@@ -658,6 +665,7 @@ static inline struct connection *conn_alloc(void)
   conn->rx_len = config.tcp_rxbuf_len;
   conn->tx_buf = (uint8_t *) tas_shm + off_tx;
   conn->tx_len = config.tcp_txbuf_len;
+  conn->rx_window_scale = config.tcp_window_scale;
   conn->to_armed = 0;
 
   return conn;
@@ -926,6 +934,10 @@ static void listener_accept(struct listener *l)
   c->remote_seq = f_beui32(p->tcp.seqno) + 1;
   c->local_seq = 1; /* TODO: generate random */
   c->syn_ts = f_beui32(opts.ts->ts_val);
+  if (opts.ws == NULL)
+    c->tx_window_scale = 0;
+  else
+    c->tx_window_scale = opts.ws->scale;
 
   /* check if ECN is offered */
   ecn_flags = TCPH_FLAGS(&p->tcp) & (TCP_ECE | TCP_CWR);
@@ -945,6 +957,7 @@ static void listener_accept(struct listener *l)
         c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) tas_shm,
         c->rx_len, c->tx_buf - (uint8_t *) tas_shm, c->tx_len,
         c->remote_seq, c->local_seq + 1, c->opaque, c->flags, c->cc_rate,
+        c->rx_window_scale, c->tx_window_scale,
         c->fn_core, c->flow_group, &c->flow_id)
       != 0)
   {
@@ -967,19 +980,22 @@ out:
 static inline int send_control_raw(uint64_t remote_mac, uint32_t remote_ip,
     uint16_t remote_port, uint16_t local_port, uint32_t local_seq,
     uint32_t remote_seq, uint16_t flags, int ts_opt, uint32_t ts_echo,
-    uint16_t mss_opt)
+    uint16_t mss_opt, uint8_t ws_opt)
 {
   uint32_t new_tail;
   struct pkt_tcp *p;
   struct tcp_mss_opt *opt_mss;
+  struct tcp_ws_opt *opt_ws;
   struct tcp_timestamp_opt *opt_ts;
   uint8_t optlen;
-  uint16_t len, off_ts, off_mss;
+  uint16_t len, off_ts, off_ws, off_mss;
 
   /* calculate header length depending on options */
   optlen = 0;
   off_mss = optlen;
   optlen += (mss_opt ? sizeof(*opt_mss) : 0);
+  off_ws = optlen;
+  optlen += (ws_opt ? sizeof(*opt_ws) : 0);
   off_ts = optlen;
   optlen += (ts_opt ? sizeof(*opt_ts) : 0);
   optlen = (optlen + 3) & ~3;
@@ -1026,6 +1042,14 @@ static inline int send_control_raw(uint64_t remote_mac, uint32_t remote_ip,
     opt_mss->mss = t_beui16(mss_opt);
   }
 
+  /* if requested: add ws option */
+  if (ws_opt) {
+    opt_ws = (struct tcp_ws_opt *) ((uint8_t *) (p + 1) + off_ws);
+    opt_ws->kind = TCP_OPT_WS;
+    opt_ws->length = sizeof(*opt_ws);
+    opt_ws->scale = ws_opt;
+  }
+
   /* if requested: add timestamp option */
   if (ts_opt) {
     opt_ts = (struct tcp_timestamp_opt *) ((uint8_t *) (p + 1) + off_ts);
@@ -1046,11 +1070,11 @@ static inline int send_control_raw(uint64_t remote_mac, uint32_t remote_ip,
 }
 
 static inline int send_control(const struct connection *conn, uint16_t flags,
-    int ts_opt, uint32_t ts_echo, uint16_t mss_opt)
+    int ts_opt, uint32_t ts_echo, uint16_t mss_opt, uint8_t ws_opt)
 {
   return send_control_raw(conn->remote_mac, conn->remote_ip, conn->remote_port,
       conn->local_port, conn->local_seq, conn->remote_seq, flags, ts_opt,
-      ts_echo, mss_opt);
+      ts_echo, mss_opt, ws_opt);
 }
 
 static inline int send_reset(const struct pkt_tcp *p,
@@ -1068,7 +1092,7 @@ static inline int send_reset(const struct pkt_tcp *p,
   memcpy(&remote_mac, &p->eth.src, ETH_ADDR_LEN);
   return send_control_raw(remote_mac, f_beui32(p->ip.src), f_beui16(p->tcp.src),
       f_beui16(p->tcp.dest), f_beui32(p->tcp.ackno), f_beui32(p->tcp.seqno) + 1,
-      TCP_RST | TCP_ACK, ts_opt, ts_val, 0);
+      TCP_RST | TCP_ACK, ts_opt, ts_val, 0, 0);
 }
 
 static inline int parse_options(const struct pkt_tcp *p, uint16_t len,
@@ -1110,6 +1134,14 @@ static inline int parse_options(const struct pkt_tcp *p, uint16_t len,
         }
 
         opts->mss = (struct tcp_mss_opt *) (opt + off);
+      } else if (opt_kind == TCP_OPT_WS) {
+        if (opt_len != sizeof(struct tcp_ws_opt)) {
+          fprintf(stderr, "parse_options: window scale option size wrong (expect %zu "
+                "got %u)\n", sizeof(struct tcp_ws_opt), opt_len);
+          return -1;
+        }
+
+        opts->ws = (struct tcp_ws_opt *) (opt + off);
       } else if (opt_kind == TCP_OPT_TIMESTAMP) {
         if (opt_len != sizeof(struct tcp_timestamp_opt)) {
           fprintf(stderr, "parse_options: opt_len=%u so=%zu\n", opt_len, sizeof(struct tcp_timestamp_opt));

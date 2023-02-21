@@ -63,6 +63,8 @@ struct configuration {
   uint32_t tcp_handshake_to;
   /** # of retries for dropped handshake packets */
   uint32_t tcp_handshake_retries;
+  /** Window scale configuration */
+  uint8_t tcp_window_scale;
   /** IP address for this host */
   uint32_t ip;
   /** IP prefix length for this host */
