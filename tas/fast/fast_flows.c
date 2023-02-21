@@ -1044,7 +1044,6 @@ static void flow_reset_retransmit(struct flextcp_pl_flowst *fs)
     fs->tx_next_pos = fs->tx_len - x;
   }
   fs->tx_avail += fs->tx_sent;
-  fs->rx_remote_avail += fs->tx_sent;
   fs->tx_sent = 0;
 
   /* cut rate by half if first drop in control interval */
