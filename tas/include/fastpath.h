@@ -83,6 +83,8 @@ struct polled_vm {
 struct vm_budget {
   uint16_t vmid;
   volatile int64_t cycles;
+  volatile uint64_t cycles_consumed_total;
+  volatile uint64_t cycles_consumed_round;
   volatile int64_t bandwidth;
 };
 

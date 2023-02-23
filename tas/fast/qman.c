@@ -421,6 +421,8 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
 
     e_cycs = util_rdtsc();
     __sync_fetch_and_sub(&budgets[idx].cycles, e_cycs - s_cycs);
+    __sync_fetch_and_add(&budgets[idx].cycles_consumed_total, e_cycs - s_cycs);
+    __sync_fetch_and_add(&budgets[idx].cycles_consumed_round, e_cycs - s_cycs);
   }
 
 
@@ -665,6 +667,7 @@ static inline unsigned flow_poll_nolimit(struct qman_thread *t, struct vm_queue 
 
   for (cnt = 0; cnt < num && fqman->nolimit_head_idx != IDXLIST_INVAL
       && vqueue->dc > 0;) {
+  // for (cnt = 0; cnt < num && fqman->nolimit_head_idx != IDXLIST_INVAL;) {
     idx = fqman->nolimit_head_idx;
     q = fqman->queues + idx;
 

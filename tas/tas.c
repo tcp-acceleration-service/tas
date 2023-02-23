@@ -253,6 +253,31 @@ int flexnic_scale_to(uint32_t cores)
   return 0;
 }
 
+uint64_t get_total_cycles_consumed(int vmid)
+{
+  int i;
+  uint64_t sum = 0;
+  for (i = 0; i < threads_launched; i++)
+  {
+    sum += ctxs[i]->budgets[vmid].cycles_consumed_total;
+  }
+
+  return sum;
+}
+
+uint64_t get_round_cycles_consumed(int vmid)
+{
+  int i;
+  uint64_t sum = 0;
+  for (i = 0; i < threads_launched; i++)
+  {
+    sum += ctxs[i]->budgets[vmid].cycles_consumed_round;
+    ctxs[i]->budgets[vmid].cycles_consumed_round = 0;
+  }
+
+  return sum;
+}
+
 void boost_budget(int vmid, int ctxid, int64_t incr)
 {
   int64_t old_budget, new_budget, max_budget;
@@ -260,13 +285,16 @@ void boost_budget(int vmid, int ctxid, int64_t incr)
   old_budget = ctxs[ctxid]->budgets[vmid].cycles;
   new_budget = old_budget + incr;
   max_budget = config.bu_max_budget;  
-  if (new_budget > max_budget)
-  {
-    incr = max_budget - old_budget;
-  }
+  new_budget = MIN(new_budget, max_budget);
+  // if (new_budget > max_budget)
+  // {
+  //   incr = max_budget - old_budget;
+  // }
   // printf("VMID=%d OLD_BUDGET=%ld NEW_BUDGET=%ld\n", vmid, old_budget, new_budget);
-  __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].cycles, incr);
+  // __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].cycles, incr);
+  ctxs[ctxid]->budgets[vmid].cycles = new_budget;
 }
+
 
 void flexnic_loadmon(uint32_t ts)
 {

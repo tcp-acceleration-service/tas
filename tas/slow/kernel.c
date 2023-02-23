@@ -42,6 +42,8 @@ void flexnic_loadmon(uint32_t cur_ts);
 static void init_vm_weights(double *vm_weights);
 void boost_budget(int vmid, int ctxid, int64_t incr);
 static void update_budget(int threads_launched);
+uint64_t get_total_cycles_consumed(int vmid);
+uint64_t get_round_cycles_consumed(int vmid);
     
 struct timeout_manager timeout_mgr;
 static int exited = 0;
@@ -156,6 +158,9 @@ int slowpath_main(int threads_launched)
       if (!config.quiet) {
         printf("stats: drops=%"PRIu64" k_rexmit=%"PRIu64" ecn=%"PRIu64" acks=%"PRIu64"\n",
             kstats.drops, kstats.kernel_rexmit, kstats.ecn_marked, kstats.acks);
+        printf("ts=%ld TVM0=%ld TVM1=%ld TVM2=%ld RVM0=%ld RVM1=%ld RVM2=%ld\n", util_rdtsc(), 
+            get_total_cycles_consumed(0), get_total_cycles_consumed(1), get_total_cycles_consumed(2),
+            get_round_cycles_consumed(0), get_round_cycles_consumed(1), get_round_cycles_consumed(2));
         fflush(stdout);
       }
       last_print = cur_ts;

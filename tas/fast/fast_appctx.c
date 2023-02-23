@@ -111,6 +111,8 @@ void fast_appctx_poll_pf_all(struct dataplane_context *ctx, uint8_t *out_of_budg
     }
     e_cycs = util_rdtsc();
     __sync_fetch_and_sub(&ctx->budgets[vmid].cycles, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_total, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_round, e_cycs - s_cycs);
   }
 }
 
@@ -260,10 +262,12 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
     {
       fast_appctx_poll_fetch_all_vm(ctx, vmid, &k, max, total, aqes);
     }
+    ctx->poll_next_vm = (ctx->poll_next_vm + 1) % (FLEXNIC_PL_VMST_NUM - 1);
 
     e_cycs = util_rdtsc();
     __sync_fetch_and_sub(&ctx->budgets[vmid].cycles, e_cycs - s_cycs);
-    ctx->poll_next_vm = (ctx->poll_next_vm + 1) % (FLEXNIC_PL_VMST_NUM - 1);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_total, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_round, e_cycs - s_cycs);
   }
 
   return k;
@@ -450,6 +454,8 @@ void fast_actx_rxq_probe_all(struct dataplane_context *ctx, uint8_t *out_of_budg
     }
     e_cycs = util_rdtsc();
     __sync_fetch_and_sub(&ctx->budgets[vmid].cycles, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_total, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_round, e_cycs - s_cycs);
   }
 }
 
