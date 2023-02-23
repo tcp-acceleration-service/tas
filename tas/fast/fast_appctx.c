@@ -32,10 +32,20 @@
 #include "internal.h"
 #include "fastemu.h"
 
-void fast_appctx_poll_pf_vm(struct dataplane_context *ctx, uint32_t vmid);
+void fast_appctx_poll_pf_active_vm(struct dataplane_context *ctx, uint32_t vmid);
+void fast_appctx_poll_pf_all_vm(struct dataplane_context *ctx, uint32_t vmid);
 static void fast_appctx_poll_pf(struct dataplane_context *ctx, uint32_t id, 
     uint16_t vm_id);
 
+
+void fast_appctx_poll_fetch_active_ctx(struct dataplane_context *ctx,
+  struct polled_context *act_ctx, uint16_t *k, uint16_t max,
+  unsigned *total, int *n_rem, struct polled_context *rem_ctxs[BATCH_SIZE],
+  void *aqes[BATCH_SIZE]);
+void fast_appctx_poll_fetch_active_vm(struct dataplane_context *ctx, 
+    struct polled_vm *act_vm, uint16_t *k, uint16_t max,
+    unsigned *total, int *n_rem, struct polled_context *rem_ctxs[BATCH_SIZE],
+    void *aqes[BATCH_SIZE]);
 int fast_appctx_poll_fetch_all_ctx(struct dataplane_context *ctx, 
     struct polled_vm *p_vm, struct polled_context *p_ctx, 
     uint32_t vmid, uint32_t ctxid, uint16_t *k, uint16_t max,
@@ -46,14 +56,29 @@ void fast_appctx_poll_fetch_all_vm(struct dataplane_context *ctx,
 static int fast_appctx_poll_fetch(struct dataplane_context *ctx, uint32_t actx_id,
     uint16_t vm_id, void **pqe);
 
+void fast_actx_rxq_probe_active_vm(struct dataplane_context *ctx, 
+    struct polled_vm *act_vm);
 void fast_actx_rxq_probe_all_vm(struct dataplane_context *ctx, uint32_t vmid);
 static int fast_actx_rxq_probe(struct dataplane_context *ctx, uint32_t id,
     uint16_t vm_id);
     
+
+void fast_appctx_poll_pf_active_vm(struct dataplane_context *ctx, uint32_t vmid)
+{
+  uint32_t cid;
+  struct polled_vm *act_vm;
+  act_vm = &ctx->polled_vms[vmid];
+
+  cid = act_vm->act_ctx_head;
+  do {
+    fast_appctx_poll_pf(ctx, cid, vmid);
+    cid = act_vm->ctxs[cid].next;
+  } while(cid != act_vm->act_ctx_head);
+}
+
 void fast_appctx_poll_pf_active(struct dataplane_context *ctx, uint8_t *out_of_budget)
 {
-  uint32_t cid, vmid;
-  struct polled_vm *act_vm;
+  uint32_t vmid;
   uint64_t s_cycs, e_cycs;
 
   vmid = ctx->act_head;
@@ -62,24 +87,21 @@ void fast_appctx_poll_pf_active(struct dataplane_context *ctx, uint8_t *out_of_b
 
     if (ctx->budgets[vmid].cycles > 0)
     {
-      act_vm = &ctx->polled_vms[vmid];
-      cid = act_vm->act_ctx_head;
-      do {
-        fast_appctx_poll_pf(ctx, cid, vmid);
-        cid = act_vm->ctxs[cid].next;
-      } while(cid != act_vm->act_ctx_head);
+      fast_appctx_poll_pf_active_vm(ctx, vmid);
     } else
     {
       out_of_budget[vmid] = 1;
     }
     e_cycs = util_rdtsc();
     __sync_fetch_and_sub(&ctx->budgets[vmid].cycles, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_total, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_round, e_cycs - s_cycs);
     
     vmid = ctx->polled_vms[vmid].next;
   } while (vmid != ctx->act_head);
 } 
 
-void fast_appctx_poll_pf_vm(struct dataplane_context *ctx, uint32_t vmid)
+void fast_appctx_poll_pf_all_vm(struct dataplane_context *ctx, uint32_t vmid)
 {
   int i;
   uint32_t cid;
@@ -104,7 +126,7 @@ void fast_appctx_poll_pf_all(struct dataplane_context *ctx, uint8_t *out_of_budg
 
     if (ctx->budgets[vmid].cycles > 0)
     {
-      fast_appctx_poll_pf_vm(ctx, vmid);
+      fast_appctx_poll_pf_all_vm(ctx, vmid);
     } else
     {
       out_of_budget[vmid] = 1;
@@ -123,16 +145,67 @@ static void fast_appctx_poll_pf(struct dataplane_context *ctx, uint32_t cid,
   rte_prefetch0(dma_pointer(actx->tx_base + actx->tx_head, 1, vmid));
 }
 
+void fast_appctx_poll_fetch_active_ctx(struct dataplane_context *ctx,
+  struct polled_context *act_ctx, uint16_t *k, uint16_t max,
+  unsigned *total, int *n_rem, struct polled_context *rem_ctxs[BATCH_SIZE],
+  void *aqes[BATCH_SIZE])
+{
+  int ret;
+  unsigned i_b;
+
+  for (i_b = 0; i_b < BATCH_SIZE && *k < max; i_b++) 
+  {
+    ret = fast_appctx_poll_fetch(ctx, act_ctx->id, act_ctx->vmid, &aqes[*k]);
+    if (ret == 0)
+    {
+      *k = *k + 1;
+      act_ctx->null_rounds = 0;
+    } else
+    {
+      act_ctx->null_rounds = act_ctx->null_rounds == MAX_NULL_ROUNDS ? 
+          MAX_NULL_ROUNDS : act_ctx->null_rounds + 1;
+
+      if (act_ctx->null_rounds >= MAX_NULL_ROUNDS)
+      {
+        rem_ctxs[*n_rem] = act_ctx;
+        *n_rem = *n_rem + 1;
+      }
+
+      break;
+    }
+    *total = *total + 1;
+  }
+}
+
+void fast_appctx_poll_fetch_active_vm(struct dataplane_context *ctx, 
+    struct polled_vm *act_vm, uint16_t *k, uint16_t max,
+    unsigned *total, int *n_rem, struct polled_context *rem_ctxs[BATCH_SIZE],
+    void *aqes[BATCH_SIZE])
+{
+  uint32_t cid;
+  struct polled_context *act_ctx;
+
+  cid = act_vm->act_ctx_head;
+  do  {
+    act_ctx = &act_vm->ctxs[cid];
+    
+    fast_appctx_poll_fetch_active_ctx(ctx, act_ctx, k, max, 
+        total, n_rem, rem_ctxs, aqes);
+        
+    cid = act_ctx->next;
+  } while(cid != act_vm->act_ctx_head && *k < max);
+
+  act_vm->act_ctx_head = act_vm->ctxs[act_vm->act_ctx_head].next;
+  act_vm->act_ctx_tail = act_vm->ctxs[act_vm->act_ctx_tail].next;
+}
+
 int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
     unsigned *total, int *n_rem, struct polled_context *rem_ctxs[BATCH_SIZE], 
     void *aqes[BATCH_SIZE], uint8_t *out_of_budget)
 {
-  int ret;
-  unsigned i_b;
   uint16_t k = 0;
-  uint32_t vmid, cid;
+  uint32_t vmid;
   struct polled_vm *act_vm;
-  struct polled_context *act_ctx;
   uint64_t s_cycs, e_cycs;
   
   vmid = ctx->act_head;
@@ -142,37 +215,13 @@ int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
 
     if (!out_of_budget[vmid])
     {
-        cid = act_vm->act_ctx_head;
-        do  {
-          act_ctx = &act_vm->ctxs[cid];
-          for (i_b = 0; i_b < BATCH_SIZE && k < max; i_b++) 
-          {
-            ret = fast_appctx_poll_fetch(ctx, cid, vmid, &aqes[k]);
-            if (ret == 0)
-            {
-              k++;
-              act_ctx->null_rounds = 0;
-            } else
-            {
-              act_ctx->null_rounds = act_ctx->null_rounds == MAX_NULL_ROUNDS ? 
-                  MAX_NULL_ROUNDS : act_ctx->null_rounds + 1;
-              if (act_ctx->null_rounds >= MAX_NULL_ROUNDS)
-              {
-                rem_ctxs[*n_rem] = act_ctx;
-                *n_rem = *n_rem + 1;
-              }
-              break;
-            }
-            *total = *total + 1;
-          }
-          cid = act_ctx->next;
-        } while(cid != act_vm->act_ctx_head && k < max);
-
-        act_vm->act_ctx_head = act_vm->ctxs[act_vm->act_ctx_head].next;
-        act_vm->act_ctx_tail = act_vm->ctxs[act_vm->act_ctx_tail].next;
+      fast_appctx_poll_fetch_active_vm(ctx, act_vm, &k, max, total, 
+          n_rem, rem_ctxs, aqes);
     }
     e_cycs = util_rdtsc();
     __sync_fetch_and_sub(&ctx->budgets[vmid].cycles, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_total, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_round, e_cycs - s_cycs);
 
     vmid = ctx->polled_vms[vmid].next; 
   } while (vmid != ctx->act_head && k < max);
@@ -404,9 +453,22 @@ static int fast_actx_rxq_probe(struct dataplane_context *ctx, uint32_t cid,
   return 0;
 }
 
-void fast_actx_rxq_probe_active(struct dataplane_context *ctx, uint8_t *out_of_budget)
+void fast_actx_rxq_probe_active_vm(struct dataplane_context *ctx, 
+    struct polled_vm *act_vm)
 {
   uint32_t cid, vmid;
+
+  cid = act_vm->act_ctx_head;
+  vmid = act_vm->id;
+  do {
+    fast_actx_rxq_probe(ctx, cid, vmid);
+    cid = act_vm->ctxs[cid].next;
+  } while(cid != act_vm->act_ctx_head); 
+}
+
+void fast_actx_rxq_probe_active(struct dataplane_context *ctx, uint8_t *out_of_budget)
+{
+  uint32_t vmid;
   struct polled_vm *act_vm;
   uint64_t s_cycs, e_cycs;
 
@@ -417,15 +479,13 @@ void fast_actx_rxq_probe_active(struct dataplane_context *ctx, uint8_t *out_of_b
    
     if (!out_of_budget[vmid])
     {
-      cid = act_vm->act_ctx_head;
-      do {
-      fast_actx_rxq_probe(ctx, cid, vmid);
-      cid = act_vm->ctxs[cid].next;
-      } while(cid != act_vm->act_ctx_head); 
+      fast_actx_rxq_probe_active_vm(ctx, act_vm);
     }
 
     e_cycs = util_rdtsc();
     __sync_fetch_and_sub(&ctx->budgets[vmid].cycles, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_total, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_round, e_cycs - s_cycs);
     vmid = ctx->polled_vms[vmid].next;
   } while (vmid != ctx->act_head);
 }
