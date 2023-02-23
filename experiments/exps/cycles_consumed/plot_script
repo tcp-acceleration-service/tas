@@ -1,6 +1,6 @@
 #!/usr/bin/gnuplot -persist
 set terminal pdf
-set output "plot.pdf"
+set output "test_activeon.pdf"
 set colorsequence podo
 set key autotitle columnhead
 unset xtics
@@ -23,7 +23,8 @@ ygraphsize = (1 - mbottom - (1 - mtop) - yspacing) / 2
 
 set multiplot layout 2,2 \
               margins mleft,mright,mbottom,mtop \
-              spacing xspacing,yspacing  
+              spacing xspacing,yspacing \
+              title "vm0: 512 conns 3 cores vm1: 4096 conns 3 cores" font "Computer Modern Roman,10"
 
 set title offset 0,-0.6
 
@@ -77,7 +78,7 @@ unset arrow
 
 
 # Plot throughput per second
-set yrange [0:]
+set yrange [0:2200]
 set xrange [TASTS_min: TASTS_max]
 set key right bottom
 set label 5 "Time" at screen mright - (xgraphsize / 2), mbottom / 2 center \

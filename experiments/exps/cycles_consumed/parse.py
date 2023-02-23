@@ -16,7 +16,7 @@ def parse_client(fname):
   for line in lines:
     ts = putils.get_ts(line)
     num_msgs = putils.get_n_messages(line)
-    tp = putils.get_tp(line)
+    tp = putils.get_tp(line).replace(",", "")
 
     client_data["timestamps"].append(ts)
     client_data["nmsgs"].append(num_msgs)
@@ -81,8 +81,8 @@ def save_client_dat(parsed_client, cid):
     ))
 
 def main():
-  parsed_c0 = parse_client("./out/cycles-consumed_bare-vtas_client0_node0_nconns256_ncores1_msize64")
-  parsed_c1 = parse_client("./out/cycles-consumed_bare-vtas_client1_node0_nconns512_ncores1_msize64")
+  parsed_c0 = parse_client("./out/cycles-consumed_bare-vtas_client0_node0_nconns512_ncores3_msize64")
+  parsed_c1 = parse_client("./out/cycles-consumed_bare-vtas_client1_node0_nconns4096_ncores3_msize64")
   parsed_tas = parse_tas("./out/tas_c")
   
   save_cycles_dat(parsed_tas)
