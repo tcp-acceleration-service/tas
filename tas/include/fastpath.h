@@ -38,8 +38,8 @@
 #define TXBUF_SIZE (2 * BATCH_SIZE)
 
 #define FLAG_ACTIVE 1
-#define MAX_POLL_ROUNDS 100
-#define MAX_NULL_ROUNDS 50
+#define MAX_POLL_ROUNDS 15
+#define MAX_NULL_ROUNDS 2000
 
 struct network_thread {
   struct rte_mempool *pool;
@@ -82,8 +82,10 @@ struct polled_vm {
 
 struct vm_budget {
   uint16_t vmid;
-  volatile uint64_t cycles;
-  volatile uint64_t bandwidth;
+  volatile int64_t cycles;
+  volatile uint64_t cycles_consumed_total;
+  volatile uint64_t cycles_consumed_round;
+  volatile int64_t bandwidth;
 };
 
 struct dataplane_context {

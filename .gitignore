@@ -6,6 +6,7 @@
 *.json
 *.img
 *.qcow2
+*.pdf
 __pycache__/
 tas/tas
 proxy/host/host

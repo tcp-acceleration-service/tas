@@ -30,6 +30,7 @@ if [[ "$stack" == 'virt-tas' ]]; then
     -cpu host \
     -smp 12 \
     -m 12G \
+    -snapshot \
     -device virtio-net-pci,netdev=net0 \
     -netdev user,id=net0,hostfwd=tcp::222${vm_id}-:22 \
     -chardev socket,path="/run/tasproxy",id="tas" \
@@ -44,6 +45,7 @@ elif [[ "$stack" == 'virt-linux' ]]; then
       -cpu host \
       -smp 12 \
       -m 12G \
+      -snapshot \
       -netdev user,id=net0 \
       -device virtio-net-pci,netdev=net0 \
       -netdev tap,ifname=$tap,script=no,downscript=no,vhost=on,id=net1 \
@@ -58,6 +60,7 @@ elif [[ "$stack" == 'tap-tas' ]]; then
     -cpu host \
     -smp 12 \
     -m 12G \
+    -snapshot \
     -netdev user,id=net0 \
     -device virtio-net-pci,netdev=net0 \
     -netdev tap,ifname=$tap,script=no,downscript=no,vhost=on,id=net1 \

@@ -22,7 +22,7 @@ def get_scp_command(machine_config, vm_config, src_path, save_path):
 def compile_and_run(pane, comp_dir, comp_cmd, 
         exec_file, args, out,
         bg=False, gdb=False, 
-        break_file=None, line_break=None):
+        break_file=None, line_break=None, save_log=False):
 
     pane.send_keys('cd ' + comp_dir)
     pane.send_keys('git pull')
@@ -33,8 +33,10 @@ def compile_and_run(pane, comp_dir, comp_cmd,
         cmd = 'sudo gdb --args ' + exec_file + ' ' + args
     else:
         cmd = 'sudo ' + exec_file + ' ' + args
-        # cmd += ' | tee ' + out
 
+    if save_log:
+        cmd += ' | tee ' + out 
+        
     if bg : 
         cmd += ' &  '
 

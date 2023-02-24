@@ -158,8 +158,9 @@ int dataplane_context_init(struct dataplane_context *ctx)
   {
     /* Initialize budget for each VM */
     ctx->budgets[i].vmid = i;
-    ctx->budgets[i].cycles = (config.bu_max_budget / FLEXNIC_PL_VMST_NUM) /
-        config.fp_cores_max;
+    ctx->budgets[i].cycles = (config.bu_max_budget / FLEXNIC_PL_VMST_NUM);
+    ctx->budgets[i].cycles_consumed_total = 0;
+    ctx->budgets[i].cycles_consumed_round = 0;
     ctx->budgets[i].bandwidth = 0;
     
     /* Initialized polled apps and polled vms*/
@@ -341,7 +342,7 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
   struct flextcp_pl_flowst *fs;
   uint8_t freebuf[BATCH_SIZE] = {0};
   void *fss[BATCH_SIZE];
-  uint64_t s_cyc, e_cyc;
+  uint64_t s_cycs, e_cycs;
   struct tcp_opts tcpopts[BATCH_SIZE];
   struct network_buf_handle *bhs[BATCH_SIZE];
 
@@ -385,12 +386,14 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
     /* run fast-path for flows with flow state */
     if (fss[i] != NULL)
     {
-      s_cyc = util_rdtsc();
+      s_cycs = util_rdtsc();
       ret = fast_flows_packet(ctx, bhs[i], fss[i], &tcpopts[i], ts);
-      e_cyc = util_rdtsc();
+      e_cycs = util_rdtsc();
       /* at this point we know fss[i] is a flow state struct */
       fs = fss[i];
-      __sync_fetch_and_sub(&ctx->budgets[fs->vm_id].cycles, e_cyc - s_cyc);
+      __sync_fetch_and_sub(&ctx->budgets[fs->vm_id].cycles, e_cycs - s_cycs);
+      __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed_total, e_cycs - s_cycs);
+      __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed_round, e_cycs - s_cycs);
     }
     else
     {
@@ -431,7 +434,6 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
   {
     total = poll_active_queues(ctx, ts);
   }
-  if (0 == 1){poll_active_queues(ctx, ts);}
   ctx->poll_rounds = (ctx->poll_rounds + 1) % MAX_POLL_ROUNDS;
   return total;
 }
@@ -578,6 +580,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   uint16_t q_bytes[BATCH_SIZE];
   struct network_buf_handle **handles;
   uint16_t off = 0, max;
+  uint64_t s_cycs, e_cycs;
   int ret, i, use;
 
   max = BATCH_SIZE;
@@ -621,10 +624,15 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
 
   for (i = 0; i < ret; i++)
   {
+    s_cycs = util_rdtsc();
     use = fast_flows_qman(ctx, vq_ids[i], fq_ids[i], handles[off], ts);
 
     if (use == 0)
       off++;
+    e_cycs = util_rdtsc();
+    __sync_fetch_and_sub(&ctx->budgets[vq_ids[i]].cycles, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_consumed_total, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_consumed_round, e_cycs - s_cycs);
   }
 
   /* apply buffer reservations */

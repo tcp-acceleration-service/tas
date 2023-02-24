@@ -1,5 +1,6 @@
 import utils
 import time
+import os
 
 class TAS:
     
@@ -20,7 +21,8 @@ class TAS:
                 comp_cmd=self.tas_config.comp_cmd,
                 exec_file=self.tas_config.exec_file,
                 out=self.tas_config.out,
-                args=tas_args)
+                args=tas_args,
+                save_log=True)
 
     def run_virt(self):
         ssh_com = utils.get_ssh_command(self.machine_config, self.vm_config)
@@ -34,5 +36,16 @@ class TAS:
                 comp_cmd=self.tas_config.comp_cmd,
                 exec_file=self.tas_config.exec_file,
                 out=self.tas_config.out,
-                args=tas_args)
+                args=tas_args,
+                save_log=True)
 
+    def save_log_bare(self, exp_path):
+        split_path = exp_path.split("/")
+        n = len(split_path)
+        
+        out_dir = os.getcwd() + "/" + "/".join(split_path[:n - 1]) + "/out"
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+
+        dest = out_dir + "/" + self.tas_config.out_file
+        os.rename(self.tas_config.out, dest)

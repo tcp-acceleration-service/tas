@@ -32,9 +32,13 @@ class Client:
         self.pane.send_keys("cd " + self.client_config.tas_dir)
         time.sleep(3)
 
-        cmd = 'sudo '
-        stack = self.client_config.stack
-        if stack == 'bare-tas' or stack == 'tap-tas' or stack == 'virt-tas':
+        cmd = ''
+        stack = self.machine_config.stack
+        
+        if stack == 'virt-tas' or stack == 'bare-tas':
+            cmd = 'sudo '
+
+        if stack == 'bare-tas' or stack == 'tap-tas' or stack == 'virt-tas' or stack == 'bare-vtas':
             cmd += 'LD_PRELOAD=' + self.client_config.lib_so + ' '
        
         cmd += self.client_config.exec_file + ' ' + \

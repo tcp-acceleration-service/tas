@@ -28,7 +28,7 @@ class Config:
                 machine_config=self.s_machine_config,
                 project_dir=self.defaults.default_vtas_dir_bare,
                 ip=self.s_machine_config.ip,
-                n_cores=16)
+                n_cores=10)
         self.s_tas_configs.append(tas_config)
 
         for i in range(self.snum):
@@ -58,7 +58,7 @@ class Config:
                 machine_config=self.c_machine_config,
                 project_dir=self.defaults.default_vtas_dir_bare,
                 ip=self.c_machine_config.ip,
-                n_cores=16)
+                n_cores=10)
         self.c_tas_configs.append(tas_config)
 
         for i in range(self.cnum):

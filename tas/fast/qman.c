@@ -93,7 +93,7 @@ struct vm_queue {
   /** Flags: FLAG_INNOLIMITL */
   uint16_t flags;
   /* Deficit counter */
-  uint16_t dc;
+  uint32_t dc;
   /* Bytes sent in this round for this VM. Reset every round. */
   uint16_t bytes;
   /* Assigned rate in cpu cycles per second */
@@ -380,37 +380,49 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
   for (cnt = 0; cnt < num && vqman->head_idx != IDXLIST_INVAL;)
   {
     s_cycs = util_rdtsc();
+
     idx = vqman->head_idx;
     struct vm_queue *vq = &vqman->queues[idx];
-    struct flow_qman *fqman = vq->fqman;
-
     vqman->head_idx = vq->next_idx;
+    vq->flags &= ~FLAG_INNOLIMITL;
+
     if (vq->next_idx == IDXLIST_INVAL)
     {
       vqman->tail_idx = IDXLIST_INVAL;
     }
 
-    vq->flags &= ~FLAG_INNOLIMITL;
-
-    x = flow_qman_poll(t, vq, fqman, num - cnt, q_ids + cnt, q_bytes + cnt);
-
-    cnt += x;
-
-    // Update vm_id list
-    for (i = cnt - x; i < cnt; i++)
+    if (budgets[idx].cycles > 0)
     {
-      vm_ids[i] = idx;
+      struct flow_qman *fqman = vq->fqman;
+      x = flow_qman_poll(t, vq, fqman, num - cnt, q_ids + cnt, q_bytes + cnt);
+
+      cnt += x;
+
+      // Update vm_id list
+      for (i = cnt - x; i < cnt; i++)
+      {
+        vm_ids[i] = idx;
+      }
+
+      if (vq->avail > 0)
+      {
+        vm_queue_fire(vqman, vq, idx, q_bytes, cnt - x, cnt);
+      }
+
+      vq->dc += QUANTA;
+
+    } else
+    {
+      if (vq->avail > 0)
+      {
+        vm_queue_activate(vqman, vq, idx);
+      }
     }
 
-    if (vq->avail > 0)
-    {
-      vm_queue_fire(vqman, vq, idx, q_bytes, cnt - x, cnt);
-    }
-
-    vq->dc += QUANTA;  
     e_cycs = util_rdtsc();
-
     __sync_fetch_and_sub(&budgets[idx].cycles, e_cycs - s_cycs);
+    __sync_fetch_and_add(&budgets[idx].cycles_consumed_total, e_cycs - s_cycs);
+    __sync_fetch_and_add(&budgets[idx].cycles_consumed_round, e_cycs - s_cycs);
   }
 
 
@@ -477,6 +489,7 @@ static inline void vm_set_impl(struct vm_qman *vqman, uint32_t v_idx,
 
   if (new_avail && vq->avail > 0 && ((vq->flags & (FLAG_INNOLIMITL)) == 0)) 
   {
+    vq->dc = QUANTA;
     vm_queue_activate(vqman, vq, v_idx);
   }
 
@@ -500,7 +513,6 @@ static inline void vm_queue_activate(struct vm_qman *vqman,
   q_tail = &vqman->queues[vqman->tail_idx];
   q_tail->next_idx = idx;
   vqman->tail_idx = idx;
-  vqman->queues[idx].dc = QUANTA;
 }
 
 static inline uint32_t sum_bytes(uint16_t *q_bytes, unsigned start, unsigned end)
@@ -655,6 +667,7 @@ static inline unsigned flow_poll_nolimit(struct qman_thread *t, struct vm_queue 
 
   for (cnt = 0; cnt < num && fqman->nolimit_head_idx != IDXLIST_INVAL
       && vqueue->dc > 0;) {
+  // for (cnt = 0; cnt < num && fqman->nolimit_head_idx != IDXLIST_INVAL;) {
     idx = fqman->nolimit_head_idx;
     q = fqman->queues + idx;
 
