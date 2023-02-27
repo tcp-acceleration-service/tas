@@ -34,8 +34,8 @@ struct guest_proxy *guest_init_proxy()
   pxy->flextcp_epfd = -1;
   pxy->flextcp_uxfd = -1;
   
-  pxy->vfds = NULL;
-  pxy->vepfd = -1;
+  pxy->fpfds = NULL;
+  pxy->epfd = -1;
   pxy->ctxreq_id_next = 0;
   
   pxy->kernel_notifyfd = -1;

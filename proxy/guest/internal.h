@@ -24,32 +24,40 @@ struct proxy_application {
 struct guest_proxy {
     /* Epoll fd for all guest to host comm */
     int chan_epfd;
+    
     /* Fd for vfio interrupt requests */
     int irq_fd;
     /* VFIO fds */
     int dev;
     int group;
     int cont;
+    
     /* Shared memory region between guest and TAS */
     void *shm;
     size_t shm_size;
     size_t shm_off;
+    
     /* Inter-vm signal memory used for interrupts */
     void *sgm;
     size_t sgm_size;
     size_t sgm_off;
+    
     /* Channel used for vm communication */
     struct channel *chan;
+    
     /* Flextcp */
     int flextcp_nfd;
     int flextcp_epfd;
     int flextcp_uxfd;
-    /* List of virtual file descriptors and epoll */
-    int *vfds;
-    int vepfd;
+    
+    /* List of eventfds for fastpath and epoll */
+    int *fpfds;
+    int epfd;
     int ctxreq_id_next;
+    
     /* Notify fd for kernel slowpath */
     int kernel_notifyfd;
+    
     /* Applications */
     uint16_t next_app_id;
     struct proxy_application *apps;
