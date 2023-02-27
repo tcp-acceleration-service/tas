@@ -26,7 +26,7 @@ static int vflextcp_uxsocket_receive(struct guest_proxy *pxy,
     struct proxy_application* app, int *actx_id);
 static int vflextcp_uxsocket_handle_msg(struct guest_proxy *pxy,
     struct proxy_application *app);
-static int vflextcp_virtfd_poll(struct guest_proxy *pxy);
+static int vflextcp_core_evfds_poll(struct guest_proxy *pxy);
 
 static int vflextcp_send_kernel_notifyfd(int cfd, int cores_num,
     int kernel_notifyfd);
@@ -113,7 +113,7 @@ int vflextcp_poll(struct guest_proxy *pxy)
     return -1;
   }
 
-  if (vflextcp_virtfd_poll(pxy) != 0) 
+  if (vflextcp_core_evfds_poll(pxy) != 0) 
   {
     fprintf(stderr, "flextcp_poll: vflextcp_virtfd_poll failed.\n");
     return -1;
@@ -164,7 +164,7 @@ error_close:
   return -1;
 }
 
-int vflextcp_fpfds_init(struct guest_proxy *pxy) {
+int vflextcp_core_evfds_init(struct guest_proxy *pxy) {
   int i;
   struct epoll_event ev;
   struct flexnic_info *finfo = pxy->flexnic_info;
@@ -173,15 +173,15 @@ int vflextcp_fpfds_init(struct guest_proxy *pxy) {
   if ((pxy->epfd = epoll_create1(0)) < 0)
   {
     fprintf(stderr,
-            "vflextcp_virtfd_init: failed to create fd for vepfd.\n");
+            "vflextcp_core_evfds_init: failed to create fd for vepfd.\n");
     return -1;
   }
 
   /* allocate memory for virtfds */
-  pxy->fpfds = malloc(sizeof(int) * finfo->cores_num);
-  if (pxy->fpfds == NULL) 
+  pxy->core_evfds = malloc(sizeof(int) * finfo->cores_num);
+  if (pxy->core_evfds == NULL) 
   {
-    fprintf(stderr, "vflextcp_virtfd_init: failed to allocate memory"
+    fprintf(stderr, "vflextcp_core_evfds_init: failed to allocate memory"
         " for virtual file descriptors.\n");
     goto error_close_vepfd;
   }
@@ -189,17 +189,17 @@ int vflextcp_fpfds_init(struct guest_proxy *pxy) {
   /* initialize fast path evfds and add them to epoll */
   for (i = 0; i < finfo->cores_num; i++) 
   {
-    if ((pxy->fpfds[i] = eventfd(0, EFD_NONBLOCK)) == -1) 
+    if ((pxy->core_evfds[i] = eventfd(0, EFD_NONBLOCK)) == -1) 
     {
-      fprintf(stderr, "vflextcp_virtfd_init: eventfd failed.\n");
+      fprintf(stderr, "vflextcp_core_evfds_init: eventfd failed.\n");
       goto error_free;
     }
 
     ev.events = EPOLLIN;
-    ev.data.fd = pxy->fpfds[i];
-    if (epoll_ctl(pxy->epfd, EPOLL_CTL_ADD, pxy->fpfds[i], &ev) != 0) 
+    ev.data.fd = pxy->core_evfds[i];
+    if (epoll_ctl(pxy->epfd, EPOLL_CTL_ADD, pxy->core_evfds[i], &ev) != 0) 
     {
-      perror("vflextcp_uxsocket_init: epoll_ctl listen failed.");
+      perror("vflextcp_core_evfds_init: epoll_ctl listen failed.");
       goto error_close;
     }
   }
@@ -207,7 +207,7 @@ int vflextcp_fpfds_init(struct guest_proxy *pxy) {
   return 0;
 
 error_free:
-  free(pxy->fpfds);
+  free(pxy->core_evfds);
 error_close_vepfd:
   close(pxy->epfd);
 error_close:
@@ -294,7 +294,7 @@ int vflextcp_handle_newapp_res(struct guest_proxy *pxy,
     return -1;
   }
 
-  if (vflextcp_send_core_fds(cfd, pxy->fpfds, n_cores) != 0) 
+  if (vflextcp_send_core_fds(cfd, pxy->core_evfds, n_cores) != 0) 
   {
     fprintf(stderr, "vflextcp_uxsocket_accept: failed to send core fds.\n");
     return -1;
@@ -398,7 +398,6 @@ static int vflextcp_uxsocket_receive(struct guest_proxy *pxy,
   ctx_req->actx_evfd = ctx_evfd;
   ctx_req->ctxreq_id = pxy->ctxreq_id_next++;
   ctx_req->app_id = app->id;
-  // TODO: MAKE CTX REQ DEAL PROPERLY WITH MULTIPLE APPS
   pxy->context_reqs[ctx_req->ctxreq_id] = ctx_req;
 
   *actx_id = ctx_req->ctxreq_id;
@@ -441,14 +440,14 @@ static int vflextcp_uxsocket_handle_msg(struct guest_proxy *pxy,
   return 0;
 }
 
-static int vflextcp_virtfd_poll(struct guest_proxy *pxy) {
+static int vflextcp_core_evfds_poll(struct guest_proxy *pxy) {
   int n, i;
   struct epoll_event evs[32];
 
   n = epoll_wait(pxy->epfd, evs, 32, 0);
   if (n < 0) 
   {
-    perror("vflextcp_virtfd_poll: epoll_wait");
+    perror("vflextcp_core_evfds_poll: epoll_wait");
     return -1;
   }
 
@@ -457,7 +456,7 @@ static int vflextcp_virtfd_poll(struct guest_proxy *pxy) {
     if (evs[i].events & EPOLLIN)
     {
       ivshmem_drain_evfd(evs[i].data.fd);
-      fprintf(stderr, "vflextcp_virtfd_poll: "
+      fprintf(stderr, "vflextcp_core_evfds_poll: "
           "does not expect notify on core fds.\n");
     }
   }
@@ -507,7 +506,7 @@ int vflextcp_send_kernel_notifyfd(int cfd, int cores_num, int kernel_notifyfd)
   return 0;
 }
 
-static int vflextcp_send_core_fds(int cfd, int *core_evfds, int cores_num) 
+static int  vflextcp_send_core_fds(int cfd, int *core_evfds, int cores_num) 
 {
   uint8_t b = 0;
   int *pfd;

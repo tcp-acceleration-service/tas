@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <sys/eventfd.h>
 
 #include "internal.h"
 #include "flextcp.h"
@@ -34,7 +35,7 @@ struct guest_proxy *guest_init_proxy()
   pxy->flextcp_epfd = -1;
   pxy->flextcp_uxfd = -1;
   
-  pxy->fpfds = NULL;
+  pxy->core_evfds = NULL;
   pxy->epfd = -1;
   pxy->ctxreq_id_next = 0;
   
@@ -52,7 +53,7 @@ int main(int argc, char *argv[])
   unsigned int n;
   struct guest_proxy *pxy = guest_init_proxy();
 
-  if ((pxy->kernel_notifyfd = epoll_create1(0)) < 0)
+  if ((pxy->kernel_notifyfd = eventfd(0, EFD_NONBLOCK)) < 0)
   {
     fprintf(stderr, "main: failed to create kernel_notifyfd.\n");
   }

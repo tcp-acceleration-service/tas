@@ -170,7 +170,7 @@ static int channel_handle_tasinfo_res(struct guest_proxy *pxy, struct tasinfo_re
     return -1; 
   }
 
-  if (vflextcp_fpfds_init(pxy) != 0) 
+  if (vflextcp_core_evfds_init(pxy) != 0) 
   {
     fprintf(stderr, "ivshmem_handle_tasinfo_res: "
             "vflextcp_virtfd_init failed.\n");

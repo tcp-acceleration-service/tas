@@ -50,8 +50,8 @@ struct guest_proxy {
     int flextcp_epfd;
     int flextcp_uxfd;
     
-    /* List of eventfds for fastpath and epoll */
-    int *fpfds;
+    /* List of eventfds for fastpath cores and epoll */
+    int *core_evfds;
     int epfd;
     int ctxreq_id_next;
     
