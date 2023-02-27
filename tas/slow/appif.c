@@ -85,8 +85,6 @@ static int *app_uxfds = NULL;
 static int epfd = -1;
 /** eventfd for notifying UX thread about completion on poll_to_ux */
 static int notifyfd = -1;
-/** eventfd for different cores */
-static int *core_evfds = NULL;
 /** Completions of asynchronous NIC operations for UX socket thread */
 static struct nbqueue poll_to_ux;
 /** Queue to pass structs for new applications from UX to poll thread */
@@ -117,17 +115,6 @@ int appif_init(void)
 
   if (uxsocket_init()) {
     return -1;
-  }
-
-  if ((core_evfds = malloc(sizeof(int) * tas_info->cores_num)) == NULL) 
-  {
-    fprintf(stderr, "appif_init: failed to allocate memory for core evfds.\n");
-    return -1;
-  }
-
-  for (i = 0; i < tas_info->cores_num; i++) 
-  {
-    core_evfds[i] = ctxs[i]->evfd;
   }
 
   /* create freelist of doorbells (0 is used by kernel) */
@@ -440,7 +427,7 @@ static void uxsocket_accept_vm()
   }
 
   if (appif_connect_accept(cfd, tas_info->cores_num,
-      kernel_notifyfd, core_evfds, vm_shm_fd[vmid]) != 0) {
+      kernel_notifyfd, vm_shm_fd[vmid]) != 0) {
     fprintf(stderr, "uxsocket_accept_vm: appif_connect_accept failed.\n");
     return;
   }
@@ -498,7 +485,7 @@ static void uxsocket_accept_app(int vm_id)
      this redundant step so that we don't break compatibility 
      with regular applications */
   if (appif_connect_accept(cfd, tas_info->cores_num,
-      kernel_notifyfd, core_evfds, vm_shm_fd[vm_id]) != 0) {
+      kernel_notifyfd, vm_shm_fd[vm_id]) != 0) {
     fprintf(stderr, "uxsocket_accept_vm: appif_connect_accept failed.\n");
     return;
   }
@@ -576,7 +563,6 @@ static void uxsocket_error(struct application *app)
   struct app_context *ctx, *prev_ctx;
   epoll_ctl(epfd, EPOLL_CTL_DEL, app->fd, NULL);
   close(app->fd);
-  // nbqueue_remove(&ux_to_poll, &app->nqe);
   free(app->resp);
   app->closed = true;
 
@@ -587,10 +573,6 @@ static void uxsocket_error(struct application *app)
     ctx = ctx->next;
     free(prev_ctx);
   }
-
-  // free(app);
-
-  // TODO: Figure out why I can't free app memory of the nqe for the app.
 }
 
 static void uxsocket_receive(struct application *app)

@@ -6,13 +6,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <fastpath.h>
+
 static int uxsocket_send_kernel_notifyfd(int cfd, int cores_num,
     int kernel_notifyfd);
-static int uxsocket_send_core_fds(int cfd, int *core_evfds, int cores_num);
+static int uxsocket_send_core_fds(int cfd, int cores_num);
 static int uxsocket_send_shm_fd(int cfd, int shmfd);
 
-int appif_connect_accept(int cfd, int cores_num, int kernel_notifyfd,
-    int *core_evfds, int shm_fd) 
+int appif_connect_accept(int cfd, int cores_num, 
+    int kernel_notifyfd, int shm_fd) 
 {
 
   if (uxsocket_send_kernel_notifyfd(cfd, cores_num, kernel_notifyfd) != 0) 
@@ -27,7 +29,7 @@ int appif_connect_accept(int cfd, int cores_num, int kernel_notifyfd,
     return -1;
   }
 
-  if (uxsocket_send_core_fds(cfd, core_evfds, cores_num) != 0) 
+  if (uxsocket_send_core_fds(cfd, cores_num) != 0) 
   {
     fprintf(stderr, "appif_connect_accept: failed to send core fds.\n");
     return -1;
@@ -85,7 +87,7 @@ int uxsocket_send_kernel_notifyfd(int cfd, int cores_num, int kernel_notifyfd)
   return 0;
 }
 
-static int uxsocket_send_core_fds(int cfd, int *core_evfds, int cores_num) 
+static int uxsocket_send_core_fds(int cfd, int cores_num) 
 {
   uint8_t b = 0;
   int *pfd;
@@ -122,7 +124,7 @@ static int uxsocket_send_core_fds(int cfd, int *core_evfds, int cores_num)
     pfd = (int *) CMSG_DATA(cmsg);
     for (j = 0; j < n; j++) 
     {
-      pfd[j] = core_evfds[off++];
+      pfd[j] = ctxs[off++]->evfd;
     }
 
     /* send out kernel notify fd */

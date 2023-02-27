@@ -826,5 +826,5 @@ unsigned kni_poll(void);
 
 
 /* Accept connection to app interface */
-int appif_connect_accept(int cfd, int cores_num, int kernel_notifyfd,
-    int *core_evfds, int shm_fd);
+int appif_connect_accept(int cfd, int cores_num, 
+    int kernel_notifyfd, int shm_fd);
