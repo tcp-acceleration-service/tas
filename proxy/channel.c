@@ -128,6 +128,12 @@ size_t channel_get_type_size(uint8_t type)
     case MSG_TYPE_POKE_APP_CTX:
       return sizeof(struct poke_app_ctx_msg);
       break;
+    case MSG_TYPE_POKE_TAS_KERNEL:
+      return sizeof(struct poke_tas_kernel_msg);
+      break;
+    case MSG_TYPE_POKE_TAS_CORE:
+      return sizeof(struct poke_tas_core_msg);
+      break;
     case MSG_TYPE_NEWAPP_REQ:
       return sizeof(struct newapp_req_msg);
       break;
