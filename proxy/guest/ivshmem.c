@@ -79,13 +79,16 @@ int ivshmem_drain_evfd(int fd)
 
 int ivshmem_channel_poll(struct guest_proxy *pxy)
 {
-  int ret;
+  int ret, is_empty;
   void *msg;
   uint8_t msg_type;
   size_t msg_size;
   
   /* Return if there are no messages in channel */
-  if (shmring_is_empty(pxy->chan->rx))
+  shmring_lock(pxy->chan->rx);
+  is_empty = shmring_is_empty(pxy->chan->rx);
+  shmring_unlock(pxy->chan->rx);
+  if (is_empty)
   {
     return 0;
   }

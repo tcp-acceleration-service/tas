@@ -44,7 +44,7 @@ static int uxsocket_sendfd(int uxfd, int fd, int64_t i);
 
 static int ctxs_poll();
 
-static int chanel_poll();
+static int channel_poll();
 static int channel_poll_vm(struct v_machine *vm);
 static int channel_handle_tasinforeq_msg(struct v_machine *vm);
 static int channel_handle_newapp(struct v_machine *vm,
@@ -124,7 +124,7 @@ int ivshmem_poll()
         return -1;
     }
 
-    if (chanel_poll() != 0)
+    if (channel_poll() != 0)
     {
         fprintf(stderr, "ivshmem_poll: failed to poll proxy channel.\n");
         return -1;
@@ -418,7 +418,7 @@ static int uxsocket_handle_error()
 /*****************************************************************************/
 /* Channel */
 
-static int chanel_poll()
+static int channel_poll()
 {
     int i;
     struct v_machine *vm;
@@ -437,13 +437,16 @@ static int chanel_poll()
 
 static int channel_poll_vm(struct v_machine *vm)
 {
-    int ret;
+    int ret, is_empty;
     void *msg;
     uint8_t msg_type;
     size_t msg_size;
 
     /* Move on if rx channel for this vm is empty */
-    if (shmring_is_empty(vm->chan->rx))
+    shmring_lock(vm->chan->rx);
+    is_empty = shmring_is_empty(vm->chan->rx);
+    shmring_unlock(vm->chan->rx); 
+    if (is_empty)
     {
         return 0;
     }
@@ -462,19 +465,24 @@ static int channel_poll_vm(struct v_machine *vm)
     switch(msg_type)
     {
         case MSG_TYPE_TASINFO_REQ:
+            printf("MSG_TYPE_TASINFO_REQ\n");
             channel_handle_tasinforeq_msg(vm);
             break;
         case MSG_TYPE_CONTEXT_REQ:
+            printf("MSG_TYPE_CONTEXT_REQ\n");
             channel_handle_ctx_req(vm, msg);
             break;
         case MSG_TYPE_NEWAPP_REQ:
+            printf("MSG_TYPE_NEWAPP_REQ\n");
             channel_handle_newapp(vm, msg);
             break;
-        case MSG_TYPE_POKE_TAS_KERNEL:
-            channel_handle_poke_tas_kernel(vm, msg);
-            break;
         case MSG_TYPE_POKE_TAS_CORE:
+            printf("MSG_TYPE_POKE_TAS_COREE\n");
             channel_handle_poke_tas_core(vm, msg);
+            break;
+        case MSG_TYPE_POKE_TAS_KERNEL:
+            printf("MSG_TYPE_POKE_TAS_KERNEL\n");
+            channel_handle_poke_tas_kernel(vm, msg);
             break;
         default:
             fprintf(stderr, "ivshmem_uxsocket_handle_msg: unknown message.\n");
@@ -674,6 +682,7 @@ static int ctxs_poll()
 
             msg.msg_type = MSG_TYPE_POKE_APP_CTX;
             msg.ctxreq_id = vctx->ctxreq_id;
+            printf("MSG_TYPE_POKE_APP_CTX\n");
             ret = channel_write(vctx->vm->chan, &msg, sizeof(struct poke_app_ctx_msg));
         
 
