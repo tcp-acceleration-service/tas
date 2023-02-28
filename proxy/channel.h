@@ -16,9 +16,11 @@
 #define MSG_TYPE_TASINFO_RES 3
 #define MSG_TYPE_CONTEXT_REQ 4
 #define MSG_TYPE_CONTEXT_RES 5
-#define MSG_TYPE_VPOKE 6
-#define MSG_TYPE_NEWAPP_REQ 7
-#define MSG_TYPE_NEWAPP_RES 8
+#define MSG_TYPE_POKE_APP_CTX 6
+#define MSG_TYPE_POKE_TAS_KERNEL 7
+#define MSG_TYPE_POKE_TAS_CORE 8
+#define MSG_TYPE_NEWAPP_REQ 9
+#define MSG_TYPE_NEWAPP_RES 10
 
 /* Used to get CTX_RESP_MAX_SIZE... kinda ugly */
 struct kernel_uxsock_response *placeholder_resp;
@@ -56,9 +58,18 @@ struct context_res_msg {
   uint8_t resp[CTX_RESP_MAX_SIZE];
 } __attribute__((packed));
 
-struct vpoke_msg {
+struct poke_app_ctx_msg {
   uint8_t msg_type;
   uint32_t ctxreq_id;
+} __attribute__((packed));
+
+struct poke_tas_kernel_msg {
+  uint8_t msg_type;
+} __attribute__((packed));
+
+struct poke_tas_core_msg {
+  uint8_t msg_type;
+  uint32_t core_id;
 } __attribute__((packed));
 
 struct newapp_req_msg {

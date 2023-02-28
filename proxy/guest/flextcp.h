@@ -3,8 +3,14 @@
 
 #include "internal.h"
 
+struct poke_event {
+    uint8_t msg_type;
+    void* msg;
+};
+
 int vflextcp_init(struct guest_proxy *pxy);
 int vflextcp_poll(struct guest_proxy *pxy);
+int vflextcp_kernel_notifyfd_init(struct guest_proxy *pxy);
 int vflextcp_core_evfds_init(struct guest_proxy *pxy);
 int vflextcp_serve_tasinfo(uint8_t *info, ssize_t size);
 int vflextcp_write_context_res(struct guest_proxy *pxy,

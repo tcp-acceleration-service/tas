@@ -14,14 +14,9 @@
 
 #include "internal.h"
 
-#define NIC_RXQ_LEN (64 * 32 * 1024)
-#define NIC_TXQ_LEN (64 * 8192)
-
+int kernel_evfd_pxy;
 static int ksock_fd_vm = -1;
 static int ksock_fd_app[FLEXNIC_PL_VMST_NUM][FLEXNIC_PL_APPST_NUM];
-
-/* TODO: Only need one kernel evfd_pxy */
-static int kernel_evfd_pxy[FLEXNIC_PL_VMST_NUM];
 
 int flextcp_vm_kernel_connect(int vmid, int *shmfd, int *flexnic_evfd);
 
@@ -88,7 +83,7 @@ int flextcp_vm_kernel_connect(int vmid, int *shmfd, int *flexnic_evfd)
     .msg_flags = 0,
   };
 
-  if (flextcp_kernel_get_notifyfd(fd, &num_fds, kernel_evfd_pxy) != 0)
+  if (flextcp_kernel_get_notifyfd(fd, &num_fds, &kernel_evfd_pxy) != 0)
   {
     fprintf(stderr, "flextcp_vm_kernel_connect: failed to receive notify fd.\n");
     return -1;

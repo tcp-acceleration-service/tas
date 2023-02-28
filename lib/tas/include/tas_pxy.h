@@ -32,6 +32,8 @@
 
 extern void *flexnic_mem_pxy[FLEXNIC_PL_VMST_NUM];
 extern int flexnic_shmfds_pxy[FLEXNIC_PL_VMST_NUM];
+extern int flexnic_evfd_pxy[FLEXTCP_MAX_FTCPCORES];
+extern int kernel_evfd_pxy;
 extern struct flexnic_info *flexnic_info_pxy;
 
 int flextcp_proxy_init();

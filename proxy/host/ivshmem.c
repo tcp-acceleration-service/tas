@@ -51,10 +51,12 @@ static int channel_handle_newapp(struct v_machine *vm,
         struct newapp_req_msg *req_msg);
 static int channel_handle_ctx_req(struct v_machine *vm, 
         struct context_req_msg *msg);
+static void channel_handle_poke_tas_kernel(struct v_machine *vm, 
+        struct poke_tas_kernel_msg *msg);
+static void channel_handle_poke_tas_core(struct v_machine *vm, 
+        struct poke_tas_core_msg *msg);
 
 
-
-int vpoke_count = 0;
 
 int ivshmem_init()
 {
@@ -413,6 +415,8 @@ static int uxsocket_handle_error()
 }
 
 
+/*****************************************************************************/
+/* Channel */
 
 static int chanel_poll()
 {
@@ -430,9 +434,6 @@ static int chanel_poll()
 
     return 0;
 }
-
-/*****************************************************************************/
-/* Channel */
 
 static int channel_poll_vm(struct v_machine *vm)
 {
@@ -468,6 +469,12 @@ static int channel_poll_vm(struct v_machine *vm)
             break;
         case MSG_TYPE_NEWAPP_REQ:
             channel_handle_newapp(vm, msg);
+            break;
+        case MSG_TYPE_POKE_TAS_KERNEL:
+            channel_handle_poke_tas_kernel(vm, msg);
+            break;
+        case MSG_TYPE_POKE_TAS_CORE:
+            channel_handle_poke_tas_core(vm, msg);
             break;
         default:
             fprintf(stderr, "ivshmem_uxsocket_handle_msg: unknown message.\n");
@@ -623,13 +630,32 @@ static int channel_handle_newapp(struct v_machine *vm,
     return 0;
 }
 
+static void channel_handle_poke_tas_kernel(struct v_machine *vm, 
+        struct poke_tas_kernel_msg *msg)
+{
+    uint64_t val = 1;
+    int r = write(kernel_evfd_pxy, &val, sizeof(uint64_t));
+    assert(r == sizeof(uint64_t));
+}
+
+static void channel_handle_poke_tas_core(struct v_machine *vm, 
+        struct poke_tas_core_msg *msg)
+{
+    uint64_t val = 1;
+    int r = write(flexnic_evfd_pxy[msg->core_id], &val, sizeof(uint64_t));
+    assert(r == sizeof(uint64_t));
+}
+
+/*****************************************************************************/
+/* App contexts */
+
 static int ctxs_poll() 
 {
     int i, n, ret;
     struct vmcontext_req *vctx;
     struct _msg;
     struct epoll_event evs[32];
-    struct vpoke_msg msg;
+    struct poke_app_ctx_msg msg;
 
     n = epoll_wait(ctx_epfd, evs, 32, 0);
 
@@ -646,23 +672,25 @@ static int ctxs_poll()
             vctx = evs[i].data.ptr;
             ivshmem_drain_evfd(vctx->ctx->evfd);
 
-            msg.msg_type = MSG_TYPE_VPOKE;
+            msg.msg_type = MSG_TYPE_POKE_APP_CTX;
             msg.ctxreq_id = vctx->ctxreq_id;
-            ret = channel_write(vctx->vm->chan, &msg, sizeof(struct vpoke_msg));
+            ret = channel_write(vctx->vm->chan, &msg, sizeof(struct poke_app_ctx_msg));
         
 
-            if (ret < sizeof(struct vpoke_msg))
+            if (ret != sizeof(struct poke_app_ctx_msg))
             {
                 fprintf(stderr, "ivshmem_ctxs_poll: failed to write poke msg.\n");
                 return -1;
             }       
-            vpoke_count++;     
             notify_guest(vctx->vm->ifd);
         }
     }
 
     return 0;
 }
+
+/*****************************************************************************/
+/* Others */
 
 static int uxsocket_send_int(int fd, int64_t i)
 {

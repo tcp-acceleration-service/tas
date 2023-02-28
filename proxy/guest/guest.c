@@ -53,11 +53,6 @@ int main(int argc, char *argv[])
   unsigned int n;
   struct guest_proxy *pxy = guest_init_proxy();
 
-  if ((pxy->kernel_notifyfd = eventfd(0, EFD_NONBLOCK)) < 0)
-  {
-    fprintf(stderr, "main: failed to create kernel_notifyfd.\n");
-  }
-
   if (ivshmem_init(pxy) < 0)
   {
     fprintf(stderr, "main: ivshmem_init failed.\n");

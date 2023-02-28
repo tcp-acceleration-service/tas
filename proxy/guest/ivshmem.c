@@ -18,7 +18,7 @@ static int channel_handle_newapp_res(struct guest_proxy *pxy,
     struct newapp_res_msg *msg);
 static int channel_handle_ctx_res(struct guest_proxy *pxy, 
     struct context_res_msg *msg);
-static int channel_handle_vpoke(struct guest_proxy *pxy, struct vpoke_msg *msg);
+static int channel_handle_vpoke(struct guest_proxy *pxy, struct poke_app_ctx_msg *msg);
 
 int ivshmem_init(struct guest_proxy *pxy)
 {
@@ -115,8 +115,8 @@ int ivshmem_channel_poll(struct guest_proxy *pxy)
     case MSG_TYPE_CONTEXT_RES:
       channel_handle_ctx_res(pxy, (struct context_res_msg *) msg);
       break;
-    case MSG_TYPE_VPOKE:
-      channel_handle_vpoke(pxy, (struct vpoke_msg *) msg);
+    case MSG_TYPE_POKE_APP_CTX:
+      channel_handle_vpoke(pxy, (struct poke_app_ctx_msg *) msg);
       break;
     default:
       fprintf(stderr, "ivshmem_channel_poll: unknown message.\n");
@@ -151,7 +151,7 @@ static int channel_handle_tasinfo_res(struct guest_proxy *pxy, struct tasinfo_re
   pxy->flexnic_info = malloc(FLEXNIC_INFO_BYTES);
   if (pxy->flexnic_info == NULL)
   {
-    fprintf(stderr, "ivshmem_handle_tasinfo_res: failed to allocate flexnic_info.\n");
+    fprintf(stderr, "channel_handle_tasinfo_res: failed to allocate flexnic_info.\n");
     return -1;
   }
 
@@ -166,15 +166,31 @@ static int channel_handle_tasinfo_res(struct guest_proxy *pxy, struct tasinfo_re
       FLEXNIC_INFO_BYTES);
   if (ret < 0)
   {
-    fprintf(stderr, "ivshmem_handle_tasinfo_res: failed to create tas_info shm region.\n");
+    fprintf(stderr, "channel_handle_tasinfo_res: failed to create tas_info shm region.\n");
     return -1; 
   }
 
+  /* Init epfd used to listen to core_evfds and kernel notify fd */
+  pxy->epfd = epoll_create1(0);
+  if ((pxy->epfd = epoll_create1(0)) < 0)
+  {
+    fprintf(stderr,
+            "channel_handle_tasinfo_res: failed to create fd for vepfd.\n");
+    return -1;
+  }
+
+  if (vflextcp_kernel_notifyfd_init(pxy) != 0)
+  {
+    fprintf(stderr, "channel_handle_tasinfo_res: "
+            "vflextcp_kernel_notifyfd_init failed.\n");
+  }
+  
   if (vflextcp_core_evfds_init(pxy) != 0) 
   {
-    fprintf(stderr, "ivshmem_handle_tasinfo_res: "
-            "vflextcp_virtfd_init failed.\n");
+    fprintf(stderr, "channel_handle_tasinfo_res: "
+            "vflextcp_core_evfds_init failed.\n");
   }
+
 
   return 0;
 }
@@ -196,7 +212,7 @@ static int channel_handle_ctx_res(struct guest_proxy *pxy, struct context_res_ms
   return 0;
 }
 
-static int channel_handle_vpoke(struct guest_proxy *pxy, struct vpoke_msg *msg)
+static int channel_handle_vpoke(struct guest_proxy *pxy, struct poke_app_ctx_msg *msg)
 {
   vflextcp_poke(pxy, msg->ctxreq_id);
   return 0;

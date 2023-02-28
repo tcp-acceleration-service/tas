@@ -11,6 +11,7 @@
 #include <utils.h>
 #include <utils_shm.h>
 #include "internal.h"
+#include "flextcp.h"
 #include "ivshmem.h"
 #include "../proxy.h"
 #include "../../include/kernel_appif.h"
@@ -19,6 +20,7 @@
    with TAS */
 
 static int vflextcp_uxsocket_init(struct guest_proxy *pxy);
+
 static int vflextcp_uxsocket_poll(struct guest_proxy *pxy);
 static int vflextcp_uxsocket_accept(struct guest_proxy *pxy);
 static int vflextcp_uxsocket_error(struct proxy_application* app);
@@ -26,7 +28,12 @@ static int vflextcp_uxsocket_receive(struct guest_proxy *pxy,
     struct proxy_application* app, int *actx_id);
 static int vflextcp_uxsocket_handle_msg(struct guest_proxy *pxy,
     struct proxy_application *app);
-static int vflextcp_core_evfds_poll(struct guest_proxy *pxy);
+
+static int vflextcp_tas_poke_poll(struct guest_proxy *pxy);
+static int vflextcp_handle_tas_kernel_poke(struct guest_proxy *pxy, 
+    struct poke_tas_kernel_msg *msg);
+static int vflextcp_handle_tas_core_poke(struct guest_proxy *pxy, 
+    struct poke_tas_core_msg *msg);
 
 static int vflextcp_send_kernel_notifyfd(int cfd, int cores_num,
     int kernel_notifyfd);
@@ -83,45 +90,6 @@ error_close_nfd:
   return -1;
 }
 
-int vflextcp_serve_tasinfo(uint8_t *info, ssize_t size)
-{
-  struct flexnic_info *pxy_tas_info = NULL;
-  umask(0);
-
-  /* create shm for tas_info */
-  pxy_tas_info = util_create_shmsiszed(FLEXNIC_NAME_INFO, FLEXNIC_INFO_BYTES,
-      NULL, NULL);
-
-  if (pxy_tas_info == NULL)
-  {
-    fprintf(stderr, "vflextcp_serve_tasinfo: "
-        "mapping tas_info in proxy failed.\n");
-    util_destroy_shm(FLEXNIC_NAME_INFO, FLEXNIC_INFO_BYTES, pxy_tas_info);
-    return -1;
-  }
-
-  memcpy(pxy_tas_info, info, size);
-
-  return 0;
-}
-
-int vflextcp_poll(struct guest_proxy *pxy) 
-{
-  if (vflextcp_uxsocket_poll(pxy) != 0) 
-  {
-    fprintf(stderr, "flextcp_poll: uxsocket_poll failed.\n");
-    return -1;
-  }
-
-  if (vflextcp_core_evfds_poll(pxy) != 0) 
-  {
-    fprintf(stderr, "flextcp_poll: vflextcp_virtfd_poll failed.\n");
-    return -1;
-  }
-
-  return 0;
-}
-
 static int vflextcp_uxsocket_init(struct guest_proxy *pxy) 
 {
   int fd, groupid;
@@ -164,18 +132,59 @@ error_close:
   return -1;
 }
 
+int vflextcp_kernel_notifyfd_init(struct guest_proxy *pxy)
+{
+  struct epoll_event ev;
+  struct poke_event *poke_ev;
+  struct poke_tas_kernel_msg *msg;
+
+  if ((pxy->kernel_notifyfd = eventfd(0, EFD_NONBLOCK)) < 0)
+  {
+    fprintf(stderr, "vflextcp_kernel_notifyfd_init: "
+        "failed to create kernel_notifyfd.\n");
+    return -1;
+  }
+
+  ev.events = EPOLLIN;
+
+  if ((poke_ev = malloc(sizeof(struct poke_event))) == NULL)
+  {
+    fprintf(stderr, "vflextcp_kernel_notifyfd_init: "
+      "failed to allocate poke_event.\n");
+    return -1;
+  }
+
+  if ((msg = malloc(sizeof(struct poke_tas_kernel_msg))) == NULL)
+  {
+    fprintf(stderr, "vflextcp_kernel_notifyfd_init: "
+        "failed to alllocate msg.\n");
+    return -1;
+  }
+
+  msg->msg_type = MSG_TYPE_POKE_TAS_KERNEL;
+  
+  /* This is redundant for a kernel msg but we need to
+     know the message type beforehand in the poke_event
+     and for other poke msgs you need to pass the core id */
+  poke_ev->msg_type = MSG_TYPE_POKE_TAS_KERNEL;
+  poke_ev->msg = msg;
+  ev.data.ptr = poke_ev;
+
+  if (epoll_ctl(pxy->epfd, EPOLL_CTL_ADD, pxy->kernel_notifyfd, &ev) != 0) 
+  {
+    perror("vflextcp_kernel_notifyfd_init: epoll_ctl listen failed.");
+    return -1;
+  }
+
+  return 0;
+}
+
 int vflextcp_core_evfds_init(struct guest_proxy *pxy) {
   int i;
   struct epoll_event ev;
+  struct poke_event *poke_ev;
+  struct poke_tas_core_msg *msg;
   struct flexnic_info *finfo = pxy->flexnic_info;
-
-  pxy->epfd = epoll_create1(0);
-  if ((pxy->epfd = epoll_create1(0)) < 0)
-  {
-    fprintf(stderr,
-            "vflextcp_core_evfds_init: failed to create fd for vepfd.\n");
-    return -1;
-  }
 
   /* allocate memory for virtfds */
   pxy->core_evfds = malloc(sizeof(int) * finfo->cores_num);
@@ -196,7 +205,29 @@ int vflextcp_core_evfds_init(struct guest_proxy *pxy) {
     }
 
     ev.events = EPOLLIN;
-    ev.data.fd = pxy->core_evfds[i];
+
+    if ((poke_ev = malloc(sizeof(struct poke_event))) == NULL)
+    {
+      fprintf(stderr, "vflextcp_core_evfds_init: "
+          "failed to allocate poke_event.\n");
+      return -1;
+    }
+
+    if ((msg = malloc(sizeof(struct poke_tas_core_msg))) == NULL)
+    {
+      fprintf(stderr, "vflextcp_core_evfds_init: failed to allocate poke msg\n");
+    }
+
+    msg->msg_type = MSG_TYPE_POKE_TAS_CORE;
+    msg->core_id = i;
+
+  /* This is redundant for a kernel msg but we need to
+     know the message type beforehand in the poke_event
+     and for other poke msgs you need to pass the core id */
+    poke_ev->msg_type = MSG_TYPE_POKE_TAS_CORE;
+    poke_ev->msg = msg;
+    ev.data.ptr = poke_ev;
+
     if (epoll_ctl(pxy->epfd, EPOLL_CTL_ADD, pxy->core_evfds[i], &ev) != 0) 
     {
       perror("vflextcp_core_evfds_init: epoll_ctl listen failed.");
@@ -216,6 +247,48 @@ error_close:
 
   return -1;
 }
+
+int vflextcp_serve_tasinfo(uint8_t *info, ssize_t size)
+{
+  struct flexnic_info *pxy_tas_info = NULL;
+  umask(0);
+
+  /* create shm for tas_info */
+  pxy_tas_info = util_create_shmsiszed(FLEXNIC_NAME_INFO, FLEXNIC_INFO_BYTES,
+      NULL, NULL);
+
+  if (pxy_tas_info == NULL)
+  {
+    fprintf(stderr, "vflextcp_serve_tasinfo: "
+        "mapping tas_info in proxy failed.\n");
+    util_destroy_shm(FLEXNIC_NAME_INFO, FLEXNIC_INFO_BYTES, pxy_tas_info);
+    return -1;
+  }
+
+  memcpy(pxy_tas_info, info, size);
+
+  return 0;
+}
+
+int vflextcp_poll(struct guest_proxy *pxy) 
+{
+  if (vflextcp_uxsocket_poll(pxy) != 0) 
+  {
+    fprintf(stderr, "flextcp_poll: uxsocket_poll failed.\n");
+    return -1;
+  }
+
+  if (vflextcp_tas_poke_poll(pxy) != 0) 
+  {
+    fprintf(stderr, "flextcp_poll: vflextcp_virtfd_poll failed.\n");
+    return -1;
+  }
+
+  return 0;
+}
+
+/*****************************************************************************/
+/* Uxsocket */
 
 static int vflextcp_uxsocket_poll(struct guest_proxy *pxy) 
 {
@@ -440,14 +513,18 @@ static int vflextcp_uxsocket_handle_msg(struct guest_proxy *pxy,
   return 0;
 }
 
-static int vflextcp_core_evfds_poll(struct guest_proxy *pxy) {
+/*****************************************************************************/
+/* Poke TAS */
+
+static int vflextcp_tas_poke_poll(struct guest_proxy *pxy) {
   int n, i;
+  struct poke_event *poke_ev;
   struct epoll_event evs[32];
 
   n = epoll_wait(pxy->epfd, evs, 32, 0);
   if (n < 0) 
   {
-    perror("vflextcp_core_evfds_poll: epoll_wait");
+    perror("vflextcp_tas_poke_poll: epoll_wait");
     return -1;
   }
 
@@ -455,13 +532,60 @@ static int vflextcp_core_evfds_poll(struct guest_proxy *pxy) {
   {
     if (evs[i].events & EPOLLIN)
     {
+      poke_ev = evs[i].data.ptr;
       ivshmem_drain_evfd(evs[i].data.fd);
-      fprintf(stderr, "vflextcp_core_evfds_poll: "
+
+      if (poke_ev->msg_type == MSG_TYPE_POKE_TAS_KERNEL)
+      {
+        vflextcp_handle_tas_kernel_poke(pxy, poke_ev->msg);
+      } else if (poke_ev->msg_type == MSG_TYPE_POKE_TAS_CORE)
+      {
+        vflextcp_handle_tas_core_poke(pxy, poke_ev->msg);
+      }
+
+      fprintf(stderr, "vflextcp_tas_poke_poll: "
           "does not expect notify on core fds.\n");
     }
   }
   return 0;
 }
+
+static int vflextcp_handle_tas_kernel_poke(struct guest_proxy *pxy, 
+    struct poke_tas_kernel_msg *msg)
+{
+  int ret;
+  ret = channel_write(pxy->chan, msg, sizeof(struct poke_tas_kernel_msg));
+
+  if (ret != sizeof(struct poke_tas_kernel_msg))
+  {
+    fprintf(stderr, "vflextcp_handle_tas_kernel_poke: "
+        "failed to write kernel poke msg.\n");
+    return -1;
+  }
+
+  ivshmem_notify_host(pxy);
+  return 0;
+}
+
+static int vflextcp_handle_tas_core_poke(struct guest_proxy *pxy, 
+    struct poke_tas_core_msg *msg)
+{
+  int ret;
+  ret = channel_write(pxy->chan, msg, sizeof(struct poke_tas_core_msg));
+
+  if (ret != sizeof(struct poke_tas_core_msg))
+  {
+    fprintf(stderr, "vflextcp_handle_tas_core_poke: " 
+        "failed to write core poke msg.\n");
+    return -1;
+  }
+
+  ivshmem_notify_host(pxy);
+  return 0;
+}
+
+/*****************************************************************************/
+/* Others */
 
 int vflextcp_send_kernel_notifyfd(int cfd, int cores_num, int kernel_notifyfd) 
 {
