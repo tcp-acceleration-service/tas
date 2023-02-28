@@ -11,7 +11,6 @@ size_t read_fragmented(struct ring_buffer *rx_ring,
     void *dst, size_t size);
 size_t push_fragmented(struct ring_buffer *tx_ring, 
     void *src, size_t size);
-size_t get_freesz(struct ring_buffer *ring);
 pthread_mutexattr_t * init_mutex_attr();
 
 struct ring_buffer* shmring_init(void *base_addr, size_t size)
@@ -106,7 +105,7 @@ size_t shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
 
   /* Return error if there is not enough written bytes
      to read in the ring */
-  freesz = get_freesz(rx_ring);
+  freesz = shmring_get_freesz(rx_ring);
   if ((hdr->ring_size - freesz) < size)
   {
     fprintf(stderr, "shmring_pop: not enough written bytes in ring.\n");
@@ -189,7 +188,7 @@ size_t shmring_read(struct ring_buffer *rx_ring, void *dst, size_t size)
 
   /* Return error if there is not enough written bytes
      to read in the ring */
-  freesz = get_freesz(rx_ring);
+  freesz = shmring_get_freesz(rx_ring);
   if ((hdr->ring_size - freesz) < size)
   {
     fprintf(stderr, "shmring_read: not enough written bytes in ring.\n");
@@ -252,7 +251,7 @@ size_t shmring_push(struct ring_buffer *tx_ring, void *src, size_t size)
   hdr = tx_ring->hdr_addr;
 
   /* Return error if there is not enough space in ring */
-  freesz = get_freesz(tx_ring);
+  freesz = shmring_get_freesz(tx_ring);
   if (freesz < size)
   {
     fprintf(stderr, "shmring_push: not enough space in ring.\n");
@@ -322,7 +321,7 @@ size_t push_fragmented(struct ring_buffer *tx_ring,
   return size;
 }
 
-size_t get_freesz(struct ring_buffer *ring)
+size_t shmring_get_freesz(struct ring_buffer *ring)
 {
   struct ring_header* hdr = ring->hdr_addr;
   int w_pos = hdr->write_pos;

@@ -471,9 +471,11 @@ static int channel_poll_vm(struct v_machine *vm)
             channel_handle_newapp(vm, msg);
             break;
         case MSG_TYPE_POKE_TAS_KERNEL:
+            printf("GOT POKE TAS_KERNEL MSG\n");
             channel_handle_poke_tas_kernel(vm, msg);
             break;
         case MSG_TYPE_POKE_TAS_CORE:
+            printf("GOT POKE TAS CORE MSG\n");
             channel_handle_poke_tas_core(vm, msg);
             break;
         default:
