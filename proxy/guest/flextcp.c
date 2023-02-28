@@ -542,9 +542,6 @@ static int vflextcp_tas_poke_poll(struct guest_proxy *pxy) {
       {
         vflextcp_handle_tas_core_poke(pxy, poke_ev->msg);
       }
-
-      fprintf(stderr, "vflextcp_tas_poke_poll: "
-          "does not expect notify on core fds.\n");
     }
   }
   return 0;
