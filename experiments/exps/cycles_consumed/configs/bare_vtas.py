@@ -24,40 +24,40 @@ class Config:
                 is_remote=True,
                 is_server=True)
 
-        # tas_config = TasConfig(pane=self.defaults.s_tas_pane,
-        #         machine_config=self.s_machine_config,
-        #         project_dir=self.defaults.default_otas_dir_bare,
-        #         ip=self.s_machine_config.ip,
-        #         n_cores=12)
-        # tas_config.args = tas_config.args + ' --shm-len=4294967296'
         tas_config = TasConfig(pane=self.defaults.s_tas_pane,
                 machine_config=self.s_machine_config,
-                project_dir=self.defaults.default_vtas_dir_bare,
+                project_dir=self.defaults.default_otas_dir_bare,
                 ip=self.s_machine_config.ip,
-                n_cores=12)
-        tas_config.args = tas_config.args + ' --vm-shm-len=4294967296'
+                n_cores=10)
+        tas_config.args = tas_config.args + ' --shm-len=4294967296'
+        # tas_config = TasConfig(pane=self.defaults.s_tas_pane,
+        #         machine_config=self.s_machine_config,
+        #         project_dir=self.defaults.default_vtas_dir_bare,
+        #         ip=self.s_machine_config.ip,
+        #         n_cores=12)
+        # tas_config.args = tas_config.args + ' --vm-shm-len=4294967296'
         self.s_tas_configs.append(tas_config)
 
-        # server0_config = ServerConfig(pane=self.defaults.s_server_pane,
-        #         idx=0, vmid=0, groupid=0,
-        #         port=1234, ncores=5, max_flows=4096, max_bytes=1024,
-        #         bench_dir=self.defaults.default_obenchmark_dir_bare,
-        #         tas_dir=self.defaults.default_otas_dir_bare)
-        # server1_config = ServerConfig(pane=self.defaults.s_server_pane,
-        #         idx=1, vmid=0, groupid=1,
-        #         port=1235, ncores=5, max_flows=4096, max_bytes=1024,
-        #         bench_dir=self.defaults.default_obenchmark_dir_bare,
-        #         tas_dir=self.defaults.default_otas_dir_bare)
         server0_config = ServerConfig(pane=self.defaults.s_server_pane,
                 idx=0, vmid=0, groupid=0,
                 port=1234, ncores=5, max_flows=4096, max_bytes=1024,
-                bench_dir=self.defaults.default_vbenchmark_dir_bare,
-                tas_dir=self.defaults.default_vtas_dir_bare)
+                bench_dir=self.defaults.default_obenchmark_dir_bare,
+                tas_dir=self.defaults.default_otas_dir_bare)
         server1_config = ServerConfig(pane=self.defaults.s_server_pane,
                 idx=1, vmid=0, groupid=1,
                 port=1235, ncores=5, max_flows=4096, max_bytes=1024,
-                bench_dir=self.defaults.default_vbenchmark_dir_bare,
-                tas_dir=self.defaults.default_vtas_dir_bare)
+                bench_dir=self.defaults.default_obenchmark_dir_bare,
+                tas_dir=self.defaults.default_otas_dir_bare)
+        # server0_config = ServerConfig(pane=self.defaults.s_server_pane,
+        #         idx=0, vmid=0, groupid=0,
+        #         port=1234, ncores=5, max_flows=4096, max_bytes=1024,
+        #         bench_dir=self.defaults.default_vbenchmark_dir_bare,
+        #         tas_dir=self.defaults.default_vtas_dir_bare)
+        # server1_config = ServerConfig(pane=self.defaults.s_server_pane,
+        #         idx=1, vmid=0, groupid=1,
+        #         port=1235, ncores=5, max_flows=4096, max_bytes=1024,
+        #         bench_dir=self.defaults.default_vbenchmark_dir_bare,
+        #         tas_dir=self.defaults.default_vtas_dir_bare)
                 
 
         self.server_configs.append(server0_config)
