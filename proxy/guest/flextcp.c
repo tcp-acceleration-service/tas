@@ -533,7 +533,6 @@ static int vflextcp_tas_poke_poll(struct guest_proxy *pxy) {
     if (evs[i].events & EPOLLIN)
     {
       poke_ev = evs[i].data.ptr;
-      ivshmem_drain_evfd(evs[i].data.fd);
 
       if (poke_ev->msg_type == MSG_TYPE_POKE_TAS_KERNEL)
       {
@@ -551,6 +550,8 @@ static int vflextcp_handle_tas_kernel_poke(struct guest_proxy *pxy,
     struct poke_tas_kernel_msg *msg)
 {
   int ret;
+
+  ivshmem_drain_evfd(pxy->kernel_notifyfd);
   ret = channel_write(pxy->chan, msg, sizeof(struct poke_tas_kernel_msg));
 
   if (ret != sizeof(struct poke_tas_kernel_msg))
@@ -568,6 +569,8 @@ static int vflextcp_handle_tas_core_poke(struct guest_proxy *pxy,
     struct poke_tas_core_msg *msg)
 {
   int ret;
+
+  ivshmem_drain_evfd(pxy->core_evfds[msg->core_id]);
   ret = channel_write(pxy->chan, msg, sizeof(struct poke_tas_core_msg));
 
   if (ret != sizeof(struct poke_tas_core_msg))

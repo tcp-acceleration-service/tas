@@ -465,23 +465,18 @@ static int channel_poll_vm(struct v_machine *vm)
     switch(msg_type)
     {
         case MSG_TYPE_TASINFO_REQ:
-            printf("MSG_TYPE_TASINFO_REQ\n");
             channel_handle_tasinforeq_msg(vm);
             break;
         case MSG_TYPE_CONTEXT_REQ:
-            printf("MSG_TYPE_CONTEXT_REQ\n");
             channel_handle_ctx_req(vm, msg);
             break;
         case MSG_TYPE_NEWAPP_REQ:
-            printf("MSG_TYPE_NEWAPP_REQ\n");
             channel_handle_newapp(vm, msg);
             break;
         case MSG_TYPE_POKE_TAS_CORE:
-            printf("MSG_TYPE_POKE_TAS_COREE\n");
             channel_handle_poke_tas_core(vm, msg);
             break;
         case MSG_TYPE_POKE_TAS_KERNEL:
-            printf("MSG_TYPE_POKE_TAS_KERNEL\n");
             channel_handle_poke_tas_kernel(vm, msg);
             break;
         default:
@@ -682,7 +677,6 @@ static int ctxs_poll()
 
             msg.msg_type = MSG_TYPE_POKE_APP_CTX;
             msg.ctxreq_id = vctx->ctxreq_id;
-            printf("MSG_TYPE_POKE_APP_CTX\n");
             ret = channel_write(vctx->vm->chan, &msg, sizeof(struct poke_app_ctx_msg));
         
 
