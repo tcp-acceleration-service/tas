@@ -54,7 +54,7 @@
 #define TIMESTAMP_BITS 32
 #define TIMESTAMP_MASK 0xFFFFFFFF
 
-#define QUANTA BATCH_SIZE * 64
+#define QUANTA BATCH_SIZE * TCP_MSS
 
 /** Queue container for a virtual machine */
 struct vm_qman {
