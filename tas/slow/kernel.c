@@ -44,6 +44,9 @@ void boost_budget(int vmid, int ctxid, int64_t incr);
 static void update_budget(int threads_launched);
 uint64_t get_total_cycles_consumed(int vmid);
 uint64_t get_round_cycles_consumed(int vmid);
+uint64_t get_poll_cycles_consumed(int vmid);
+uint64_t get_rx_cycles_consumed(int vmid);
+uint64_t get_tx_cycles_consumed(int vmid);
     
 struct timeout_manager timeout_mgr;
 static int exited = 0;
@@ -52,7 +55,7 @@ uint32_t cur_ts;
 int kernel_notifyfd = 0;
 static int epfd;
 
-double vm_weights[FLEXNIC_PL_VMST_NUM];
+double vm_weights[FLEXNIC_PL_VMST_NUM - 1];
 uint64_t last_bu_update_ts = 0;
 
 int slowpath_main(int threads_launched)
@@ -158,15 +161,18 @@ int slowpath_main(int threads_launched)
       if (!config.quiet) {
         printf("stats: drops=%"PRIu64" k_rexmit=%"PRIu64" ecn=%"PRIu64" acks=%"PRIu64"\n",
             kstats.drops, kstats.kernel_rexmit, kstats.ecn_marked, kstats.acks);
-        printf("ts=%ld TVM0=%ld TVM1=%ld TVM2=%ld RVM0=%ld RVM1=%ld RVM2=%ld\n", util_rdtsc(), 
-            get_total_cycles_consumed(0), get_total_cycles_consumed(1), get_total_cycles_consumed(2),
-            get_round_cycles_consumed(0), get_round_cycles_consumed(1), get_round_cycles_consumed(2));
+        printf("ts=%ld TVM0=%ld TVM1=%ld " 
+            "RVM0=%ld RVM1=%ld "
+            "POLLVM0=%ld TXVM0=%ld RXVM0=%ld "
+            "POLLVM1=%ld TXVM1=%ld RXVM1=%ld\n", util_rdtsc(), 
+            get_total_cycles_consumed(0), get_total_cycles_consumed(1),
+            get_round_cycles_consumed(0), get_round_cycles_consumed(1),
+            get_poll_cycles_consumed(0), get_tx_cycles_consumed(0), get_rx_cycles_consumed(0),
+            get_poll_cycles_consumed(1), get_tx_cycles_consumed(1), get_rx_cycles_consumed(1));
         fflush(stdout);
       }
       last_print = cur_ts;
     }
-
-
   }
 
   return EXIT_SUCCESS;
@@ -176,7 +182,7 @@ static void init_vm_weights(double *vm_weights)
 {
   int vmid;
 
-  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
   {
     vm_weights[vmid] = 1;
   }
@@ -187,7 +193,7 @@ static double sum_weights(double *vm_weights)
   int vmid;
   double sum = 0;
 
-  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
   {
     sum += vm_weights[vmid];
   }
@@ -204,13 +210,11 @@ static void update_budget(int threads_launched)
 
   cur_ts = util_rdtsc();
 
-  // printf("TOTAL BUDGET=%ld\n", cur_ts - last_bu_update_ts);
   total_budget = config.bu_boost * (cur_ts - last_bu_update_ts);
   total_weight = sum_weights(vm_weights);
-  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
   {
     incr = ((total_budget * vm_weights[vmid]) / total_weight);
-    // printf("INCR=%ld\n", incr);
     for (ctxid = 0; ctxid < threads_launched; ctxid++)
     {
       boost_budget(vmid, ctxid, incr);

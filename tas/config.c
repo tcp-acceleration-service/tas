@@ -647,10 +647,9 @@ static int config_defaults(struct configuration *c, char *progname)
   c->fp_vlan_strip = 0;
   c->fp_poll_interval_tas = 10000;
   c->fp_poll_interval_app = 10000;
-  // c->bu_max_budget = 600000;
-  c->bu_max_budget = 999999999999;
+  c->bu_max_budget = 250000;
   c->bu_update_freq = 1000;
-  c->bu_boost = 5;
+  c->bu_boost = 0.65;
   c->ps_algorithm = CONFIG_PS_DEFAULT;
   c->kni_name = NULL;
   c->ready_fd = -1;

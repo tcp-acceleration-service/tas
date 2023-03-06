@@ -22,8 +22,6 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-// TODO: Add skiplist to app queues
-
 /**
  * Complete queue manager implementation
  */
@@ -56,7 +54,7 @@
 #define TIMESTAMP_BITS 32
 #define TIMESTAMP_MASK 0xFFFFFFFF
 
-#define QUANTA BATCH_SIZE * TCP_MSS
+#define QUANTA BATCH_SIZE * 64
 
 /** Queue container for a virtual machine */
 struct vm_qman {
@@ -393,6 +391,7 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
 
     if (budgets[idx].cycles > 0)
     {
+      vq->dc += QUANTA;
       struct flow_qman *fqman = vq->fqman;
       x = flow_qman_poll(t, vq, fqman, num - cnt, q_ids + cnt, q_bytes + cnt);
 
@@ -409,8 +408,6 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
         vm_queue_fire(vqman, vq, idx, q_bytes, cnt - x, cnt);
       }
 
-      vq->dc += QUANTA;
-
     } else
     {
       if (vq->avail > 0)
@@ -421,6 +418,7 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
 
     e_cycs = util_rdtsc();
     __sync_fetch_and_sub(&budgets[idx].cycles, e_cycs - s_cycs);
+    __sync_fetch_and_add(&budgets[idx].cycles_tx, e_cycs - s_cycs);
     __sync_fetch_and_add(&budgets[idx].cycles_consumed_total, e_cycs - s_cycs);
     __sync_fetch_and_add(&budgets[idx].cycles_consumed_round, e_cycs - s_cycs);
   }
@@ -667,7 +665,6 @@ static inline unsigned flow_poll_nolimit(struct qman_thread *t, struct vm_queue 
 
   for (cnt = 0; cnt < num && fqman->nolimit_head_idx != IDXLIST_INVAL
       && vqueue->dc > 0;) {
-  // for (cnt = 0; cnt < num && fqman->nolimit_head_idx != IDXLIST_INVAL;) {
     idx = fqman->nolimit_head_idx;
     q = fqman->queues + idx;
 
@@ -765,7 +762,7 @@ static inline unsigned flow_poll_skiplist(struct qman_thread *t,
   /* maximum virtual time stamp that can be reached */
   max_vts = t->ts_virtual + (cur_ts - t->ts_real);
 
-  for (cnt = 0; cnt < num;) {
+  for (cnt = 0; cnt < num && vqueue->dc > 0;) {
     idx = fqman->head_idx[0];
 
     /* no more queues */

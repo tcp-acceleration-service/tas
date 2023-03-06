@@ -278,6 +278,45 @@ uint64_t get_round_cycles_consumed(int vmid)
   return sum;
 }
 
+uint64_t get_poll_cycles_consumed(int vmid)
+{
+  int i;
+  uint64_t sum = 0;
+    for (i = 0; i < threads_launched; i++)
+  {
+    sum += ctxs[i]->budgets[vmid].cycles_poll;
+    ctxs[i]->budgets[vmid].cycles_poll = 0;
+  }
+
+  return sum;
+}
+
+uint64_t get_rx_cycles_consumed(int vmid)
+{
+  int i;
+  uint64_t sum = 0;
+    for (i = 0; i < threads_launched; i++)
+  {
+    sum += ctxs[i]->budgets[vmid].cycles_rx;
+    ctxs[i]->budgets[vmid].cycles_rx = 0;
+  }
+
+  return sum;
+}
+
+uint64_t get_tx_cycles_consumed(int vmid)
+{
+  int i;
+  uint64_t sum = 0;
+    for (i = 0; i < threads_launched; i++)
+  {
+    sum += ctxs[i]->budgets[vmid].cycles_tx;
+    ctxs[i]->budgets[vmid].cycles_tx = 0;
+  }
+
+  return sum;
+}
+
 void boost_budget(int vmid, int ctxid, int64_t incr)
 {
   int64_t old_budget, new_budget, max_budget;
@@ -285,14 +324,15 @@ void boost_budget(int vmid, int ctxid, int64_t incr)
   old_budget = ctxs[ctxid]->budgets[vmid].cycles;
   new_budget = old_budget + incr;
   max_budget = config.bu_max_budget;  
-  new_budget = MIN(new_budget, max_budget);
-  // if (new_budget > max_budget)
-  // {
-  //   incr = max_budget - old_budget;
-  // }
-  // printf("VMID=%d OLD_BUDGET=%ld NEW_BUDGET=%ld\n", vmid, old_budget, new_budget);
-  // __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].cycles, incr);
-  ctxs[ctxid]->budgets[vmid].cycles = new_budget;
+  // new_budget = MIN(new_budget, max_budget);
+
+  if (new_budget > max_budget)
+  {
+    incr = max_budget - old_budget;
+  }
+  __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].cycles, incr);
+
+  // ctxs[ctxid]->budgets[vmid].cycles = new_budget;
 }
 
 

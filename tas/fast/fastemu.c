@@ -339,10 +339,10 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
 {
   int ret;
   unsigned i, n;
-  struct flextcp_pl_flowst *fs;
+  // struct flextcp_pl_flowst *fs;
   uint8_t freebuf[BATCH_SIZE] = {0};
   void *fss[BATCH_SIZE];
-  uint64_t s_cycs, e_cycs;
+  // uint64_t s_cycs, e_cycs;
   struct tcp_opts tcpopts[BATCH_SIZE];
   struct network_buf_handle *bhs[BATCH_SIZE];
 
@@ -386,14 +386,15 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
     /* run fast-path for flows with flow state */
     if (fss[i] != NULL)
     {
-      s_cycs = util_rdtsc();
+      // s_cycs = util_rdtsc();
       ret = fast_flows_packet(ctx, bhs[i], fss[i], &tcpopts[i], ts);
-      e_cycs = util_rdtsc();
+      // e_cycs = util_rdtsc();
       /* at this point we know fss[i] is a flow state struct */
-      fs = fss[i];
-      __sync_fetch_and_sub(&ctx->budgets[fs->vm_id].cycles, e_cycs - s_cycs);
-      __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed_total, e_cycs - s_cycs);
-      __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed_round, e_cycs - s_cycs);
+      // fs = fss[i];
+      // __sync_fetch_and_sub(&ctx->budgets[fs->vm_id].cycles, e_cycs - s_cycs);
+      // __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_rx, e_cycs - s_cycs);
+      // __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed_total, e_cycs - s_cycs);
+      // __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed_round, e_cycs - s_cycs);
     }
     else
     {
@@ -631,6 +632,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
       off++;
     e_cycs = util_rdtsc();
     __sync_fetch_and_sub(&ctx->budgets[vq_ids[i]].cycles, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_tx, e_cycs - s_cycs);
     __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_consumed_total, e_cycs - s_cycs);
     __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_consumed_round, e_cycs - s_cycs);
   }
