@@ -259,7 +259,7 @@ uint64_t get_total_cycles_consumed(int vmid)
   uint64_t sum = 0;
   for (i = 0; i < threads_launched; i++)
   {
-    sum += ctxs[i]->budgets[vmid].cycles_consumed_total;
+    __sync_fetch_and_add(&sum, ctxs[i]->budgets[vmid].cycles_consumed_total);
   }
 
   return sum;
@@ -269,9 +269,11 @@ uint64_t get_round_cycles_consumed(int vmid)
 {
   int i;
   uint64_t sum = 0;
+  uint64_t cur_consumed = 0;
   for (i = 0; i < threads_launched; i++)
   {
-    sum += ctxs[i]->budgets[vmid].cycles_consumed_round;
+    cur_consumed = __sync_fetch_and_add(&ctxs[i]->budgets[vmid].cycles_consumed_round, 0);
+    sum += cur_consumed;
     ctxs[i]->budgets[vmid].cycles_consumed_round = 0;
   }
 
@@ -284,7 +286,7 @@ uint64_t get_poll_cycles_consumed(int vmid)
   uint64_t sum = 0;
     for (i = 0; i < threads_launched; i++)
   {
-    sum += ctxs[i]->budgets[vmid].cycles_poll;
+    __sync_fetch_and_add(&sum, ctxs[i]->budgets[vmid].cycles_poll);
     ctxs[i]->budgets[vmid].cycles_poll = 0;
   }
 
@@ -297,7 +299,7 @@ uint64_t get_rx_cycles_consumed(int vmid)
   uint64_t sum = 0;
     for (i = 0; i < threads_launched; i++)
   {
-    sum += ctxs[i]->budgets[vmid].cycles_rx;
+    __sync_fetch_and_add(&sum, ctxs[i]->budgets[vmid].cycles_rx);
     ctxs[i]->budgets[vmid].cycles_rx = 0;
   }
 
@@ -310,14 +312,43 @@ uint64_t get_tx_cycles_consumed(int vmid)
   uint64_t sum = 0;
     for (i = 0; i < threads_launched; i++)
   {
-    sum += ctxs[i]->budgets[vmid].cycles_tx;
+    __sync_fetch_and_add(&sum, ctxs[i]->budgets[vmid].cycles_tx);
     ctxs[i]->budgets[vmid].cycles_tx = 0;
   }
 
   return sum;
 }
 
-void boost_budget(int vmid, int ctxid, int64_t incr)
+int64_t boost_budget(int vmid, int ctxid, int64_t incr, 
+    int64_t *last_bu_used)
+{
+  uint64_t bu_used;
+  int64_t old_budget, new_budget, max_budget;
+
+  old_budget = ctxs[ctxid]->budgets[vmid].cycles;
+  new_budget = old_budget + incr;
+  max_budget = config.bu_max_budget;  
+  // new_budget = MIN(new_budget, max_budget);
+
+  if (new_budget > max_budget)
+  {
+    incr = max_budget - old_budget;
+  }
+  
+  __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].cycles, incr);
+  
+  bu_used = 
+      __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].cycles_consumed, 0);
+
+  __sync_fetch_and_sub(&ctxs[ctxid]->budgets[vmid].cycles_consumed, bu_used);
+  *last_bu_used = bu_used;
+
+  // ctxs[ctxid]->budgets[vmid].cycles = new_budget;
+  return ctxs[ctxid]->budgets[vmid].cycles;
+}
+
+/* Called in the s*/
+void redistr_unused_budget(int vmid, int ctxid, int64_t incr)
 {
   int64_t old_budget, new_budget, max_budget;
 
@@ -331,8 +362,6 @@ void boost_budget(int vmid, int ctxid, int64_t incr)
     incr = max_budget - old_budget;
   }
   __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].cycles, incr);
-
-  // ctxs[ctxid]->budgets[vmid].cycles = new_budget;
 }
 
 

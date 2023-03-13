@@ -139,14 +139,14 @@ struct configuration {
   uint32_t fp_poll_interval_app;
   /** Packet scheduling algorithm */
   enum config_ps_algorithm ps_algorithm;
-  /** Max budget. This gets divided by the max 
-      number of VMs and threads launched to get
-      a per context max budget */
+  /** Max budget for a vm */
   uint64_t bu_max_budget;
   /** Budget update frequency in microseconds */
   uint64_t bu_update_freq;
   /** Boost for the budget */
   double bu_boost;
+  /** VM budget used before rellocating to other VMs */
+  double bu_use_ratio;
   /** SP: kni interface name */
   char *kni_name;
   /** Ready signal fd */

@@ -86,6 +86,7 @@ struct vm_budget {
   volatile int64_t cycles_poll;
   volatile int64_t cycles_tx;
   volatile int64_t cycles_rx;
+  volatile uint64_t cycles_consumed;
   volatile uint64_t cycles_consumed_total;
   volatile uint64_t cycles_consumed_round;
   volatile int64_t bandwidth;

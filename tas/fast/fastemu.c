@@ -159,6 +159,7 @@ int dataplane_context_init(struct dataplane_context *ctx)
     /* Initialize budget for each VM */
     ctx->budgets[i].vmid = i;
     ctx->budgets[i].cycles = (config.bu_max_budget / FLEXNIC_PL_VMST_NUM);
+    ctx->budgets[i].cycles_consumed = 0;
     ctx->budgets[i].cycles_consumed_total = 0;
     ctx->budgets[i].cycles_consumed_round = 0;
     ctx->budgets[i].bandwidth = 0;
@@ -339,10 +340,10 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
 {
   int ret;
   unsigned i, n;
-  // struct flextcp_pl_flowst *fs;
+  struct flextcp_pl_flowst *fs;
   uint8_t freebuf[BATCH_SIZE] = {0};
   void *fss[BATCH_SIZE];
-  // uint64_t s_cycs, e_cycs;
+  uint64_t s_cycs, e_cycs;
   struct tcp_opts tcpopts[BATCH_SIZE];
   struct network_buf_handle *bhs[BATCH_SIZE];
 
@@ -386,15 +387,16 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
     /* run fast-path for flows with flow state */
     if (fss[i] != NULL)
     {
-      // s_cycs = util_rdtsc();
-      ret = fast_flows_packet(ctx, bhs[i], fss[i], &tcpopts[i], ts);
-      // e_cycs = util_rdtsc();
+      s_cycs = util_rdtsc();
       /* at this point we know fss[i] is a flow state struct */
-      // fs = fss[i];
-      // __sync_fetch_and_sub(&ctx->budgets[fs->vm_id].cycles, e_cycs - s_cycs);
-      // __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_rx, e_cycs - s_cycs);
-      // __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed_total, e_cycs - s_cycs);
-      // __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed_round, e_cycs - s_cycs);
+      fs = fss[i];
+      ret = fast_flows_packet(ctx, bhs[i], fss[i], &tcpopts[i], ts);
+      e_cycs = util_rdtsc();
+      __sync_fetch_and_sub(&ctx->budgets[fs->vm_id].cycles, e_cycs - s_cycs);
+      __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed, e_cycs - s_cycs);
+      __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_rx, e_cycs - s_cycs);
+      __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed_total, e_cycs - s_cycs);
+      __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed_round, e_cycs - s_cycs);
     }
     else
     {
@@ -427,7 +429,8 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
 {
   unsigned total;
 
-  if (ctx->poll_rounds % MAX_POLL_ROUNDS == 0 || ctx->act_head == IDXLIST_INVAL)
+  // if (ctx->poll_rounds % MAX_POLL_ROUNDS == 0 || ctx->act_head == IDXLIST_INVAL)
+  if (1)
   {
     total = poll_all_queues(ctx, ts);
   }
@@ -443,13 +446,11 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
 static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
 {
   int ret, n_rem = 0;
-  uint8_t out_of_budget[FLEXNIC_PL_VMST_NUM];
   struct network_buf_handle **handles;
   void *aqes[BATCH_SIZE];
   struct polled_context *rem_ctxs[BATCH_SIZE];
   unsigned total = 0;
   uint16_t max, i, k = 0, num_bufs = 0;
-  memset(out_of_budget, 0, sizeof(*out_of_budget) * FLEXNIC_PL_VMST_NUM);
 
   STATS_ADD(ctx, qs_poll, 1);
 
@@ -461,11 +462,10 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
   max = bufcache_prealloc(ctx, max, &handles);
 
   /* prefetch all active contexts */
-  fast_appctx_poll_pf_active(ctx, out_of_budget);
+  fast_appctx_poll_pf_active(ctx);
 
   /* fetch packets from active contexts */
-  k = fast_appctx_poll_fetch_active(ctx, max, &total, &n_rem, rem_ctxs,
-      aqes, out_of_budget);
+  k = fast_appctx_poll_fetch_active(ctx, max, &total, &n_rem, rem_ctxs, aqes);
 
   for (i = 0; i < k; i++)
   {
@@ -478,7 +478,7 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
   bufcache_alloc(ctx, num_bufs);
 
   /* probe receive queue on all active contexts */
-  fast_actx_rxq_probe_active(ctx, out_of_budget);
+  fast_actx_rxq_probe_active(ctx);
 
   /* update round */
   ctx->act_head = ctx->polled_vms[ctx->act_head].next;
@@ -499,12 +499,10 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
 static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts)
 {
   int ret;
-  uint8_t out_of_budget[FLEXNIC_PL_VMST_NUM];
   struct network_buf_handle **handles;
   void *aqes[BATCH_SIZE];
   unsigned total = 0;
   uint16_t max, k, i, num_bufs = 0;
-  memset(out_of_budget, 0, sizeof(*out_of_budget) * FLEXNIC_PL_VMST_NUM);
 
   STATS_ADD(ctx, qs_poll, 1);
 
@@ -516,10 +514,10 @@ static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts)
   max = bufcache_prealloc(ctx, max, &handles);
 
   /* prefetch every ctx from every app */
-  fast_appctx_poll_pf_all(ctx, out_of_budget);
+  fast_appctx_poll_pf_all(ctx);
 
   /* prefetch up to max pkts from apps in round robin fashion */
-  k = fast_appctx_poll_fetch_all(ctx, max, &total, aqes, out_of_budget);
+  k = fast_appctx_poll_fetch_all(ctx, max, &total, aqes);
 
   for (i = 0; i < k; i++)
   {
@@ -532,7 +530,7 @@ static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts)
   bufcache_alloc(ctx, num_bufs);
 
   /* probe every ctx from every app */
-  fast_actx_rxq_probe_all(ctx, out_of_budget);
+  fast_actx_rxq_probe_all(ctx);
 
   STATS_ADD(ctx, qs_total, total);
   if (total == 0)
@@ -632,6 +630,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
       off++;
     e_cycs = util_rdtsc();
     __sync_fetch_and_sub(&ctx->budgets[vq_ids[i]].cycles, e_cycs - s_cycs);
+    __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_consumed, e_cycs - s_cycs);
     __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_tx, e_cycs - s_cycs);
     __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_consumed_total, e_cycs - s_cycs);
     __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_consumed_round, e_cycs - s_cycs);

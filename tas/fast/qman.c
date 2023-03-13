@@ -418,6 +418,7 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
 
     e_cycs = util_rdtsc();
     __sync_fetch_and_sub(&budgets[idx].cycles, e_cycs - s_cycs);
+    __sync_fetch_and_add(&budgets[idx].cycles_consumed, e_cycs - s_cycs);
     __sync_fetch_and_add(&budgets[idx].cycles_tx, e_cycs - s_cycs);
     __sync_fetch_and_add(&budgets[idx].cycles_consumed_total, e_cycs - s_cycs);
     __sync_fetch_and_add(&budgets[idx].cycles_consumed_round, e_cycs - s_cycs);

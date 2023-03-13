@@ -182,7 +182,7 @@ STATIC_ASSERT(sizeof(struct flextcp_pl_atx) == 16, atx_size);
 /******************************************************************************/
 /* Internal flexnic memory */
 
-#define FLEXNIC_PL_VMST_NUM         4
+#define FLEXNIC_PL_VMST_NUM         3
 #define FLEXNIC_PL_APPST_NUM        8
 #define FLEXNIC_PL_APPST_CTX_NUM   31
 #define FLEXNIC_PL_APPST_CTX_MCS   16

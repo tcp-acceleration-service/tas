@@ -80,6 +80,7 @@ enum cfg_params {
   CP_FP_POLL_INTERVAL_APP,
   CP_BU_MAX_BUDGET,
   CP_BU_BUDGET_BOOST,
+  CP_BU_USE_RATIO,
   CP_BU_UPDATE_FREQ,
   CP_PS,
   CP_KNI_NAME,
@@ -221,6 +222,10 @@ static struct option opts[] = {
     { .name = "bu-max-budget",
       .has_arg = required_argument,
       .val = CP_BU_MAX_BUDGET },
+    {
+      .name = "bu-use-ratio",
+      .has_arg = required_argument,
+      .val = CP_BU_USE_RATIO },
     { .name = "bu-update-freq",
       .has_arg = required_argument,
       .val = CP_BU_UPDATE_FREQ },
@@ -531,6 +536,12 @@ int config_parse(struct configuration *c, int argc, char *argv[])
           goto failed;
         }
         break;
+      case CP_BU_USE_RATIO:
+        if (parse_double(optarg, &c->bu_use_ratio) != 0) {
+          fprintf(stderr, "budget use ratio failed parsing\n");
+          goto failed;
+        }
+        break;
       case CP_BU_UPDATE_FREQ:
         if (parse_int64(optarg, &c->bu_update_freq) != 0) {
           fprintf(stderr, "budget update frequency failed parsing\n");
@@ -647,9 +658,10 @@ static int config_defaults(struct configuration *c, char *progname)
   c->fp_vlan_strip = 0;
   c->fp_poll_interval_tas = 10000;
   c->fp_poll_interval_app = 10000;
-  c->bu_max_budget = 250000;
-  c->bu_update_freq = 1000;
-  c->bu_boost = 0.65;
+  c->bu_max_budget = 21000000;
+  c->bu_update_freq = 10000;
+  c->bu_use_ratio = 0.9;
+  c->bu_boost = 0.7;
   c->ps_algorithm = CONFIG_PS_DEFAULT;
   c->kni_name = NULL;
   c->ready_fd = -1;
@@ -762,11 +774,13 @@ static void print_usage(struct configuration *c, char *progname)
       "  --dpdk-extra=ARG            Add extra DPDK argument\n"
       "\n"
       "Budget:\n"
-      "  --bu-max-budget             Max budget for a VM"
+      "  --bu-max-budget             Max budget for a VM "
           "[default: %"PRIu64"]\n"
-      "  --bu-update-freq            Budget update freq"
+      "  --bu-use-ratio              Minimum usage before cycles relocation "
+          "[default: %lf]\n"
+      "  --bu-update-freq            Budget update freq "
           "[default: %"PRIu64"]\n"
-      "  --bu-boost                  Boost for VM budget"
+      "  --bu-boost                  Boost for VM budget "
           "[default: %lf]\n"
       "\n"
       "Packet scheduling:\n"
@@ -797,7 +811,7 @@ static void print_usage(struct configuration *c, char *progname)
       (double) c->cc_timely_beta / UINT32_MAX, c->cc_timely_min_rtt,
       c->cc_timely_min_rate, c->arp_to, c->arp_to_max,
       c->fp_cores_max, c->fp_poll_interval_tas, c->fp_poll_interval_app,
-      c->bu_max_budget, c->bu_update_freq, c->bu_boost);
+      c->bu_max_budget, c->bu_use_ratio, c->bu_update_freq, c->bu_boost);
 }
 
 static inline int parse_int64(const char *s, uint64_t *pi)
