@@ -45,12 +45,13 @@ int64_t boost_budget(int vmid, int ctxid, int64_t incr,
     int64_t *last_bu_used);
 void redistr_unused_budget(int vmid, int ctxid, int64_t incr);
 static void update_budget(int threads_launched, 
-    int64_t bu_stats[FLEXNIC_PL_VMST_NUM][1]);
-uint64_t get_total_cycles_consumed(int vmid);
+    int64_t bu_stats[FLEXNIC_PL_VMST_NUM + 1][1]);
+uint64_t get_total_cycles_consumed();
 uint64_t get_round_cycles_consumed(int vmid);
 uint64_t get_poll_cycles_consumed(int vmid);
 uint64_t get_rx_cycles_consumed(int vmid);
 uint64_t get_tx_cycles_consumed(int vmid);
+uint64_t get_tx_split_cycles_consumed(int vmid);
     
 struct timeout_manager timeout_mgr;
 static int exited = 0;
@@ -60,14 +61,14 @@ int kernel_notifyfd = 0;
 int vm_weights_sum;
 static int epfd;
 
-double vm_weights[FLEXNIC_PL_VMST_NUM - 1];
+double vm_weights[FLEXNIC_PL_VMST_NUM];
 uint64_t last_bu_update_ts = 0;
 int64_t last_bu_update_incr[FLEXNIC_PL_VMST_NUM][FLEXNIC_PL_APPST_CTX_NUM];
 
 int slowpath_main(int threads_launched)
 {
-  int64_t bu_stats[FLEXNIC_PL_VMST_NUM][1];
-  memset(bu_stats, 0, sizeof(int64_t) * FLEXNIC_PL_VMST_NUM * threads_launched);
+  int64_t bu_stats[FLEXNIC_PL_VMST_NUM + 1][1];
+  memset(bu_stats, 0, sizeof(int64_t) * (FLEXNIC_PL_VMST_NUM + 1) * threads_launched);
   struct notify_blockstate nbs;
   uint32_t last_print = 0;
   uint32_t last_baccum = 0;
@@ -175,12 +176,12 @@ int slowpath_main(int threads_launched)
         printf("stats: drops=%"PRIu64" k_rexmit=%"PRIu64" ecn=%"PRIu64" acks=%"PRIu64"\n",
             kstats.drops, kstats.kernel_rexmit, kstats.ecn_marked, kstats.acks);
         printf("ts=%ld elapsed=%ld " 
-            "TVM0=%ld TVM1=%ld " 
+            "TOTAL=%ld " 
             "RVM0=%ld RVM1=%ld "
             "POLLVM0=%ld TXVM0=%ld RXVM0=%ld "
             "POLLVM1=%ld TXVM1=%ld RXVM1=%ld "
             "BUVM0=%ld BUVM1=%ld\n", cycs_ts, cycs_ts - last_cycs_ts, 
-            get_total_cycles_consumed(0), get_total_cycles_consumed(1),
+            get_total_cycles_consumed(),
             get_round_cycles_consumed(0), get_round_cycles_consumed(1),
             get_poll_cycles_consumed(0), get_tx_cycles_consumed(0), get_rx_cycles_consumed(0),
             get_poll_cycles_consumed(1), get_tx_cycles_consumed(1), get_rx_cycles_consumed(1),
@@ -199,7 +200,7 @@ static void init_vm_weights(double *vm_weights)
 {
   int vmid;
 
-  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
   {
     vm_weights[vmid] = 1;
     vm_weights_sum += 1;
@@ -207,25 +208,27 @@ static void init_vm_weights(double *vm_weights)
 }
 
 static void update_budget(int threads_launched, 
-    int64_t bu_stats[FLEXNIC_PL_VMST_NUM][1])
+    int64_t bu_stats[FLEXNIC_PL_VMST_NUM + 1][1])
 {
-  int vmid, ctxid;
-  uint64_t cur_ts, bu_unused_div;
-  int64_t total_budget, incr, last_incr, bu_unused, use_target;
-  uint64_t bu_unused_sum[threads_launched];
+  int vmid, ctxid, n_unused = 0;
+  uint64_t cur_ts;
+  int64_t incr, last_incr, bu_unused, use_target;
+  uint64_t total_budget, bu_unused_sum[threads_launched];
   int64_t bu_used[FLEXNIC_PL_VMST_NUM][FLEXNIC_PL_APPCTX_NUM];
+  int bu_was_unused[FLEXNIC_PL_VMST_NUM][FLEXNIC_PL_APPCTX_NUM];
 
   memset(bu_unused_sum, 0, sizeof(bu_unused_sum));
+  memset(bu_was_unused, 0, sizeof(bu_was_unused));
   memset(bu_used, 0, sizeof(bu_used));
 
   cur_ts = util_rdtsc();
   total_budget = config.bu_boost * (cur_ts - last_bu_update_ts);
-
+  
   /* Update budget */
-  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
   {
-    incr = ((total_budget * vm_weights[vmid]) / vm_weights_sum);
-    
+    // incr = ((total_budget * vm_weights[vmid]) / vm_weights_sum);
+    incr = total_budget;
     for (ctxid = 0; ctxid < threads_launched; ctxid++)
     {
       last_incr = last_bu_update_incr[vmid][ctxid];
@@ -240,19 +243,28 @@ static void update_budget(int threads_launched,
       if ((use_target - bu_unused) < 0)
       {
         bu_unused_sum[ctxid] += bu_unused;
+        bu_was_unused[vmid][ctxid] = 1;
+        n_unused += 1;
       }
     }
   }
 
   /* Reallocate unused cycles */
-  for (ctxid = 0; ctxid < threads_launched; ctxid++)
-  {
-    bu_unused_div = bu_unused_sum[ctxid] / (FLEXNIC_PL_VMST_NUM - 1);
-    for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
-    {
-      redistr_unused_budget(vmid, ctxid, bu_unused_div);
-    }
-  }
+  // if (n_unused != (FLEXNIC_PL_VMST_NUM - 1) && n_unused != 0)
+  // {
+  //   for (ctxid = 0; ctxid < threads_launched; ctxid++)
+  //   {
+  //     bu_unused_div = bu_unused_sum[ctxid] / (FLEXNIC_PL_VMST_NUM - 1 - n_unused);
+  //     printf("bu_unused_div=%ld\n", bu_unused_div);
+  //     for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
+  //     {
+  //       if (!bu_was_unused[vmid][ctxid])
+  //       {
+  //         redistr_unused_budget(vmid, ctxid, bu_unused_div);
+  //       }
+  //     }
+  //   }
+  // }
 
   last_bu_update_ts = cur_ts;
 }

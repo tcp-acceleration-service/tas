@@ -57,17 +57,18 @@ int shm_preinit(void)
   uint8_t i;
   char name[20];
 
-  if ((vm_shm = malloc(FLEXNIC_PL_VMST_NUM * sizeof(void *))) == NULL) {
+  /* Allocate shm group for each VM and internal kernel shared message queue */
+  if ((vm_shm = malloc((FLEXNIC_PL_VMST_NUM + 1) * sizeof(void *))) == NULL) {
     fprintf(stderr, "shm_preinit: failed to allocate handle for group shared memory handle.\n");
     return -1;
   }
 
-  if ((vm_shm_fd = malloc(FLEXNIC_PL_VMST_NUM * sizeof(int))) == NULL) {
+  if ((vm_shm_fd = malloc((FLEXNIC_PL_VMST_NUM + 1) * sizeof(int))) == NULL) {
     fprintf(stderr, "shm_preinit: failed to allocate memory for group memory fds.\n");
     return -1;
   }
 
-  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++) {
+  for (i = 0; i < (FLEXNIC_PL_VMST_NUM + 1); i++) {
     snprintf(name, sizeof(name), "%s_vm%d", FLEXNIC_NAME_DMA_MEM, i);
 
     if (config.fp_hugepages) {
@@ -146,7 +147,7 @@ void shm_cleanup(void)
   }
 
   /* cleanup dma memory region */
-  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++) {
+  for (i = 0; i < (FLEXNIC_PL_VMST_NUM + 1); i++) {
     snprintf(name, sizeof(name), "%s_vm%d", FLEXNIC_NAME_DMA_MEM, i);
     if (config.fp_hugepages) {
       util_destroy_shm_huge(name, config.vm_shm_len,

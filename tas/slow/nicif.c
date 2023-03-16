@@ -149,7 +149,7 @@ int nicif_appctx_add(uint16_t vmid, uint16_t appid, uint32_t db,
 
   for (i = 0; i < tas_info->cores_num; i++) {
     actx = &fp_state->appctx[i][vmid][db];
-    actx->appst_id = appid;
+    actx->vm_id = vmid;
     actx->rx_base = rxq_base[i];
     actx->tx_base = txq_base[i];
     actx->rx_avail = rxq_len;

@@ -83,11 +83,10 @@ struct polled_vm {
 struct vm_budget {
   uint16_t vmid;
   volatile int64_t cycles;
-  volatile int64_t cycles_poll;
-  volatile int64_t cycles_tx;
-  volatile int64_t cycles_rx;
+  volatile uint64_t cycles_poll;
+  volatile uint64_t cycles_tx;
+  volatile uint64_t cycles_rx;
   volatile uint64_t cycles_consumed;
-  volatile uint64_t cycles_consumed_total;
   volatile uint64_t cycles_consumed_round;
   volatile int64_t bandwidth;
 };
@@ -124,6 +123,10 @@ struct dataplane_context {
    /********************************************************/
   /* resource usage for each vm */
   struct vm_budget budgets[FLEXNIC_PL_VMST_NUM];
+  /* counters for number of packets served by a vm in a phase*/
+  int vm_counters[FLEXNIC_PL_VMST_NUM];
+  int counters_total;
+  volatile uint64_t cycles_total;
 
   /********************************************************/
   /* pre-allocated buffers for polling doorbells and queue manager */

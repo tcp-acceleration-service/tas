@@ -47,6 +47,7 @@ int fast_kernel_poll(struct dataplane_context *ctx,
 
   kctx = &fp_state->kctx[ctx->id];
 
+
   /* stop if context is not in use */
   if (kctx->tx_len == 0)
     return -1;

@@ -93,6 +93,9 @@ static inline void tx_flush(struct dataplane_context *ctx);
 static inline void tx_send(struct dataplane_context *ctx,
                            struct network_buf_handle *nbh, uint16_t off, uint16_t len);
 
+static void record_consumption(struct dataplane_context *ctx, 
+    uint64_t cycles, char *phase_name);
+
 static void arx_cache_flush(struct dataplane_context *ctx, uint64_t tsc) __attribute__((noinline));
 
 int dataplane_init(void)
@@ -158,11 +161,16 @@ int dataplane_context_init(struct dataplane_context *ctx)
   {
     /* Initialize budget for each VM */
     ctx->budgets[i].vmid = i;
-    ctx->budgets[i].cycles = (config.bu_max_budget / FLEXNIC_PL_VMST_NUM);
+    ctx->budgets[i].cycles = config.bu_max_budget;
     ctx->budgets[i].cycles_consumed = 0;
-    ctx->budgets[i].cycles_consumed_total = 0;
     ctx->budgets[i].cycles_consumed_round = 0;
+    ctx->budgets[i].cycles_poll = 0;
+    ctx->budgets[i].cycles_rx = 0;
+    ctx->budgets[i].cycles_tx = 0;
     ctx->budgets[i].bandwidth = 0;
+
+    /* Set phase counters to 0 */
+    ctx->vm_counters[i] = 0;
     
     /* Initialized polled apps and polled vms*/
     p_vm = &ctx->polled_vms[i];
@@ -173,6 +181,8 @@ int dataplane_context_init(struct dataplane_context *ctx)
       polled_ctx_init(p_ctx, j, i);
     }
   }
+  ctx->cycles_total = 0;
+  ctx->counters_total = 0;
   ctx->poll_rounds = 0;
   ctx->poll_next_vm = 0;
   ctx->act_head = IDXLIST_INVAL;
@@ -218,7 +228,7 @@ void dataplane_loop(struct dataplane_context *ctx)
 {
   struct notify_blockstate nbs;
   uint32_t ts;
-  uint64_t cyc, prev_cyc;
+  uint64_t cyc, prev_cyc, s_cycs, e_cycs;
   int was_idle = 1;
 
   notify_canblock_reset(&nbs);
@@ -235,19 +245,41 @@ void dataplane_loop(struct dataplane_context *ctx)
     ts = qman_timestamp(cyc);
 
     STATS_TS(start);
+  
+    s_cycs = util_rdtsc();
     n += poll_rx(ctx, ts, cyc);
+    e_cycs = util_rdtsc();
+    if (ctx->counters_total > 0)
+      __sync_fetch_and_add(&ctx->cycles_total, e_cycs - s_cycs);
+    record_consumption(ctx, e_cycs - s_cycs, "rx");
+  
     STATS_TS(rx);
     tx_flush(ctx);
 
     n += poll_qman_fwd(ctx, ts);
 
     STATS_TSADD(ctx, cyc_rx, rx - start);
+   
+    s_cycs = util_rdtsc();
     n += poll_qman(ctx, ts);
+    e_cycs = util_rdtsc();
+    if (ctx->counters_total > 0)
+      __sync_fetch_and_add(&ctx->cycles_total, e_cycs - s_cycs);
+    record_consumption(ctx, e_cycs - s_cycs, "tx");
+   
     STATS_TS(qm);
     STATS_TSADD(ctx, cyc_qm, qm - rx);
+   
+    s_cycs = util_rdtsc();
     n += poll_queues(ctx, ts);
+    e_cycs = util_rdtsc();
+    if (ctx->counters_total > 0)
+      __sync_fetch_and_add(&ctx->cycles_total, e_cycs - s_cycs);
+    record_consumption(ctx, e_cycs - s_cycs, "poll");
+   
     STATS_TS(qs);
     STATS_TSADD(ctx, cyc_qs, qs - qm);
+
     n += poll_kernel(ctx, ts);
 
     /* flush transmit buffer */
@@ -340,10 +372,9 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
 {
   int ret;
   unsigned i, n;
-  struct flextcp_pl_flowst *fs;
   uint8_t freebuf[BATCH_SIZE] = {0};
   void *fss[BATCH_SIZE];
-  uint64_t s_cycs, e_cycs;
+  struct flextcp_pl_flowst *fs;
   struct tcp_opts tcpopts[BATCH_SIZE];
   struct network_buf_handle *bhs[BATCH_SIZE];
 
@@ -387,16 +418,11 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
     /* run fast-path for flows with flow state */
     if (fss[i] != NULL)
     {
-      s_cycs = util_rdtsc();
-      /* at this point we know fss[i] is a flow state struct */
       fs = fss[i];
+      /* at this point we know fss[i] is a flow state struct */
       ret = fast_flows_packet(ctx, bhs[i], fss[i], &tcpopts[i], ts);
-      e_cycs = util_rdtsc();
-      __sync_fetch_and_sub(&ctx->budgets[fs->vm_id].cycles, e_cycs - s_cycs);
-      __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed, e_cycs - s_cycs);
-      __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_rx, e_cycs - s_cycs);
-      __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed_total, e_cycs - s_cycs);
-      __sync_fetch_and_add(&ctx->budgets[fs->vm_id].cycles_consumed_round, e_cycs - s_cycs);
+      ctx->vm_counters[fs->vm_id] += 1;
+      ctx->counters_total += 1;
     }
     else
     {
@@ -429,8 +455,7 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
 {
   unsigned total;
 
-  // if (ctx->poll_rounds % MAX_POLL_ROUNDS == 0 || ctx->act_head == IDXLIST_INVAL)
-  if (1)
+  if (ctx->poll_rounds % MAX_POLL_ROUNDS == 0 || ctx->act_head == IDXLIST_INVAL)
   {
     total = poll_all_queues(ctx, ts);
   }
@@ -439,6 +464,8 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
     total = poll_active_queues(ctx, ts);
   }
   ctx->poll_rounds = (ctx->poll_rounds + 1) % MAX_POLL_ROUNDS;
+
+  ctx->counters_total = total;
   return total;
 }
 
@@ -516,7 +543,7 @@ static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts)
   /* prefetch every ctx from every app */
   fast_appctx_poll_pf_all(ctx);
 
-  /* prefetch up to max pkts from apps in round robin fashion */
+  /* fetch up to max pkts from groups in round robin fashion */
   k = fast_appctx_poll_fetch_all(ctx, max, &total, aqes);
 
   for (i = 0; i < k; i++)
@@ -579,7 +606,6 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   uint16_t q_bytes[BATCH_SIZE];
   struct network_buf_handle **handles;
   uint16_t off = 0, max;
-  uint64_t s_cycs, e_cycs;
   int ret, i, use;
 
   max = BATCH_SIZE;
@@ -593,6 +619,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
 
   /* poll queue manager */
   ret = qman_poll(ctx, max, vq_ids, fq_ids, q_bytes);
+
   if (ret <= 0)
   {
     STATS_ADD(ctx, qm_empty, 1);
@@ -600,7 +627,6 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   }
 
   STATS_ADD(ctx, qm_total, ret);
-
   for (i = 0; i < ret; i++)
   {
     rte_prefetch0(handles[i]);
@@ -623,19 +649,15 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
 
   for (i = 0; i < ret; i++)
   {
-    s_cycs = util_rdtsc();
     use = fast_flows_qman(ctx, vq_ids[i], fq_ids[i], handles[off], ts);
 
     if (use == 0)
       off++;
-    e_cycs = util_rdtsc();
-    __sync_fetch_and_sub(&ctx->budgets[vq_ids[i]].cycles, e_cycs - s_cycs);
-    __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_consumed, e_cycs - s_cycs);
-    __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_tx, e_cycs - s_cycs);
-    __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_consumed_total, e_cycs - s_cycs);
-    __sync_fetch_and_add(&ctx->budgets[vq_ids[i]].cycles_consumed_round, e_cycs - s_cycs);
-  }
 
+    ctx->vm_counters[vq_ids[i]] += 1;
+  }
+  ctx->counters_total = ret;
+  
   /* apply buffer reservations */
   bufcache_alloc(ctx, off);
 
@@ -662,6 +684,7 @@ static inline uint8_t bufcache_prealloc(struct dataplane_context *ctx, uint16_t 
 {
   uint16_t grow, res, head, g, i;
   struct network_buf_handle *nbh;
+
   /* try refilling buffer cache */
   if (ctx->bufcache_num < num)
   {
@@ -826,4 +849,41 @@ static void arx_cache_flush(struct dataplane_context *ctx, uint64_t tsc)
   }
 
   ctx->arx_num = 0;
+}
+
+static void record_consumption(struct dataplane_context *ctx, 
+    uint64_t cycles, char *phase_name)
+{
+  int vmid;
+  double counter;
+  uint64_t vm_cycles;
+
+  if (ctx->counters_total == 0)
+    return;
+
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
+  {
+    counter = ctx->vm_counters[vmid];
+    vm_cycles = cycles * (counter / ctx->counters_total);
+    __sync_fetch_and_sub(&ctx->budgets[vmid].cycles, vm_cycles);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed, vm_cycles);
+    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_round, vm_cycles);
+
+    if (strcmp(phase_name,"poll") == 0)
+    {
+      __sync_fetch_and_add(&ctx->budgets[vmid].cycles_poll, vm_cycles);
+    }
+    else if (strcmp(phase_name, "tx") == 0)
+    {
+      __sync_fetch_and_add(&ctx->budgets[vmid].cycles_tx, vm_cycles);
+    }
+    else if (strcmp(phase_name, "rx") == 0)
+    {
+      __sync_fetch_and_add(&ctx->budgets[vmid].cycles_rx, vm_cycles);
+    }
+
+    ctx->vm_counters[vmid] = 0;
+  }
+
+  ctx->counters_total = 0;
 }

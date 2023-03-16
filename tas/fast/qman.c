@@ -343,14 +343,14 @@ int vmcont_init(struct qman_thread *t)
   t->vqman = malloc(sizeof(struct vm_qman));
   struct vm_qman *vqman = t->vqman;
 
-  vqman->queues = calloc(1, sizeof(*vqman->queues) * (FLEXNIC_PL_VMST_NUM - 1));
+  vqman->queues = calloc(1, sizeof(*vqman->queues) * (FLEXNIC_PL_VMST_NUM));
   if (vqman->queues == NULL)
   {
     fprintf(stderr, "vmcont_init: queues malloc failed\n");
     return -1;
   }
 
-  for (i = 0; i < FLEXNIC_PL_VMST_NUM - 1; i++)
+  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
   {
     vq = &vqman->queues[i];
     vq->avail = 0;
@@ -373,12 +373,9 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
 {
   int i, cnt, x;
   uint32_t idx;
-  uint64_t s_cycs, e_cycs;
 
   for (cnt = 0; cnt < num && vqman->head_idx != IDXLIST_INVAL;)
   {
-    s_cycs = util_rdtsc();
-
     idx = vqman->head_idx;
     struct vm_queue *vq = &vqman->queues[idx];
     vqman->head_idx = vq->next_idx;
@@ -415,13 +412,6 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
         vm_queue_activate(vqman, vq, idx);
       }
     }
-
-    e_cycs = util_rdtsc();
-    __sync_fetch_and_sub(&budgets[idx].cycles, e_cycs - s_cycs);
-    __sync_fetch_and_add(&budgets[idx].cycles_consumed, e_cycs - s_cycs);
-    __sync_fetch_and_add(&budgets[idx].cycles_tx, e_cycs - s_cycs);
-    __sync_fetch_and_add(&budgets[idx].cycles_consumed_total, e_cycs - s_cycs);
-    __sync_fetch_and_add(&budgets[idx].cycles_consumed_round, e_cycs - s_cycs);
   }
 
 
@@ -436,7 +426,7 @@ static inline int vm_qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t fl
   struct vm_queue *vq = &vqman->queues[vm_id];
   struct flow_qman *fqman = vq->fqman;
 
-  if (vm_id >= FLEXNIC_PL_VMST_NUM) 
+  if (vm_id >= (FLEXNIC_PL_VMST_NUM)) 
   {
     fprintf(stderr, "vm_qman_set: invalid vm id: %u >= %u\n", vm_id,
         FLEXNIC_PL_VMST_NUM);
@@ -893,7 +883,7 @@ void qman_free_vm_cont(struct dataplane_context *ctx)
 
   vqman = ctx->qman.vqman;
 
-  for (i = 0; i < FLEXNIC_PL_VMST_NUM - 1; i++)
+  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
   {
     vq = &vqman->queues[i];
     fqman = vq->fqman;
