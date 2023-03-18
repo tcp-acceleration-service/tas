@@ -67,6 +67,21 @@ struct kernel_statistics {
   uint64_t acks;
 };
 
+struct budget_statistics {
+  int64_t budget;
+  uint64_t cycles_poll;
+  uint64_t cycles_tx;
+  uint64_t cycles_rx;
+  uint64_t cycles_total;
+  uint64_t hist_poll[16 + 1];
+  uint64_t poll_total;
+  uint64_t hist_tx[16 + 1];
+  uint64_t tx_total;
+  uint64_t hist_rx[16 + 1];
+  uint64_t rx_total;
+
+};
+
 /** Type of timeout */
 enum timeout_type {
   /** ARP request */

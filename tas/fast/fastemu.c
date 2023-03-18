@@ -93,8 +93,8 @@ static inline void tx_flush(struct dataplane_context *ctx);
 static inline void tx_send(struct dataplane_context *ctx,
                            struct network_buf_handle *nbh, uint16_t off, uint16_t len);
 
-static void record_consumption(struct dataplane_context *ctx, 
-    uint64_t cycles, char *phase_name);
+static void spend_budget(struct dataplane_context *ctx, 
+    uint64_t cycles, int phase_name);
 
 static void arx_cache_flush(struct dataplane_context *ctx, uint64_t tsc) __attribute__((noinline));
 
@@ -161,13 +161,10 @@ int dataplane_context_init(struct dataplane_context *ctx)
   {
     /* Initialize budget for each VM */
     ctx->budgets[i].vmid = i;
-    ctx->budgets[i].cycles = config.bu_max_budget;
-    ctx->budgets[i].cycles_consumed = 0;
-    ctx->budgets[i].cycles_consumed_round = 0;
+    ctx->budgets[i].budget = config.bu_max_budget;
     ctx->budgets[i].cycles_poll = 0;
     ctx->budgets[i].cycles_rx = 0;
     ctx->budgets[i].cycles_tx = 0;
-    ctx->budgets[i].bandwidth = 0;
 
     /* Set phase counters to 0 */
     ctx->vm_counters[i] = 0;
@@ -181,7 +178,9 @@ int dataplane_context_init(struct dataplane_context *ctx)
       polled_ctx_init(p_ctx, j, i);
     }
   }
-  ctx->cycles_total = 0;
+  memset(ctx->hist_poll, 0, sizeof(ctx->hist_poll));
+  memset(ctx->hist_tx, 0, sizeof(ctx->hist_tx));
+  memset(ctx->hist_rx, 0, sizeof(ctx->hist_rx));
   ctx->counters_total = 0;
   ctx->poll_rounds = 0;
   ctx->poll_next_vm = 0;
@@ -249,9 +248,7 @@ void dataplane_loop(struct dataplane_context *ctx)
     s_cycs = util_rdtsc();
     n += poll_rx(ctx, ts, cyc);
     e_cycs = util_rdtsc();
-    if (ctx->counters_total > 0)
-      __sync_fetch_and_add(&ctx->cycles_total, e_cycs - s_cycs);
-    record_consumption(ctx, e_cycs - s_cycs, "rx");
+    spend_budget(ctx, e_cycs - s_cycs, RX_PHASE);
   
     STATS_TS(rx);
     tx_flush(ctx);
@@ -263,9 +260,7 @@ void dataplane_loop(struct dataplane_context *ctx)
     s_cycs = util_rdtsc();
     n += poll_qman(ctx, ts);
     e_cycs = util_rdtsc();
-    if (ctx->counters_total > 0)
-      __sync_fetch_and_add(&ctx->cycles_total, e_cycs - s_cycs);
-    record_consumption(ctx, e_cycs - s_cycs, "tx");
+    spend_budget(ctx, e_cycs - s_cycs, TX_PHASE);
    
     STATS_TS(qm);
     STATS_TSADD(ctx, cyc_qm, qm - rx);
@@ -273,9 +268,7 @@ void dataplane_loop(struct dataplane_context *ctx)
     s_cycs = util_rdtsc();
     n += poll_queues(ctx, ts);
     e_cycs = util_rdtsc();
-    if (ctx->counters_total > 0)
-      __sync_fetch_and_add(&ctx->cycles_total, e_cycs - s_cycs);
-    record_consumption(ctx, e_cycs - s_cycs, "poll");
+    spend_budget(ctx, e_cycs - s_cycs, POLL_PHASE);
    
     STATS_TS(qs);
     STATS_TSADD(ctx, cyc_qs, qs - qm);
@@ -448,6 +441,7 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
       bufcache_free(ctx, bhs[i]);
   }
 
+  ctx->hist_rx[n] += 1;
   return n;
 }
 
@@ -519,6 +513,7 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
   if (total == 0)
     STATS_ADD(ctx, qs_empty, total);
 
+  ctx->hist_poll[total] += 1;
   return total;
 }
 
@@ -563,6 +558,7 @@ static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts)
   if (total == 0)
     STATS_ADD(ctx, qs_empty, total);
 
+  ctx->hist_poll[total] += 1;
   return total;
 }
 
@@ -623,6 +619,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   if (ret <= 0)
   {
     STATS_ADD(ctx, qm_empty, 1);
+    ctx->hist_tx[0] += 1;
     return 0;
   }
 
@@ -650,7 +647,6 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   for (i = 0; i < ret; i++)
   {
     use = fast_flows_qman(ctx, vq_ids[i], fq_ids[i], handles[off], ts);
-
     if (use == 0)
       off++;
 
@@ -661,6 +657,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   /* apply buffer reservations */
   bufcache_alloc(ctx, off);
 
+  ctx->hist_tx[ret] += 1;
   return ret;
 }
 
@@ -851,8 +848,8 @@ static void arx_cache_flush(struct dataplane_context *ctx, uint64_t tsc)
   ctx->arx_num = 0;
 }
 
-static void record_consumption(struct dataplane_context *ctx, 
-    uint64_t cycles, char *phase_name)
+static void spend_budget(struct dataplane_context *ctx, 
+    uint64_t cycles, int phase)
 {
   int vmid;
   double counter;
@@ -861,25 +858,27 @@ static void record_consumption(struct dataplane_context *ctx,
   if (ctx->counters_total == 0)
     return;
 
-  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
   {
     counter = ctx->vm_counters[vmid];
+    assert(ctx->counters_total > 0 && ctx->counters_total <= BATCH_SIZE);
+    assert(counter >= 0 && counter <= BATCH_SIZE);
+    assert((counter / ctx->counters_total) <= 1);
     vm_cycles = cycles * (counter / ctx->counters_total);
-    __sync_fetch_and_sub(&ctx->budgets[vmid].cycles, vm_cycles);
-    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed, vm_cycles);
-    __sync_fetch_and_add(&ctx->budgets[vmid].cycles_consumed_round, vm_cycles);
+    __sync_fetch_and_sub(&ctx->budgets[vmid].budget, vm_cycles);
 
-    if (strcmp(phase_name,"poll") == 0)
+    switch(phase)
     {
-      __sync_fetch_and_add(&ctx->budgets[vmid].cycles_poll, vm_cycles);
-    }
-    else if (strcmp(phase_name, "tx") == 0)
-    {
-      __sync_fetch_and_add(&ctx->budgets[vmid].cycles_tx, vm_cycles);
-    }
-    else if (strcmp(phase_name, "rx") == 0)
-    {
-      __sync_fetch_and_add(&ctx->budgets[vmid].cycles_rx, vm_cycles);
+      case POLL_PHASE:
+        __sync_fetch_and_add(&ctx->budgets[vmid].cycles_poll, vm_cycles);
+        break;
+      case TX_PHASE:
+        assert(phase == TX_PHASE);
+        __sync_fetch_and_add(&ctx->budgets[vmid].cycles_tx, vm_cycles);
+        break;
+      case RX_PHASE:
+        __sync_fetch_and_add(&ctx->budgets[vmid].cycles_rx, vm_cycles);
+        break;
     }
 
     ctx->vm_counters[vmid] = 0;

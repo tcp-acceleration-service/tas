@@ -53,7 +53,7 @@
 #define FLEXNIC_FLAG_HUGEPAGES 2
 
 /** ID of the mem region to use for the slow path */
-#define SP_MEM_ID FLEXNIC_PL_VMST_NUM - 1
+#define SP_MEM_ID FLEXNIC_PL_VMST_NUM
 
 /** Info struct: layout of info shared memory region */
 struct flexnic_info {
@@ -182,7 +182,7 @@ STATIC_ASSERT(sizeof(struct flextcp_pl_atx) == 16, atx_size);
 /******************************************************************************/
 /* Internal flexnic memory */
 
-#define FLEXNIC_PL_VMST_NUM         3
+#define FLEXNIC_PL_VMST_NUM         2
 #define FLEXNIC_PL_APPST_NUM        8
 #define FLEXNIC_PL_APPST_CTX_NUM   31
 #define FLEXNIC_PL_APPST_CTX_MCS   16
@@ -212,7 +212,7 @@ struct flextcp_pl_appctx {
   uint64_t tx_base;
   uint32_t rx_len;
   uint32_t tx_len;
-  uint32_t appst_id;
+  uint32_t vm_id;
   int	   evfd;
 
   /********************************************************/

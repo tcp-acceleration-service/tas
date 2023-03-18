@@ -41,18 +41,10 @@ static void signal_tas_ready(void);
 void flexnic_loadmon(uint32_t cur_ts);
 
 static void init_vm_weights(double *vm_weights);
-int64_t boost_budget(int vmid, int ctxid, int64_t incr, 
-    int64_t *last_bu_used);
-void redistr_unused_budget(int vmid, int ctxid, int64_t incr);
-static void update_budget(int threads_launched, 
-    int64_t bu_stats[FLEXNIC_PL_VMST_NUM + 1][1]);
-uint64_t get_total_cycles_consumed();
-uint64_t get_round_cycles_consumed(int vmid);
-uint64_t get_poll_cycles_consumed(int vmid);
-uint64_t get_rx_cycles_consumed(int vmid);
-uint64_t get_tx_cycles_consumed(int vmid);
-uint64_t get_tx_split_cycles_consumed(int vmid);
-    
+static void update_budget(int threads_launched);
+void boost_budget(int vmid, int ctxid, int64_t incr);
+struct budget_statistics get_budget_stats(int vmid, int ctxid);
+
 struct timeout_manager timeout_mgr;
 static int exited = 0;
 struct kernel_statistics kstats;
@@ -63,25 +55,23 @@ static int epfd;
 
 double vm_weights[FLEXNIC_PL_VMST_NUM];
 uint64_t last_bu_update_ts = 0;
-int64_t last_bu_update_incr[FLEXNIC_PL_VMST_NUM][FLEXNIC_PL_APPST_CTX_NUM];
 
 int slowpath_main(int threads_launched)
 {
-  int64_t bu_stats[FLEXNIC_PL_VMST_NUM + 1][1];
-  memset(bu_stats, 0, sizeof(int64_t) * (FLEXNIC_PL_VMST_NUM + 1) * threads_launched);
   struct notify_blockstate nbs;
   uint32_t last_print = 0;
   uint32_t last_baccum = 0;
   uint32_t loadmon_ts = 0;
   uint64_t cycs_ts;
   uint64_t last_cycs_ts = util_rdtsc();
+  struct budget_statistics bstats_vm0, bstats_vm1;
 
   kernel_notifyfd = eventfd(0, EFD_NONBLOCK);
   assert(kernel_notifyfd != -1);
 
   struct epoll_event ev = {
-    .events = EPOLLIN,
-    .data.fd = kernel_notifyfd,
+      .events = EPOLLIN,
+      .data.fd = kernel_notifyfd,
   };
 
   epfd = epoll_create1(0);
@@ -91,67 +81,68 @@ int slowpath_main(int threads_launched)
   assert(r == 0);
 
   /* initialize timers for timeouts */
-  if (util_timeout_init(&timeout_mgr, timeout_trigger, NULL)) {
+  if (util_timeout_init(&timeout_mgr, timeout_trigger, NULL))
+  {
     fprintf(stderr, "timeout_init failed\n");
     return EXIT_FAILURE;
   }
 
   /* initialize kni */
-  if (kni_init()) {
+  if (kni_init())
+  {
     fprintf(stderr, "kni_init failed\n");
     return EXIT_FAILURE;
   }
 
   /* initialize routing subsystem */
-  if (routing_init()) {
+  if (routing_init())
+  {
     fprintf(stderr, "routing_init failed\n");
     return EXIT_FAILURE;
   }
 
   /* connect to NIC */
-  if (nicif_init()) {
+  if (nicif_init())
+  {
     fprintf(stderr, "nicif_init failed\n");
     return EXIT_FAILURE;
   }
 
   /* initialize CC */
-  if (cc_init()) {
+  if (cc_init())
+  {
     fprintf(stderr, "cc_init failed\n");
     return EXIT_FAILURE;
   }
 
   /* prepare application interface */
-  if (appif_init()) {
+  if (appif_init())
+  {
     fprintf(stderr, "appif_init failed\n");
     return EXIT_FAILURE;
   }
 
-  if (arp_init()) {
+  if (arp_init())
+  {
     fprintf(stderr, "arp_init failed\n");
     return EXIT_FAILURE;
   }
 
-
-  if (tcp_init()) {
+  if (tcp_init())
+  {
     fprintf(stderr, "tcp_init failed\n");
     return EXIT_FAILURE;
   }
 
   init_vm_weights(vm_weights);
-  memset(last_bu_update_incr, 0, sizeof(last_bu_update_incr));
 
   signal_tas_ready();
 
   notify_canblock_reset(&nbs);
-  while (exited == 0) {
+  while (exited == 0)
+  {
     unsigned n = 0;
     cur_ts = util_timeout_time_us();
-    
-    /* Accumulate per context VM budget and update total budget */
-    if (cur_ts - last_baccum >= config.bu_update_freq) {
-      update_budget(threads_launched, bu_stats);
-      last_baccum = cur_ts;
-    }
 
     n += nicif_poll();
     n += cc_poll(cur_ts);
@@ -160,36 +151,70 @@ int slowpath_main(int threads_launched)
     tcp_poll();
     util_timeout_poll_ts(&timeout_mgr, cur_ts);
 
-    if (config.fp_autoscale && cur_ts - loadmon_ts >= 10000) {
+    if (config.fp_autoscale && cur_ts - loadmon_ts >= 10000)
+    {
       flexnic_loadmon(cur_ts);
       loadmon_ts = cur_ts;
     }
 
-    if (notify_canblock(&nbs, n != 0, util_rdtsc())) {
+    if (notify_canblock(&nbs, n != 0, util_rdtsc()))
+    {
       slowpath_block(cur_ts);
       notify_canblock_reset(&nbs);
     }
 
-    if (cur_ts - last_print >= 1000000) {
+    if (cur_ts - last_print >= 1000000)
+    {
       cycs_ts = util_rdtsc();
-      if (!config.quiet) {
-        printf("stats: drops=%"PRIu64" k_rexmit=%"PRIu64" ecn=%"PRIu64" acks=%"PRIu64"\n",
-            kstats.drops, kstats.kernel_rexmit, kstats.ecn_marked, kstats.acks);
-        printf("ts=%ld elapsed=%ld " 
-            "TOTAL=%ld " 
-            "RVM0=%ld RVM1=%ld "
-            "POLLVM0=%ld TXVM0=%ld RXVM0=%ld "
-            "POLLVM1=%ld TXVM1=%ld RXVM1=%ld "
-            "BUVM0=%ld BUVM1=%ld\n", cycs_ts, cycs_ts - last_cycs_ts, 
-            get_total_cycles_consumed(),
-            get_round_cycles_consumed(0), get_round_cycles_consumed(1),
-            get_poll_cycles_consumed(0), get_tx_cycles_consumed(0), get_rx_cycles_consumed(0),
-            get_poll_cycles_consumed(1), get_tx_cycles_consumed(1), get_rx_cycles_consumed(1),
-            bu_stats[0][0], bu_stats[1][0]);
+
+      bstats_vm0 = get_budget_stats(0, 0);
+      bstats_vm1 = get_budget_stats(1, 0);
+
+      if (!config.quiet)
+      {
+        printf("stats: drops=%" PRIu64 " k_rexmit=%" PRIu64 " ecn=%" PRIu64 " acks=%" PRIu64 "\n",
+               kstats.drops, kstats.kernel_rexmit, kstats.ecn_marked, kstats.acks);
+
+        printf("ts=%ld elapsed=%ld "
+               "RVM0=%ld RVM1=%ld "
+               "POLLVM0=%ld TXVM0=%ld RXVM0=%ld "
+               "POLLVM1=%ld TXVM1=%ld RXVM1=%ld "
+               "BUVM0=%ld BUVM1=%ld\n",
+               cycs_ts, cycs_ts - last_cycs_ts,
+               bstats_vm0.cycles_total, bstats_vm1.cycles_total,
+               bstats_vm0.cycles_poll, bstats_vm0.cycles_tx, bstats_vm0.cycles_rx,
+               bstats_vm1.cycles_poll, bstats_vm1.cycles_tx, bstats_vm1.cycles_rx,
+               bstats_vm0.budget, bstats_vm1.budget);
+
+        printf("POLL_TOTAL=%ld B0=%ld B1=%ld B2=%ld B3=%ld B4=%ld B5=%ld B6=%ld B7=%ld B8=%ld B9=%ld B10=%ld B11=%ld B12=%ld B13=%ld B14=%ld B15=%ld B16=%ld\n",
+            bstats_vm0.poll_total, bstats_vm0.hist_poll[0], bstats_vm0.hist_poll[1], bstats_vm0.hist_poll[2], 
+            bstats_vm0.hist_poll[3], bstats_vm0.hist_poll[4], bstats_vm0.hist_poll[5], bstats_vm0.hist_poll[6],
+            bstats_vm0.hist_poll[7], bstats_vm0.hist_poll[8], bstats_vm0.hist_poll[9], bstats_vm0.hist_poll[10], 
+            bstats_vm0.hist_poll[11], bstats_vm0.hist_poll[12], bstats_vm0.hist_poll[13], bstats_vm0.hist_poll[14], 
+            bstats_vm0.hist_poll[15], bstats_vm0.hist_poll[16]);
+        printf("TX_TOTAL=%ld B0=%ld B1=%ld B2=%ld B3=%ld B4=%ld B5=%ld B6=%ld B7=%ld B8=%ld B9=%ld B10=%ld B11=%ld B12=%ld B13=%ld B14=%ld B15=%ld B16=%ld\n",
+            bstats_vm0.tx_total, bstats_vm0.hist_tx[0], bstats_vm0.hist_tx[1], bstats_vm0.hist_tx[2], 
+            bstats_vm0.hist_tx[3], bstats_vm0.hist_tx[4], bstats_vm0.hist_tx[5], bstats_vm0.hist_tx[6],
+            bstats_vm0.hist_tx[7], bstats_vm0.hist_tx[8], bstats_vm0.hist_tx[9], bstats_vm0.hist_tx[10], 
+            bstats_vm0.hist_tx[11], bstats_vm0.hist_tx[12], bstats_vm0.hist_tx[13], bstats_vm0.hist_tx[14], 
+            bstats_vm0.hist_tx[15], bstats_vm0.hist_tx[16]);
+        printf("RX_TOTAL=%ld B0=%ld B1=%ld B2=%ld B3=%ld B4=%ld B5=%ld B6=%ld B7=%ld B8=%ld B9=%ld B10=%ld B11=%ld B12=%ld B13=%ld B14=%ld B15=%ld B16=%ld\n",
+            bstats_vm0.rx_total, bstats_vm0.hist_rx[0], bstats_vm0.hist_rx[1], bstats_vm0.hist_rx[2], 
+            bstats_vm0.hist_rx[3], bstats_vm0.hist_rx[4], bstats_vm0.hist_rx[5], bstats_vm0.hist_rx[6],
+            bstats_vm0.hist_rx[7], bstats_vm0.hist_rx[8], bstats_vm0.hist_rx[9], bstats_vm0.hist_rx[10], 
+            bstats_vm0.hist_rx[11], bstats_vm0.hist_rx[12], bstats_vm0.hist_rx[13], bstats_vm0.hist_rx[14], 
+            bstats_vm0.hist_rx[15], bstats_vm0.hist_rx[16]);
         fflush(stdout);
       }
       last_print = cur_ts;
       last_cycs_ts = cycs_ts;
+    }
+
+    /* Accumulate per context VM budget and update total budget */
+    if (cur_ts - last_baccum >= config.bu_update_freq)
+    {
+      update_budget(threads_launched);
+      last_baccum = cur_ts;
     }
   }
 
@@ -207,64 +232,25 @@ static void init_vm_weights(double *vm_weights)
   }
 }
 
-static void update_budget(int threads_launched, 
-    int64_t bu_stats[FLEXNIC_PL_VMST_NUM + 1][1])
+static void update_budget(int threads_launched)
 {
-  int vmid, ctxid, n_unused = 0;
+  int vmid, ctxid;
   uint64_t cur_ts;
-  int64_t incr, last_incr, bu_unused, use_target;
-  uint64_t total_budget, bu_unused_sum[threads_launched];
-  int64_t bu_used[FLEXNIC_PL_VMST_NUM][FLEXNIC_PL_APPCTX_NUM];
-  int bu_was_unused[FLEXNIC_PL_VMST_NUM][FLEXNIC_PL_APPCTX_NUM];
-
-  memset(bu_unused_sum, 0, sizeof(bu_unused_sum));
-  memset(bu_was_unused, 0, sizeof(bu_was_unused));
-  memset(bu_used, 0, sizeof(bu_used));
+  int64_t incr;
+  uint64_t total_budget;
 
   cur_ts = util_rdtsc();
   total_budget = config.bu_boost * (cur_ts - last_bu_update_ts);
-  
+
   /* Update budget */
   for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
   {
-    // incr = ((total_budget * vm_weights[vmid]) / vm_weights_sum);
-    incr = total_budget;
+    incr = ((total_budget * vm_weights[vmid]) / vm_weights_sum);
     for (ctxid = 0; ctxid < threads_launched; ctxid++)
     {
-      last_incr = last_bu_update_incr[vmid][ctxid];
-      last_bu_update_incr[vmid][ctxid] = incr;
-
-      bu_stats[vmid][ctxid] = boost_budget(vmid, ctxid, 
-          incr, &bu_used[vmid][ctxid]);
-
-      bu_unused = last_incr - bu_used[vmid][ctxid];
-
-      use_target = last_incr * config.bu_use_ratio;
-      if ((use_target - bu_unused) < 0)
-      {
-        bu_unused_sum[ctxid] += bu_unused;
-        bu_was_unused[vmid][ctxid] = 1;
-        n_unused += 1;
-      }
+      boost_budget(vmid, ctxid, incr);
     }
   }
-
-  /* Reallocate unused cycles */
-  // if (n_unused != (FLEXNIC_PL_VMST_NUM - 1) && n_unused != 0)
-  // {
-  //   for (ctxid = 0; ctxid < threads_launched; ctxid++)
-  //   {
-  //     bu_unused_div = bu_unused_sum[ctxid] / (FLEXNIC_PL_VMST_NUM - 1 - n_unused);
-  //     printf("bu_unused_div=%ld\n", bu_unused_div);
-  //     for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
-  //     {
-  //       if (!bu_was_unused[vmid][ctxid])
-  //       {
-  //         redistr_unused_budget(vmid, ctxid, bu_unused_div);
-  //       }
-  //     }
-  //   }
-  // }
 
   last_bu_update_ts = cur_ts;
 }
@@ -275,38 +261,51 @@ static void slowpath_block(uint32_t cur_ts)
   struct epoll_event event[2];
   uint64_t val;
   uint32_t cc_timeout = cc_next_ts(cur_ts),
-    util_timeout = util_timeout_next(&timeout_mgr, cur_ts),
-    timeout_us;
+           util_timeout = util_timeout_next(&timeout_mgr, cur_ts),
+           timeout_us;
 
-  if(cc_timeout != -1U && util_timeout != -1U) {
+  if (cc_timeout != -1U && util_timeout != -1U)
+  {
     timeout_us = MIN(cc_timeout, util_timeout);
-  } else if(cc_timeout != -1U) {
+  }
+  else if (cc_timeout != -1U)
+  {
     timeout_us = util_timeout;
-  } else {
+  }
+  else
+  {
     timeout_us = cc_timeout;
   }
-  if(timeout_us != -1U) {
+  if (timeout_us != -1U)
+  {
     timeout_ms = timeout_us / 1000;
-  } else {
+  }
+  else
+  {
     timeout_ms = -1;
   }
 
   // Deal with load management
-  if(timeout_ms == -1 || timeout_ms > 1000) {
+  if (timeout_ms == -1 || timeout_ms > 1000)
+  {
     timeout_ms = 10;
   }
 
 again:
   n = epoll_wait(epfd, event, 2, timeout_ms);
-  if(n == -1 && errno == EINTR) {
+  if (n == -1 && errno == EINTR)
+  {
     /* To support attaching GDB */
     goto again;
-  } else if (n == -1) {
+  }
+  else if (n == -1)
+  {
     perror("slowpath_block: epoll_wait failed");
     abort();
   }
 
-  for(i = 0; i < n; i++) {
+  for (i = 0; i < n; i++)
+  {
     assert(event[i].data.fd == kernel_notifyfd);
     ret = read(kernel_notifyfd, &val, sizeof(uint64_t));
     if ((ret > 0 && ret != sizeof(uint64_t)) ||
@@ -320,20 +319,21 @@ again:
 
 static void timeout_trigger(struct timeout *to, uint8_t type, void *opaque)
 {
-  switch (type) {
-    case TO_ARP_REQ:
-      arp_timeout(to, type);
-      break;
+  switch (type)
+  {
+  case TO_ARP_REQ:
+    arp_timeout(to, type);
+    break;
 
-    case TO_TCP_HANDSHAKE:
-    case TO_TCP_RETRANSMIT:
-    case TO_TCP_CLOSED:
-      tcp_timeout(to, type);
-      break;
+  case TO_TCP_HANDSHAKE:
+  case TO_TCP_RETRANSMIT:
+  case TO_TCP_CLOSED:
+    tcp_timeout(to, type);
+    break;
 
-    default:
-      fprintf(stderr, "Unknown timeout type: %u\n", type);
-      abort();
+  default:
+    fprintf(stderr, "Unknown timeout type: %u\n", type);
+    abort();
   }
 }
 

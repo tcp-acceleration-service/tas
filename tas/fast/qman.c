@@ -56,6 +56,12 @@
 
 #define QUANTA BATCH_SIZE * TCP_MSS
 
+/** Node in a list of out of budget VMs to be activated */
+struct out_of_budget_vm {
+  uint32_t vmid;
+  struct out_of_budget_vm *next;
+};
+
 /** Queue container for a virtual machine */
 struct vm_qman {
   /** VM queue */
@@ -355,6 +361,7 @@ int vmcont_init(struct qman_thread *t)
     vq = &vqman->queues[i];
     vq->avail = 0;
     vq->dc = QUANTA;
+
     ret = flowcont_init(vq);
 
     if (ret != 0)
@@ -371,8 +378,11 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
     struct vm_budget *budgets, unsigned num, 
     unsigned *vm_ids, unsigned *q_ids, uint16_t *q_bytes)
 {
-  int i, cnt, x;
   uint32_t idx;
+  int i, cnt, x;
+  struct out_of_budget_vm *oob_vm, *prev_oob_vm;
+  struct out_of_budget_vm *oob_head = NULL;
+  struct out_of_budget_vm *oob_tail = NULL;
 
   for (cnt = 0; cnt < num && vqman->head_idx != IDXLIST_INVAL;)
   {
@@ -386,7 +396,7 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
       vqman->tail_idx = IDXLIST_INVAL;
     }
 
-    if (budgets[idx].cycles > 0)
+    if (budgets[idx].budget > 0)
     {
       vq->dc += QUANTA;
       struct flow_qman *fqman = vq->fqman;
@@ -409,11 +419,33 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
     {
       if (vq->avail > 0)
       {
-        vm_queue_activate(vqman, vq, idx);
+        oob_vm = malloc(sizeof(struct out_of_budget_vm));
+        oob_vm->vmid = idx;
+        oob_vm->next = NULL;
+
+        if (oob_head == NULL) 
+        {
+          oob_head = oob_vm;
+          oob_tail = oob_vm;
+        }
+        else {
+          oob_tail->next = oob_vm;
+          oob_tail = oob_vm;
+        }
       }
     }
   }
 
+  /* Enqueue VMs out of budget that still have packets to send*/
+  oob_vm = oob_head;
+  while(oob_vm != NULL)
+  {
+    idx = oob_vm->vmid;
+    vm_queue_activate(vqman, &vqman->queues[idx], idx);
+    prev_oob_vm = oob_vm;
+    oob_vm = oob_vm->next;
+    free(prev_oob_vm);
+  }
 
   return cnt;
 }

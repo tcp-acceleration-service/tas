@@ -25,7 +25,7 @@ int flextcp_proxy_kernel_connect(int *shmfds, int *flexnic_evfd)
   int ret;
   uint16_t vmid;
 
-  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM - 1; vmid++)
+  for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
   {
     ret = flextcp_vm_kernel_connect(vmid, &shmfds[vmid], flexnic_evfd);
     if (ret < 0)

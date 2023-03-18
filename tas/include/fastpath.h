@@ -41,6 +41,10 @@
 #define MAX_POLL_ROUNDS 15
 #define MAX_NULL_ROUNDS 2000
 
+#define POLL_PHASE 1
+#define TX_PHASE 2
+#define RX_PHASE 3
+
 struct network_thread {
   struct rte_mempool *pool;
   uint16_t queue_id;
@@ -82,13 +86,10 @@ struct polled_vm {
 
 struct vm_budget {
   uint16_t vmid;
-  volatile int64_t cycles;
+  volatile int64_t budget;
   volatile uint64_t cycles_poll;
   volatile uint64_t cycles_tx;
   volatile uint64_t cycles_rx;
-  volatile uint64_t cycles_consumed;
-  volatile uint64_t cycles_consumed_round;
-  volatile int64_t bandwidth;
 };
 
 struct dataplane_context {
@@ -121,12 +122,13 @@ struct dataplane_context {
   struct polled_vm polled_vms[FLEXNIC_PL_VMST_NUM];  
 
    /********************************************************/
-  /* resource usage for each vm */
-  struct vm_budget budgets[FLEXNIC_PL_VMST_NUM];
-  /* counters for number of packets served by a vm in a phase*/
-  int vm_counters[FLEXNIC_PL_VMST_NUM];
+  /* group resource budget */
   int counters_total;
-  volatile uint64_t cycles_total;
+  int vm_counters[FLEXNIC_PL_VMST_NUM];
+  struct vm_budget budgets[FLEXNIC_PL_VMST_NUM];
+  uint64_t hist_poll[BATCH_SIZE + 1];
+  uint64_t hist_tx[BATCH_SIZE + 1];
+  uint64_t hist_rx[BATCH_SIZE + 1];
 
   /********************************************************/
   /* pre-allocated buffers for polling doorbells and queue manager */

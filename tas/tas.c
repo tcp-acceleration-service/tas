@@ -59,6 +59,7 @@ volatile unsigned fp_scale_to = 0;
 static unsigned threads_launched = 0;
 int exited;
 
+struct budget_statistics budget_statistics;
 struct dataplane_context **ctxs = NULL;
 struct core_load *core_loads = NULL;
 
@@ -253,125 +254,69 @@ int flexnic_scale_to(uint32_t cores)
   return 0;
 }
 
-uint64_t get_total_cycles_consumed()
+uint64_t sum_hist(uint64_t hist[16 + 1], int n)
 {
   int i;
   uint64_t sum = 0;
-  uint64_t cur_consumed = 0;
-  for (i = 0; i < threads_launched; i++)
+  for (i = 0; i < n; i++)
   {
-    cur_consumed = __sync_fetch_and_add(&ctxs[i]->cycles_total, 0);
-    sum += cur_consumed;
-    __sync_fetch_and_sub(&ctxs[i]->cycles_total, cur_consumed);
+    sum += hist[i];
   }
 
   return sum;
 }
 
-uint64_t get_round_cycles_consumed(int vmid)
+struct budget_statistics get_budget_stats(int vmid, int ctxid)
 {
-  int i;
-  uint64_t sum = 0;
-  uint64_t cur_consumed = 0;
-  for (i = 0; i < threads_launched; i++)
-  {
-    cur_consumed = __sync_fetch_and_add(&ctxs[i]->budgets[vmid].cycles_consumed_round, 0);
-    sum += cur_consumed;
-    __sync_fetch_and_sub(&ctxs[i]->budgets[vmid].cycles_consumed_round, cur_consumed);
-  }
+  struct budget_statistics stats;
 
-  return sum;
+  /* Get stats for this logging round */
+  stats.budget = ctxs[ctxid]->budgets[vmid].budget;
+  stats.cycles_poll = ctxs[ctxid]->budgets[vmid].cycles_poll;
+  stats.cycles_tx = ctxs[ctxid]->budgets[vmid].cycles_tx;
+  stats.cycles_rx = ctxs[ctxid]->budgets[vmid].cycles_rx;
+  memcpy(stats.hist_poll, ctxs[ctxid]->hist_poll, sizeof(ctxs[ctxid]->hist_poll));
+  stats.poll_total = sum_hist(stats.hist_poll, 16 + 1);
+  memcpy(stats.hist_tx, ctxs[ctxid]->hist_tx, sizeof(ctxs[ctxid]->hist_tx));
+  stats.tx_total = sum_hist(stats.hist_tx, 16 + 1);
+  memcpy(stats.hist_rx, ctxs[ctxid]->hist_rx, sizeof(ctxs[ctxid]->hist_rx));
+  stats.rx_total = sum_hist(stats.hist_rx, 16 + 1);
+  stats.cycles_total = stats.cycles_poll + stats.cycles_tx + stats.cycles_rx;
+
+  /* Reset stats for this logging round (budget is not reset) */
+  __sync_fetch_and_sub(&ctxs[ctxid]->budgets[vmid].cycles_poll,
+      stats.cycles_poll);
+
+  __sync_fetch_and_sub(&ctxs[ctxid]->budgets[vmid].cycles_tx,
+      stats.cycles_tx);
+
+  __sync_fetch_and_sub(&ctxs[ctxid]->budgets[vmid].cycles_rx,
+      stats.cycles_rx);
+
+  memset(ctxs[ctxid]->hist_poll, 0, sizeof(ctxs[ctxid]->hist_poll));
+  memset(ctxs[ctxid]->hist_tx, 0, sizeof(ctxs[ctxid]->hist_tx));
+  memset(ctxs[ctxid]->hist_rx, 0, sizeof(ctxs[ctxid]->hist_rx));
+
+  return stats;
 }
 
-uint64_t get_poll_cycles_consumed(int vmid)
+void boost_budget(int vmid, int ctxid, int64_t incr)
 {
-  int i;
-  uint64_t sum = 0;
-  uint64_t cur_consumed = 0;
-    for (i = 0; i < threads_launched; i++)
-  {
-    cur_consumed = __sync_fetch_and_add(&ctxs[i]->budgets[vmid].cycles_poll, 0);
-    sum += cur_consumed;
-    __sync_fetch_and_sub(&ctxs[i]->budgets[vmid].cycles_poll, cur_consumed);
-  }
-
-  return sum;
-}
-
-uint64_t get_rx_cycles_consumed(int vmid)
-{
-  int i;
-  uint64_t sum = 0;
-  uint64_t cur_consumed = 0;
-    for (i = 0; i < threads_launched; i++)
-  {
-    cur_consumed = __sync_fetch_and_add(&ctxs[i]->budgets[vmid].cycles_rx, 0);
-    sum += cur_consumed;
-    __sync_fetch_and_sub(&ctxs[i]->budgets[vmid].cycles_rx, cur_consumed);
-  }
-
-  return sum;
-}
-
-uint64_t get_tx_cycles_consumed(int vmid)
-{
-  int i;
-  uint64_t sum = 0;
-  uint64_t cur_consumed = 0;
-    for (i = 0; i < threads_launched; i++)
-  {
-    cur_consumed = __sync_fetch_and_add(&ctxs[i]->budgets[vmid].cycles_tx, 0);
-    sum += cur_consumed;
-    __sync_fetch_and_sub(&ctxs[i]->budgets[vmid].cycles_tx, cur_consumed);
-  }
-
-  return sum;
-}
-
-int64_t boost_budget(int vmid, int ctxid, int64_t incr, 
-    int64_t *last_bu_used)
-{
-  uint64_t bu_used;
   uint64_t old_budget, new_budget, max_budget;
 
-  old_budget = __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].cycles, 0);
+  old_budget = ctxs[ctxid]->budgets[vmid].budget;
   new_budget = old_budget + incr;
   max_budget = config.bu_max_budget;  
-  // new_budget = MIN(new_budget, max_budget);
 
+  /* TODO: Leftovers that would go over budget (new_budget - max_budget)
+     give to other VMs that would not go over MAX */
   if (new_budget > max_budget)
   {
     incr = max_budget - old_budget;
   }
-  
-  __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].cycles, incr);
-  
-  bu_used = 
-      __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].cycles_consumed, 0);
-
-  __sync_fetch_and_sub(&ctxs[ctxid]->budgets[vmid].cycles_consumed, bu_used);
-  *last_bu_used = bu_used;
-
-  // ctxs[ctxid]->budgets[vmid].cycles = new_budget;
-  return ctxs[ctxid]->budgets[vmid].cycles;
+  __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].budget, incr);
+  printf("INCR=%ld NEW_BUDGET=%ld\n", incr, ctxs[ctxid]->budgets[vmid].budget);
 }
-
-/* Called in the s*/
-void redistr_unused_budget(int vmid, int ctxid, int64_t incr)
-{
-  int64_t old_budget, new_budget, max_budget;
-
-  old_budget = ctxs[ctxid]->budgets[vmid].cycles;
-  new_budget = old_budget + incr;
-  max_budget = config.bu_max_budget;  
-  // new_budget = MIN(new_budget, max_budget);
-  if (new_budget > max_budget)
-  {
-    incr = max_budget - old_budget;
-  }
-  __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].cycles, incr);
-}
-
 
 void flexnic_loadmon(uint32_t ts)
 {
