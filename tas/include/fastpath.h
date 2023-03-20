@@ -126,9 +126,6 @@ struct dataplane_context {
   int counters_total;
   int vm_counters[FLEXNIC_PL_VMST_NUM];
   struct vm_budget budgets[FLEXNIC_PL_VMST_NUM];
-  uint64_t hist_poll[BATCH_SIZE + 1];
-  uint64_t hist_tx[BATCH_SIZE + 1];
-  uint64_t hist_rx[BATCH_SIZE + 1];
 
   /********************************************************/
   /* pre-allocated buffers for polling doorbells and queue manager */

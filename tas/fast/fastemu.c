@@ -178,9 +178,6 @@ int dataplane_context_init(struct dataplane_context *ctx)
       polled_ctx_init(p_ctx, j, i);
     }
   }
-  memset(ctx->hist_poll, 0, sizeof(ctx->hist_poll));
-  memset(ctx->hist_tx, 0, sizeof(ctx->hist_tx));
-  memset(ctx->hist_rx, 0, sizeof(ctx->hist_rx));
   ctx->counters_total = 0;
   ctx->poll_rounds = 0;
   ctx->poll_next_vm = 0;
@@ -441,7 +438,6 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
       bufcache_free(ctx, bhs[i]);
   }
 
-  ctx->hist_rx[n] += 1;
   return n;
 }
 
@@ -513,7 +509,6 @@ static unsigned poll_active_queues(struct dataplane_context *ctx, uint32_t ts)
   if (total == 0)
     STATS_ADD(ctx, qs_empty, total);
 
-  ctx->hist_poll[total] += 1;
   return total;
 }
 
@@ -558,7 +553,6 @@ static unsigned poll_all_queues(struct dataplane_context *ctx, uint32_t ts)
   if (total == 0)
     STATS_ADD(ctx, qs_empty, total);
 
-  ctx->hist_poll[total] += 1;
   return total;
 }
 
@@ -619,7 +613,6 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   if (ret <= 0)
   {
     STATS_ADD(ctx, qm_empty, 1);
-    ctx->hist_tx[0] += 1;
     return 0;
   }
 
@@ -657,7 +650,6 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
   /* apply buffer reservations */
   bufcache_alloc(ctx, off);
 
-  ctx->hist_tx[ret] += 1;
   return ret;
 }
 

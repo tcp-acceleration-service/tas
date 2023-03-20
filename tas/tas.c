@@ -275,12 +275,6 @@ struct budget_statistics get_budget_stats(int vmid, int ctxid)
   stats.cycles_poll = ctxs[ctxid]->budgets[vmid].cycles_poll;
   stats.cycles_tx = ctxs[ctxid]->budgets[vmid].cycles_tx;
   stats.cycles_rx = ctxs[ctxid]->budgets[vmid].cycles_rx;
-  memcpy(stats.hist_poll, ctxs[ctxid]->hist_poll, sizeof(ctxs[ctxid]->hist_poll));
-  stats.poll_total = sum_hist(stats.hist_poll, 16 + 1);
-  memcpy(stats.hist_tx, ctxs[ctxid]->hist_tx, sizeof(ctxs[ctxid]->hist_tx));
-  stats.tx_total = sum_hist(stats.hist_tx, 16 + 1);
-  memcpy(stats.hist_rx, ctxs[ctxid]->hist_rx, sizeof(ctxs[ctxid]->hist_rx));
-  stats.rx_total = sum_hist(stats.hist_rx, 16 + 1);
   stats.cycles_total = stats.cycles_poll + stats.cycles_tx + stats.cycles_rx;
 
   /* Reset stats for this logging round (budget is not reset) */
@@ -292,10 +286,6 @@ struct budget_statistics get_budget_stats(int vmid, int ctxid)
 
   __sync_fetch_and_sub(&ctxs[ctxid]->budgets[vmid].cycles_rx,
       stats.cycles_rx);
-
-  memset(ctxs[ctxid]->hist_poll, 0, sizeof(ctxs[ctxid]->hist_poll));
-  memset(ctxs[ctxid]->hist_tx, 0, sizeof(ctxs[ctxid]->hist_tx));
-  memset(ctxs[ctxid]->hist_rx, 0, sizeof(ctxs[ctxid]->hist_rx));
 
   return stats;
 }
@@ -315,7 +305,6 @@ void boost_budget(int vmid, int ctxid, int64_t incr)
     incr = max_budget - old_budget;
   }
   __sync_fetch_and_add(&ctxs[ctxid]->budgets[vmid].budget, incr);
-  printf("INCR=%ld NEW_BUDGET=%ld\n", incr, ctxs[ctxid]->budgets[vmid].budget);
 }
 
 void flexnic_loadmon(uint32_t ts)

@@ -185,27 +185,9 @@ int slowpath_main(int threads_launched)
                bstats_vm0.cycles_poll, bstats_vm0.cycles_tx, bstats_vm0.cycles_rx,
                bstats_vm1.cycles_poll, bstats_vm1.cycles_tx, bstats_vm1.cycles_rx,
                bstats_vm0.budget, bstats_vm1.budget);
-
-        printf("POLL_TOTAL=%ld B0=%ld B1=%ld B2=%ld B3=%ld B4=%ld B5=%ld B6=%ld B7=%ld B8=%ld B9=%ld B10=%ld B11=%ld B12=%ld B13=%ld B14=%ld B15=%ld B16=%ld\n",
-            bstats_vm0.poll_total, bstats_vm0.hist_poll[0], bstats_vm0.hist_poll[1], bstats_vm0.hist_poll[2], 
-            bstats_vm0.hist_poll[3], bstats_vm0.hist_poll[4], bstats_vm0.hist_poll[5], bstats_vm0.hist_poll[6],
-            bstats_vm0.hist_poll[7], bstats_vm0.hist_poll[8], bstats_vm0.hist_poll[9], bstats_vm0.hist_poll[10], 
-            bstats_vm0.hist_poll[11], bstats_vm0.hist_poll[12], bstats_vm0.hist_poll[13], bstats_vm0.hist_poll[14], 
-            bstats_vm0.hist_poll[15], bstats_vm0.hist_poll[16]);
-        printf("TX_TOTAL=%ld B0=%ld B1=%ld B2=%ld B3=%ld B4=%ld B5=%ld B6=%ld B7=%ld B8=%ld B9=%ld B10=%ld B11=%ld B12=%ld B13=%ld B14=%ld B15=%ld B16=%ld\n",
-            bstats_vm0.tx_total, bstats_vm0.hist_tx[0], bstats_vm0.hist_tx[1], bstats_vm0.hist_tx[2], 
-            bstats_vm0.hist_tx[3], bstats_vm0.hist_tx[4], bstats_vm0.hist_tx[5], bstats_vm0.hist_tx[6],
-            bstats_vm0.hist_tx[7], bstats_vm0.hist_tx[8], bstats_vm0.hist_tx[9], bstats_vm0.hist_tx[10], 
-            bstats_vm0.hist_tx[11], bstats_vm0.hist_tx[12], bstats_vm0.hist_tx[13], bstats_vm0.hist_tx[14], 
-            bstats_vm0.hist_tx[15], bstats_vm0.hist_tx[16]);
-        printf("RX_TOTAL=%ld B0=%ld B1=%ld B2=%ld B3=%ld B4=%ld B5=%ld B6=%ld B7=%ld B8=%ld B9=%ld B10=%ld B11=%ld B12=%ld B13=%ld B14=%ld B15=%ld B16=%ld\n",
-            bstats_vm0.rx_total, bstats_vm0.hist_rx[0], bstats_vm0.hist_rx[1], bstats_vm0.hist_rx[2], 
-            bstats_vm0.hist_rx[3], bstats_vm0.hist_rx[4], bstats_vm0.hist_rx[5], bstats_vm0.hist_rx[6],
-            bstats_vm0.hist_rx[7], bstats_vm0.hist_rx[8], bstats_vm0.hist_rx[9], bstats_vm0.hist_rx[10], 
-            bstats_vm0.hist_rx[11], bstats_vm0.hist_rx[12], bstats_vm0.hist_rx[13], bstats_vm0.hist_rx[14], 
-            bstats_vm0.hist_rx[15], bstats_vm0.hist_rx[16]);
         fflush(stdout);
       }
+      
       last_print = cur_ts;
       last_cycs_ts = cycs_ts;
     }
