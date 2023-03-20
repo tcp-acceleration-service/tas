@@ -40,110 +40,142 @@ def parse_client(fname):
 
   return client_data
 
-def parse_tas(fname):
+def parse_phases(fname):
   f = open(fname)
   lines = f.readlines()
 
   tas_data = {
     "timestamps": [],
-    "vm0_cycles_total": [],
-    "vm0_cycles_rate": [],
-    "vm0_cycles_poll": [],
-    "vm0_cycles_tx": [],
-    "vm0_cycles_rx": [],
-    "vm1_cycles_total": [],
-    "vm1_cycles_rate": [],
-    "vm1_cycles_poll": [],
-    "vm1_cycles_tx": [],
-    "vm1_cycles_rx": [],
+    "elapsed": [],
+    "vm0_poll": [],
+    "vm0_tx": [],
+    "vm0_rx": [],
+    "vm1_poll": [],
+    "vm1_tx": [],
+    "vm1_rx": [],
   }
 
   for line in lines:
     if "VM" in line:
       timestamp = putils.get_ts(line)
-      vm0tc = putils.get_cycles_total(line, 0)
-      vm0rc = putils.get_cycles_rate(line, 0)
+      elapsed = putils.get_elapsed(line)
       vm0_cpoll = putils.get_cycles_poll(line, 0)
       vm0_ctx = putils.get_cycles_tx(line, 0)
       vm0_crx = putils.get_cycles_rx(line, 0)
-      vm1tc = putils.get_cycles_total(line, 1)
-      vm1rc = putils.get_cycles_rate(line, 1)
       vm1_cpoll = putils.get_cycles_poll(line, 1)
       vm1_ctx = putils.get_cycles_tx(line, 1)
       vm1_crx = putils.get_cycles_rx(line, 1)
 
       tas_data["timestamps"].append(timestamp)
-      tas_data["vm0_cycles_total"].append(vm0tc)
-      tas_data["vm0_cycles_rate"].append(vm0rc)
-      tas_data["vm0_cycles_poll"].append(vm0_cpoll)
-      tas_data["vm0_cycles_tx"].append(vm0_ctx)
-      tas_data["vm0_cycles_rx"].append(vm0_crx)
-      tas_data["vm1_cycles_total"].append(vm1tc)
-      tas_data["vm1_cycles_rate"].append(vm1rc)
-      tas_data["vm1_cycles_poll"].append(vm1_cpoll)
-      tas_data["vm1_cycles_tx"].append(vm1_ctx)
-      tas_data["vm1_cycles_rx"].append(vm1_crx)
+      tas_data["elapsed"].append(elapsed)
+      tas_data["vm0_poll"].append(vm0_cpoll)
+      tas_data["vm0_tx"].append(vm0_ctx)
+      tas_data["vm0_rx"].append(vm0_crx)
+      tas_data["vm1_poll"].append(vm1_cpoll)
+      tas_data["vm1_tx"].append(vm1_ctx)
+      tas_data["vm1_rx"].append(vm1_crx)
 
   return tas_data
 
-def save_cycles_phase_agg_dat(parsed_tas):
+def parse_cycles(fname):
+  f = open(fname)
+  lines = f.readlines()
+
+  tas_data = {
+    "timestamps": [],
+    "elapsed": [],
+    "vm0_cycles_rate": [],
+    "vm0_budget": [],
+    "vm1_cycles_rate": [],
+    "vm1_budget": []
+  }
+
+  for line in lines:
+    if "VM" in line:
+      timestamp = putils.get_ts(line)
+      elapsed = putils.get_elapsed(line)
+      vm0rc = putils.get_cycles_rate(line, 0)
+      vm0bu = putils.get_budget(line, 0)
+      vm1rc = putils.get_cycles_rate(line, 1)
+      vm1bu = putils.get_budget(line, 1)
+
+      tas_data["timestamps"].append(timestamp)
+      tas_data["elapsed"].append(elapsed)
+      tas_data["vm0_cycles_rate"].append(vm0rc)
+      tas_data["vm0_budget"].append(vm0bu)
+      tas_data["vm1_cycles_rate"].append(vm1rc)
+      tas_data["vm1_budget"].append(vm1bu)
+
+  return tas_data
+
+def save_phases_dat(parsed_tas):
   header = "vmid ts cycles_poll cycles_tx cycles_rx\n"
   
-  f = open("cycles_phase_agg.dat", "w+")
+  f = open("phases.dat", "w+")
   f.write(header)
 
-  vm0_poll_sum = 0
-  vm0_tx_sum = 0
-  vm0_rx_sum = 0
-  vm1_poll_sum = 0
-  vm1_tx_sum = 0
-  vm1_rx_sum = 0
-
-  ts_len = len(parsed_tas["timestamps"])
-  total_ts = int(parsed_tas["timestamps"][ts_len - 1]) - int(parsed_tas["timestamps"][0])
-
   for i in range(len(parsed_tas["timestamps"])):
-    vm0_poll_sum += int(parsed_tas["vm0_cycles_poll"][i])
-    vm0_tx_sum += int(parsed_tas["vm0_cycles_tx"][i])
-    vm0_rx_sum += int(parsed_tas["vm0_cycles_rx"][i])
+    ts = parsed_tas["timestamps"][i]
+    elapsed = parsed_tas["elapsed"][i]
+    vm0_poll = parsed_tas["vm0_poll"][i]
+    vm0_tx = parsed_tas["vm0_tx"][i]
+    vm0_rx = parsed_tas["vm0_rx"][i]
+    vm1_poll = parsed_tas["vm1_poll"][i]
+    vm1_tx = parsed_tas["vm1_tx"][i] 
+    vm1b_rx = parsed_tas["vm1_rx"][i]
+    f.write("{} {} {} {} {} {} {} {}\n".format(
+      ts, elapsed, 
+      vm0_poll, vm0_tx, vm0_rx,
+      vm1_poll, vm1_tx, vm1b_rx
+    ))
 
-    vm1_poll_sum += int(parsed_tas["vm1_cycles_poll"][i])
-    vm1_tx_sum += int(parsed_tas["vm1_cycles_tx"][i])
-    vm1_rx_sum += int(parsed_tas["vm1_cycles_rx"][i])
+  # vm0_poll_sum = 0
+  # vm0_tx_sum = 0
+  # vm0_rx_sum = 0
+  # vm1_poll_sum = 0
+  # vm1_tx_sum = 0
+  # vm1_rx_sum = 0
+  
+  # ts_len = len(parsed_tas["timestamps"])
+  # total_ts = int(parsed_tas["timestamps"][ts_len - 1]) - int(parsed_tas["timestamps"][0])
 
-  f.write("{} {} {} {} {}\n".format(
-    "vm0", total_ts,
-    vm0_poll_sum, vm0_tx_sum, vm0_rx_sum
-  ))
+  # for i in range(len(parsed_tas["timestamps"])):
+  #   vm0_poll_sum += int(parsed_tas["vm0_cycles_poll"][i])
+  #   vm0_tx_sum += int(parsed_tas["vm0_cycles_tx"][i])
+  #   vm0_rx_sum += int(parsed_tas["vm0_cycles_rx"][i])
 
-  f.write("{} {} {} {} {}\n".format(
-    "vm1", total_ts,
-    vm1_poll_sum, vm1_tx_sum, vm1_rx_sum
-  ))
+  #   vm1_poll_sum += int(parsed_tas["vm1_cycles_poll"][i])
+  #   vm1_tx_sum += int(parsed_tas["vm1_cycles_tx"][i])
+  #   vm1_rx_sum += int(parsed_tas["vm1_cycles_rx"][i])
+
+  # f.write("{} {} {} {} {}\n".format(
+  #   "vm0", total_ts,
+  #   vm0_poll_sum, vm0_tx_sum, vm0_rx_sum
+  # ))
+
+  # f.write("{} {} {} {} {}\n".format(
+  #   "vm1", total_ts,
+  #   vm1_poll_sum, vm1_tx_sum, vm1_rx_sum
+  # ))
 
 def save_cycles_dat(parsed_tas):
-  header = "timestamp " + \
-      "vm0_rate vm0_total vm0_cycles_poll vm0_cycles_tx vm0_cycles_rx " + \
-      "vm1_rate vm1_total vm1_cycles_poll vm1_cycles_tx vm1_cycles_rx\n"
+  header = "timestamp elapsed " + \
+      "vm0_rate vm0_budget " + \
+      "vm1_rate vm1_budget\n"
   f = open("cycles.dat", "w+")
   f.write(header)
 
   for i in range(len(parsed_tas["timestamps"])):
     ts = parsed_tas["timestamps"][i]
+    elapsed = parsed_tas["elapsed"][i]
     vm0r = parsed_tas["vm0_cycles_rate"][i]
-    vm0t = parsed_tas["vm0_cycles_total"][i]
-    vm0_poll = parsed_tas["vm0_cycles_poll"][i]
-    vm0_tx = parsed_tas["vm0_cycles_tx"][i]
-    vm0_rx = parsed_tas["vm0_cycles_rx"][i]
+    vm0b = parsed_tas["vm0_budget"][i]
     vm1r = parsed_tas["vm1_cycles_rate"][i]
-    vm1t = parsed_tas["vm1_cycles_total"][i] 
-    vm1_poll = parsed_tas["vm1_cycles_poll"][i]
-    vm1_tx = parsed_tas["vm1_cycles_tx"][i]
-    vm1_rx = parsed_tas["vm1_cycles_rx"][i]
-    f.write("{} {} {} {} {} {} {} {} {} {} {}\n".format(
-      ts, 
-      vm0r, vm0t, vm0_poll, vm0_tx, vm0_rx,
-      vm1r, vm1t, vm1_poll, vm1_tx, vm1_rx
+    vm1b = parsed_tas["vm1_budget"][i]
+    f.write("{} {} {} {} {} {}\n".format(
+      ts, elapsed, 
+      vm0r, vm0b,
+      vm1r, vm1b
     ))
 
 def save_lat_dat(parsed_latencies, cid):
@@ -173,15 +205,17 @@ def save_client_dat(parsed_client, cid):
 def main():
   parsed_c0 = parse_client("./out/cycles-consumed_bare-vtas_client0_node0_nconns512_ncores3_msize64")
   parsed_c1 = parse_client("./out/cycles-consumed_bare-vtas_client1_node0_nconns4096_ncores3_msize64")
-  parsed_tas = parse_tas("./out/tas_c")
+  parsed_cycles = parse_cycles("./out/tas_c")
+  parsed_phases = parse_phases("./out/tas_c")
   latencies_c0 = parse_latencies("./out/cycles-consumed_bare-vtas_client0_node0_nconns512_ncores3_msize64")
   latencies_c1 = parse_latencies("./out/cycles-consumed_bare-vtas_client1_node0_nconns4096_ncores3_msize64")
   
-  save_cycles_dat(parsed_tas)
-  save_cycles_phase_agg_dat(parsed_tas)
+  save_cycles_dat(parsed_cycles)
+  save_phases_dat(parsed_phases)
   save_client_dat(parsed_c0, 0)
   save_client_dat(parsed_c1, 1)
   save_lat_dat(latencies_c0, 0)
+  save_lat_dat(latencies_c1, 0)
 
 if __name__ == '__main__':
   main()
