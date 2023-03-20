@@ -853,9 +853,6 @@ static void spend_budget(struct dataplane_context *ctx,
   for (vmid = 0; vmid < FLEXNIC_PL_VMST_NUM; vmid++)
   {
     counter = ctx->vm_counters[vmid];
-    assert(ctx->counters_total > 0 && ctx->counters_total <= BATCH_SIZE);
-    assert(counter >= 0 && counter <= BATCH_SIZE);
-    assert((counter / ctx->counters_total) <= 1);
     vm_cycles = cycles * (counter / ctx->counters_total);
     __sync_fetch_and_sub(&ctx->budgets[vmid].budget, vm_cycles);
 
@@ -865,7 +862,6 @@ static void spend_budget(struct dataplane_context *ctx,
         __sync_fetch_and_add(&ctx->budgets[vmid].cycles_poll, vm_cycles);
         break;
       case TX_PHASE:
-        assert(phase == TX_PHASE);
         __sync_fetch_and_add(&ctx->budgets[vmid].cycles_tx, vm_cycles);
         break;
       case RX_PHASE:
