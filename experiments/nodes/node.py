@@ -53,3 +53,39 @@ class Node:
       cmd = "sudo bash br_down.sh {} {}/24".format(interface, ip)
       self.cleanup_pane.send_keys(cmd)
       time.sleep(2)
+
+  def start_ovs(self, ovsctl_path):
+      cmd = "sudo {} start".format(ovsctl_path)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(2)
+
+  def stop_ovs(self, ovsctl_path):
+      cmd = "sudo {} stop".format(ovsctl_path)
+      self.cleanup_pane.send_keys(cmd)
+      time.sleep(2)
+
+  def ovsbr_add(self, br_name, ip, interface, script_dir):
+      cmd = "cd {}".format(script_dir)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(1)
+      cmd = "sudo bash ovsbr-add.sh {} {} {}".format(br_name, ip, interface)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(2)
+
+  def ovsbr_del(self, br_name):
+      cmd = "sudo ovs-vsctl del-br {}".format(br_name)
+      self.cleanup_pane.send_keys(cmd)
+      time.sleep(2)
+  
+  def ovstap_add(self, br_name, tap_name, script_dir):
+      cmd = "cd {}".format(script_dir)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(1)
+      cmd = "sudo bash ovstap-add.sh {} {}".format(br_name, tap_name)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(2)
+
+  def ovstap_del(self, script_dir):
+      cmd = "cd {}".format(script_dir)
+      self.cleanup_pane.send_keys(cmd)
+      time.sleep(1)

@@ -56,6 +56,8 @@ class Defaults:
         self.default_obenchmark_dir_bare = '{}/projects/o-benchmarks/benchmarks'.format(self.home_dir)
         self.default_obenchmark_dir_virt = '{}/projects/o-benchmarks/benchmarks'.format(self.home_dir_virt)
 
+        self.ovs_ctl_path = "/usr/local/share/openvswitch/scripts/ovs-ctl"
+
 class MachineConfig:
     def __init__(self, ip, interface, stack, is_remote, is_server):
         self.is_server = is_server
@@ -84,9 +86,9 @@ class TasConfig:
         self.lib_so = self.comp_dir + 'lib/libtas_interpose.so'
         self.exec_file = self.comp_dir + '/tas/tas'
         self.args = '--ip-addr={}/24 --fp-cores-max={}'.format(ip, n_cores) + \
-            ' --cc=const-rate --cc-const-rate=0 --fp-no-ints' + \
-            ' --fp-no-autoscale --fp-no-xsumoffload' + \
-            ' --dpdk-extra="-w{}"'.format(dpdk_extra)
+            ' --cc=const-rate --cc-const-rate=0' + \
+            ' --fp-no-autoscale --fp-no-ints' + \
+            ' --dpdk-extra="-w{}"'.format(dpdk_extra)   
         
         self.pane = pane
         self.ip = ip

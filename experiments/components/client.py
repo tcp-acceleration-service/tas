@@ -16,17 +16,17 @@ class Client:
         self.save_logs_pane = self.wmanager.add_new_pane(defaults.c_savelogs_pane,
                 machine_config.is_remote)
 
-    def run_bare(self):
-        self.run_benchmark_rpc()
+    def run_bare(self, w_sudo, ld_preload):
+        self.run_benchmark_rpc(w_sudo, ld_preload)
 
-    def run_virt(self):
+    def run_virt(self, w_sudo, ld_preload):
         ssh_com = utils.get_ssh_command(self.machine_config, self.vm_config)
         self.pane.send_keys(ssh_com)
         time.sleep(3)
         self.pane.send_keys("tas")
-        self.run_benchmark_rpc()
+        self.run_benchmark_rpc(w_sudo, ld_preload)
 
-    def run_benchmark_rpc(self):
+    def run_benchmark_rpc(self, w_sudo, ld_preload):
         self.pane.send_keys('cd ' + self.client_config.comp_dir)
         self.pane.send_keys(self.client_config.comp_cmd)
         self.pane.send_keys("cd " + self.client_config.tas_dir)
@@ -35,10 +35,10 @@ class Client:
         cmd = ''
         stack = self.machine_config.stack
         
-        if stack == 'virt-tas' or stack == 'bare-tas':
+        if w_sudo:
             cmd = 'sudo '
-
-        if stack == 'bare-tas' or stack == 'tap-tas' or stack == 'virt-tas' or stack == 'bare-vtas':
+        
+        if ld_preload:
             cmd += 'LD_PRELOAD=' + self.client_config.lib_so + ' '
        
         cmd += self.client_config.exec_file + ' ' + \

@@ -32,7 +32,7 @@ class VirtTasClient(VirtTas):
             vm_config, 
             self.wmanager)
         self.clients.append(client)
-        client.run_virt()
+        client.run_virt(True, True)
         time.sleep(3)
 
   def run(self):

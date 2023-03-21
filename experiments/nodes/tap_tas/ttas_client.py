@@ -29,7 +29,7 @@ class TapTasClient(TapTas):
             vm_config, 
             self.wmanager)
         self.clients.append(client)
-        client.run_virt()
+        client.run_virt(False, True)
         time.sleep(3)
 
   def run(self):

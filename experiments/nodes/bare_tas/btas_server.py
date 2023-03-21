@@ -24,7 +24,7 @@ class BareTasServer(BareTas):
               server_config, 
               None,
               self.wmanager)
-      server.run_bare()
+      server.run_bare(True, True)
       time.sleep(3)
 
   def run(self):

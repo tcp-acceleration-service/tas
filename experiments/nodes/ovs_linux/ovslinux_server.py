@@ -1,13 +1,13 @@
 import time
 
-from nodes.virt_linux.vlinux import VirtLinux
+from nodes.ovs_linux.ovslinux import OVSLinux
 from components.server import Server
 
-class VirtLinuxServer(VirtLinux):
+class OVSLinuxServer(OVSLinux):
   
   def __init__(self, config, wmanager):
 
-    VirtLinux.__init__(self, config.defaults, config.s_machine_config,
+    OVSLinux.__init__(self, config.defaults, config.s_machine_config,
         config.s_vm_configs, wmanager, 
         config.defaults.s_setup_pane, 
         config.defaults.s_cleanup_pane)

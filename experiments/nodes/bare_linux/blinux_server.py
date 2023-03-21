@@ -22,7 +22,7 @@ class BareLinuxServer(BareLinux):
               server_config, 
               None,
               self.wmanager)
-      server.run_bare()
+      server.run_bare(False, False)
       time.sleep(3)
 
   def run(self):

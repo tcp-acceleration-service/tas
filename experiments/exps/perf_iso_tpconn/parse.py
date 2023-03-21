@@ -37,15 +37,18 @@ def get_avg_tp(fname_c0, fname_c1):
   f = open(fname_c0)
   lines = f.readlines()
 
-  c1_first_ts = putils.get_last_ts(fname_c1)
+  c1_first_ts = putils.get_first_ts(fname_c1)
   idx, _ = putils.get_min_idx(fname_c0, c1_first_ts)
 
-  msize = int(putils.get_msize(fname_c0))
-  for l in lines[idx:]:
-    n_messages += int(putils.get_n_messages(l))
-    n += 1
+  first_line = lines[idx]
+  last_line = lines[len(lines) - 1]
 
-  return str((n_messages * msize / n) / 1000000)
+  n_messages = int(putils.get_n_messages(last_line)) - \
+      int(putils.get_n_messages(first_line))
+  msize = int(putils.get_msize(fname_c0))
+  n = len(lines) - idx
+
+  return str((n_messages * msize * 8 / n) / 1000000)
 
 def parse_metadata():
   dir_path = "./out/"
@@ -53,6 +56,10 @@ def parse_metadata():
 
   for f in os.listdir(dir_path):
     fname = os.fsdecode(f)
+
+    if "tas_c" == fname:
+      continue
+
     nconns = get_conns(fname)
     cid = putils.get_client_id(fname)
     nid = putils.get_node_id(fname)
@@ -93,7 +100,6 @@ def save_dat_file(avg_tps, fname):
   f = open(fname, "w+")
   header = "nconns bare-tas bare-vtas virt-tas\n"
   f.write(header)
-
   for tp in avg_tps:
     f.write("{} {} {} {}\n".format(
       tp["nconns"],

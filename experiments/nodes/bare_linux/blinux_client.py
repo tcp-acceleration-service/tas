@@ -24,7 +24,7 @@ class BareLinuxClient(BareLinux):
           None, 
           self.wmanager)
       self.clients.append(client)
-      client.run_bare()
+      client.run_bare(False, False)
       time.sleep(3)
 
   def run(self):

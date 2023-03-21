@@ -29,7 +29,7 @@ class TapTasServer(TapTas):
                 vm_config,
                 self.wmanager)
         self.servers.append(server)
-        server.run_virt()
+        server.run_virt(False, True)
         time.sleep(3)
 
   def run(self):

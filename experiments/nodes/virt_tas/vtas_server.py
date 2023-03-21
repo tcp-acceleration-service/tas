@@ -30,7 +30,7 @@ class VirtTasServer(VirtTas):
                 server_config, 
                 vm_config,
                 self.wmanager)
-        server.run_virt()
+        server.run_virt(True, True)
         time.sleep(3)
 
   def run(self):

@@ -40,6 +40,26 @@ def get_cycles_rate(line, vmid):
   cycles = re.search(regex, line).group(0)
   return cycles
 
+def get_budget(line, vmid):
+  regex = "(?<=(BUVM{}=))(.*?)(?=[\ \n])".format(vmid)
+  cycles = re.search(regex, line).group(0)
+  return cycles
+
+def get_cycles_poll(line, vmid):
+  regex = "(?<=(POLLVM{}=))(.*?)(?=[\ \n])".format(vmid)
+  cycles = re.search(regex, line).group(0)
+  return cycles
+
+def get_cycles_tx(line, vmid):
+  regex = "(?<=(TXVM{}=))(.*?)(?=[\ \n])".format(vmid)
+  cycles = re.search(regex, line).group(0)
+  return cycles
+
+def get_cycles_rx(line, vmid):
+  regex = "(?<=(RXVM{}=))(.*?)(?=[\ \n])".format(vmid)
+  cycles = re.search(regex, line).group(0)
+  return cycles
+
 def get_50p_lat(line):
   regex = "(?<=(50p=))(.*?)(?=\ )"
   lat = re.search(regex, line).group(0)
@@ -77,6 +97,11 @@ def get_tp(line):
 
 def get_ts(line):
   ts_regex = "(?<=(ts=))(.*?)(?=\ )"
+  ts = re.search(ts_regex, line).group(0)
+  return ts
+
+def get_elapsed(line):
+  ts_regex = "(?<=(elapsed=))(.*?)(?=\ )"
   ts = re.search(ts_regex, line).group(0)
   return ts
 
