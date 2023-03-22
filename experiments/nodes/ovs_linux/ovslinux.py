@@ -1,3 +1,4 @@
+import time
 from components.vm import VM
 from nodes.node import Node
 
@@ -18,7 +19,7 @@ class OVSLinux(Node):
 
     self.start_ovs(self.defaults.ovs_ctl_path)
     self.ovsbr_add("br0", 
-                   self.machine_config.ip, 
+                   self.machine_config.ip + "/24", 
                    self.machine_config.interface,
                    self.vm_configs[0].manager_dir)
     
@@ -37,9 +38,17 @@ class OVSLinux(Node):
     self.ovsbr_del("br0")
     self.stop_ovs(self.defaults.ovs_ctl_path)
 
+    cmd = "sudo ip addr add {} dev {}".format(self.machine_config.ip + "/24",
+                                              self.machine_config.interface)
+    self.cleanup_pane.send_keys(cmd)
+    time.sleep(1)
+
+    cmd = "sudo ip link set dev {} up".format(self.machine_config.interface)
+    self.cleanup_pane.send_keys(cmd)
+    time.sleep(1)
+
     for vm_config in self.vm_configs:
       self.tap_down("tap{}".format(vm_config.id), vm_config.manager_dir)
-      # self.tap_down("ovstap{}".format(vm_config.id), vm_config.manager_dir)
     
   def start_vms(self):
     for vm_config in self.vm_configs:
