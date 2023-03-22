@@ -86,6 +86,13 @@ sockets interposition run as follows (for example):
 sudo LD_PRELOAD=lib/libtas_interpose.so ../benchmarks/micro_rpc/echoserver_linux 1234 1 foo 8192 1
 ```
 
+It could be the case if you are running one of the baselines that uses a TAP, that IP
+tables may drop packets on the bridge. If that happens, run the following on the host
+machine:
+```
+echo 0 > /proc/sys/net/bridge/bridge-nf-call-iptables
+```
+
 ### Kernel NIC Interface
 
 TAS supports the DPDK kernel NIC interface (KNI) to pass packets to the Linux
