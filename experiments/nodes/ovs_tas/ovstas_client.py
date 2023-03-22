@@ -1,13 +1,13 @@
 import time
 
-from nodes.ovs_linux.ovslinux import OvsLinux
+from nodes.ovs_tas.ovstas import OvsTas
 from components.client import Client
 
-class OvsLinuxClient(OvsLinux):
+class OVSLinuxClient(OvsTas):
   
   def __init__(self, config, wmanager):
 
-    OvsLinux.__init__(self, config.defaults, config.c_machine_config,
+    OvsTas.__init__(self, config.defaults, config.c_machine_config,
         config.c_vm_configs, wmanager, 
         config.defaults.c_setup_pane, 
         config.defaults.c_cleanup_pane)
@@ -29,12 +29,13 @@ class OvsLinuxClient(OvsLinux):
             vm_config, 
             self.wmanager)
         self.clients.append(client)
-        client.run_virt(False, False)
+        client.run_virt(False, True)
         time.sleep(3)
 
   def run(self):
     self.setup()
     self.start_vms()
+    self.start_tas()
     self.start_clients()
 
   def save_logs(self, exp_path):

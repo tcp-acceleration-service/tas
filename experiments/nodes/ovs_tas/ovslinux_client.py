@@ -3,7 +3,7 @@ import time
 from nodes.ovs_linux.ovslinux import OvsLinux
 from components.client import Client
 
-class OvsLinuxClient(OvsLinux):
+class OVSLinuxClient(OvsLinux):
   
   def __init__(self, config, wmanager):
 

@@ -13,8 +13,8 @@ from nodes.tap_tas.ttas_server import TapTasServer
 from nodes.tap_tas.ttas_client import TapTasClient
 from nodes.vtas_bare.vtasbare_server import VTasBareServer
 from nodes.vtas_bare.vtasbare_client import VTasBareClient
-from nodes.ovs_linux.ovslinux_server import OVSLinuxServer
-from nodes.ovs_linux.ovslinux_client import OVSLinuxClient
+from nodes.ovs_linux.ovslinux_server import OvsLinuxServer
+from nodes.ovs_linux.ovslinux_client import OvsLinuxClient
 
 class Experiment:
 
@@ -40,7 +40,7 @@ class Experiment:
         elif stack == "bare-vtas":
             node = VTasBareServer(self.config, self.wmanager)
         elif stack == "ovs-linux":
-            node = OVSLinuxServer(self.config, self.wmanager)
+            node = OvsLinuxServer(self.config, self.wmanager)
 
         return node
 
@@ -58,7 +58,7 @@ class Experiment:
         elif stack == "bare-vtas":
             node = VTasBareClient(self.config, self.wmanager)
         elif stack == "ovs-linux":
-            node = OVSLinuxClient(self.config, self.wmanager)
+            node = OvsLinuxClient(self.config, self.wmanager)
 
         return node
 

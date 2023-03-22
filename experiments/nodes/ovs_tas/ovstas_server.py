@@ -1,13 +1,13 @@
 import time
 
-from nodes.ovs_linux.ovslinux import OvsLinux
+from nodes.ovs_tas.ovstas import OvsTas
 from components.server import Server
 
-class OvsLinuxServer(OvsLinux):
+class OvsTasServer(OvsTas):
   
   def __init__(self, config, wmanager):
 
-    OvsLinux.__init__(self, config.defaults, config.s_machine_config,
+    OvsTas.__init__(self, config.defaults, config.s_machine_config,
         config.s_vm_configs, wmanager, 
         config.defaults.s_setup_pane, 
         config.defaults.s_cleanup_pane)
@@ -15,6 +15,7 @@ class OvsLinuxServer(OvsLinux):
     self.server_configs = config.server_configs
     self.nodenum = config.snodenum
     self.snum = config.snum
+    self.server = []
 
   def start_servers(self):
     for i in range(self.nodenum):
@@ -27,10 +28,12 @@ class OvsLinuxServer(OvsLinux):
                 server_config, 
                 vm_config,
                 self.wmanager)
-        server.run_virt(False, False)
+        self.servers.append(server)
+        server.run_virt(False, True)
         time.sleep(3)
 
   def run(self):
     self.setup()
     self.start_vms()
+    self.start_tas()
     self.start_servers()
