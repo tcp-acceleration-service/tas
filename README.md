@@ -40,7 +40,7 @@ vTAS, the host proxy, a VM using QEMU's ivshmem and the guest proxy.
 
 First start vTAS on the host with the following command:
 ```
-sudo code/tas/tas --ip-addr=10.0.0.1/24 --fp-cores-max=1 --fp-no-ints --fp-no-autoscale --dpdk-extra="-w08:00.0"
+sudo code/tas/tas --ip-addr=10.0.0.1/24 --fp-cores-max=1 --fp-no-ints --fp-no-autoscale --dpdk-extra="-a08:00.0"
 ```
 
 After vTAS starts run the host proxy:
