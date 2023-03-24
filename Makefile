@@ -5,7 +5,7 @@
 
 CPPFLAGS += -Iinclude/
 CPPFLAGS += $(EXTRA_CPPFLAGS)
-CFLAGS += -std=gnu99 -O3 -g -Wall -Werror -march=native
+CFLAGS += -std=gnu99 -O3 -g -Wall -march=native
 CFLAGS += -Wno-address-of-packed-member
 CFLAGS += $(EXTRA_CFLAGS)
 CFLAGS_SHARED += $(CFLAGS) -fPIC

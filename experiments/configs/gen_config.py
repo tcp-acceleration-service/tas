@@ -88,7 +88,7 @@ class TasConfig:
         self.args = '--ip-addr={}/24 --fp-cores-max={}'.format(ip, n_cores) + \
             ' --cc=const-rate --cc-const-rate=0' + \
             ' --fp-no-autoscale --fp-no-ints' + \
-            ' --dpdk-extra="-w{}"'.format(dpdk_extra)   
+            ' --dpdk-extra="-a{}"'.format(dpdk_extra)   
         
         self.pane = pane
         self.ip = ip

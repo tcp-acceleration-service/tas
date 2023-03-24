@@ -8,8 +8,8 @@ class OvsTasServer(OvsTas):
   def __init__(self, config, wmanager):
 
     OvsTas.__init__(self, config.defaults, config.s_machine_config,
-        config.s_vm_configs, wmanager, 
-        config.defaults.s_setup_pane, 
+        config.s_tas_configs, config.s_vm_configs,
+        wmanager, config.defaults.s_setup_pane, 
         config.defaults.s_cleanup_pane)
 
     self.server_configs = config.server_configs

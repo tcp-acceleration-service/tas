@@ -69,6 +69,22 @@ elif [[ "$stack" == 'ovs-linux' ]]; then
     -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
     -drive if=virtio,format=raw,file="seed.img" \
     ;
+elif [[ "$stack" == 'ovs-tas' ]]; then
+  sudo qemu-system-x86_64 \
+    -nographic -monitor none -serial stdio \
+    -machine accel=kvm,type=q35 \
+    -cpu host \
+    -smp 12 \
+    -m 12G \
+    -netdev user,id=net0 \
+    -device virtio-net-pci,netdev=net0 \
+    -netdev tap,ifname=$tap,script=no,downscript=no,vhost=on,id=net1 \
+    -device virtio-net-pci,mac=$mac,netdev=net1 \
+    -netdev tap,ifname=$ovstap,script=no,downscript=no,vhost=on,id=net2 \
+    -device virtio-net-pci,mac=$alt_mac,vectors=18,mq=on,netdev=net2 \
+    -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
+    -drive if=virtio,format=raw,file="seed.img" \
+    ;
 elif [[ "$stack" == 'tap-tas' ]]; then
   sudo qemu-system-x86_64 \
     -nographic -monitor none -serial stdio \
