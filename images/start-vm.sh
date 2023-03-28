@@ -76,12 +76,13 @@ elif [[ "$stack" == 'ovs-tas' ]]; then
     -cpu host \
     -smp 12 \
     -m 12G \
+    -snapshot \
     -netdev user,id=net0 \
     -device virtio-net-pci,netdev=net0 \
     -netdev tap,ifname=$tap,script=no,downscript=no,vhost=on,id=net1 \
     -device virtio-net-pci,mac=$mac,netdev=net1 \
-    -netdev tap,ifname=$ovstap,script=no,downscript=no,vhost=on,id=net2 \
-    -device virtio-net-pci,mac=$alt_mac,vectors=18,mq=on,netdev=net2 \
+    -netdev tap,ifname=$ovstap,script=no,downscript=no,vhost=on,queues=10,id=net2 \
+    -device virtio-net-pci,mac=$alt_mac,vectors=18,mq=on,rss=on,hash=off,netdev=net2 \
     -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
     -drive if=virtio,format=raw,file="seed.img" \
     ;

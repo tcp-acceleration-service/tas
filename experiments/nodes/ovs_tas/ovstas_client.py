@@ -29,7 +29,7 @@ class OvsTasClient(OvsTas):
             vm_config, 
             self.wmanager)
         self.clients.append(client)
-        client.run_virt(False, True)
+        client.run_virt(True, True)
         time.sleep(3)
 
   def run(self):

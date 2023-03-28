@@ -80,7 +80,8 @@ def parse_data(parsed_md):
   for nconns in parsed_md:
     data_point = {"nconns": nconns}
     for stack in parsed_md[nconns]:
-      if stack == "virt-tas":
+      is_virt = stack == "virt-tas" or stack == "ovs-tas" or stack == "ovs-linux"
+      if is_virt:
         c0_fname = out_dir + parsed_md[nconns][stack]["0"]["0"]
         c1_fname = out_dir + parsed_md[nconns][stack]["1"]["0"]
       else:
@@ -98,14 +99,16 @@ def parse_data(parsed_md):
 
 def save_dat_file(avg_tps, fname):
   f = open(fname, "w+")
-  header = "nconns bare-tas bare-vtas virt-tas\n"
+  header = "nconns bare-tas bare-vtas virt-tas ovs-linux ovs-tas\n"
   f.write(header)
   for tp in avg_tps:
     f.write("{} {} {} {}\n".format(
       tp["nconns"],
       tp["bare-tas"],
       tp["bare-vtas"],
-      tp["virt-tas"]
+      tp["virt-tas"],
+      tp["ovs-linux"],
+      tp["ovs-tas"]
     ))
         
 def main():

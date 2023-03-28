@@ -15,3 +15,5 @@ set yrange [0:]
 plot 'tp.dat' using 1:2:xtic(1) title 'bare-tas' linetype 2 w lp, \
      'tp.dat' using 1:3:xtic(1) title 'bare-vtas' linetype 3 w lp, \
      'tp.dat' using 1:4:xtic(1) title 'virt-tas' linetype 4 w lp, \
+     'tp.dat' using 1:5:xtic(1) title 'ovs-linux' linetype 4 w lp, \
+     'tp.dat' using 1:6:xtic(1) title 'ovs-tas' linetype 4 w lp, \

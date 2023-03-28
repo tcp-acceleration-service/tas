@@ -8,8 +8,7 @@ from exps.perf_iso_tpconn.configs.ovs_tas import Config as OVSTasConf
 
 experiments = []
 
-# n_conns = [128, 256, 512, 1024, 2048, 4096, 8192]
-n_conns = [128]
+n_conns = [128, 256, 512, 1024, 2048, 4096, 8192]
 
 for n in n_conns:
   exp_name = "perf-iso-tpconn_conns{}_".format(n)
@@ -21,7 +20,7 @@ for n in n_conns:
 
   # experiments.append(tas_bare_exp)
   # experiments.append(vtas_bare_exp)
-  # experiments.append(tas_virt_exp)
+  experiments.append(tas_virt_exp)
+  # experiments.append(ovs_tas_exp)
   # experiments.append(ovs_linux_exp)
-  experiments.append(ovs_tas_exp)
   

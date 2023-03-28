@@ -2,8 +2,6 @@ from configs.gen_config import Defaults
 from configs.gen_config import MachineConfig
 from configs.gen_config import TasConfig
 from configs.gen_config import VMConfig
-from configs.gen_config import HostProxyConfig
-from configs.gen_config import GuestProxyConfig
 from configs.gen_config import ClientConfig
 from configs.gen_config import ServerConfig
 
@@ -74,7 +72,7 @@ class Config:
                 project_dir=self.defaults.default_otas_dir_virt,
                 ip=vm0_config.tas_tap_ip,
                 n_cores=1, dpdk_extra="00:04.0")
-        tas_config.args = tas_config.args + ' --shm-len=4294967296'
+        tas0_config.args = tas0_config.args + ' --shm-len=4294967296'
         
 
         vm1_config = VMConfig(pane=self.defaults.c_vm_pane,
@@ -87,13 +85,13 @@ class Config:
                 project_dir=self.defaults.default_otas_dir_virt,
                 ip=vm1_config.tas_tap_ip,
                 n_cores=1, dpdk_extra="00:04.0")
-        tas_config.args = tas_config.args + ' --shm-len=4294967296'
+        tas1_config.args = tas1_config.args + ' --shm-len=4294967296'
 
 
         self.c_tas_configs.append(tas0_config)
-        # self.c_tas_configs.append(tas1_config)
+        self.c_tas_configs.append(tas1_config)
         self.c_vm_configs.append(vm0_config)
-        # self.c_vm_configs.append(vm1_config)
+        self.c_vm_configs.append(vm1_config)
 
         client0_config = ClientConfig(exp_name=exp_name, 
                 pane=self.defaults.c_client_pane,
@@ -113,4 +111,4 @@ class Config:
                 tas_dir=self.defaults.default_otas_dir_virt)
 
         self.client_configs.append(client0_config)
-        # self.client_configs.append(client1_config)
+        self.client_configs.append(client1_config)

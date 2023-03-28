@@ -1,4 +1,5 @@
 import time
+import threading 
 
 from components.tas import TAS
 from components.vm import VM
@@ -30,11 +31,13 @@ class OvsTas(Node):
     for vm_config in self.vm_configs:
       # Tap that allows us to ssh to VM
       self.ovstap_add("br0", 
-                      "tap{}".format(vm_config.id), 
+                      "tap{}".format(vm_config.id),
+                      0, 
                       vm_config.manager_dir)
       # TAP used by OvS
       self.ovstap_add("br0", 
-                      "ovstap{}".format(vm_config.id), 
+                      "ovstap{}".format(vm_config.id),
+                      1, 
                       vm_config.manager_dir)
 
   def cleanup(self):
@@ -69,14 +72,24 @@ class OvsTas(Node):
       tas.run_virt()
       time.sleep(3)
 
+  def start_vm(self, vm, vm_config):
+    vm.start()
+    vm.enable_hugepages()
+    vm.enable_noiommu("1af4 1110")
+    vm.init_interface(vm_config.vm_ip, self.defaults.vm_interface)
+    vm.init_interface(vm_config.tas_tap_ip, self.defaults.tas_interface)
+    vm.dpdk_bind(vm_config.tas_tap_ip, self.defaults.tas_interface,
+        self.defaults.pci_id)
+
   def start_vms(self):
+    threads = []
     for vm_config in self.vm_configs:
       vm = VM(self.defaults, self.machine_config, vm_config, self.wmanager)
       self.vms.append(vm)
-      vm.start()
-      vm.enable_hugepages()
-      vm.enable_noiommu("1af4 1110")
-      vm.init_interface(vm_config.vm_ip, self.defaults.vm_interface)
-      vm.init_interface(vm_config.tas_tap_ip, self.defaults.tas_interface)
-      vm.dpdk_bind(vm_config.tas_tap_ip, self.defaults.tas_interface,
-          self.defaults.pci_id)
+      vm_thread = threading.Thread(target=self.start_vm, args=(vm, vm_config))
+      threads.append(vm_thread)
+      vm_thread.start()
+
+    for t in threads:
+      t.join()
+      

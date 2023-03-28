@@ -1,4 +1,5 @@
 import time
+import threading
 
 from components.tas import TAS
 from components.vm import VM
@@ -52,10 +53,7 @@ class TapTas(Node):
       tas.run_virt()
       time.sleep(3)
 
-  def start_vms(self):
-    for vm_config in self.vm_configs:
-      vm = VM(self.defaults, self.machine_config, vm_config, self.wmanager)
-      self.vms.append(vm)
+  def start_vm(self, vm, vm_config):
       vm.start()
       vm.enable_hugepages()
       vm.enable_noiommu("1af4 1110")
@@ -63,3 +61,15 @@ class TapTas(Node):
       vm.init_interface(vm_config.tas_tap_ip, self.defaults.tas_interface)
       vm.dpdk_bind(vm_config.tas_tap_ip, self.defaults.tas_interface,
           self.defaults.pci_id)
+
+  def start_vms(self):
+    threads = []
+    for vm_config in self.vm_configs:
+      vm = VM(self.defaults, self.machine_config, vm_config, self.wmanager)
+      self.vms.append(vm)
+      vm_thread = threading.Thread(target=self.start_vm, args=(vm, vm_config))
+      threads.append(vm_thread)
+      vm_thread.start()
+
+    for t in threads:
+      t.join()

@@ -77,11 +77,12 @@ class Node:
       self.cleanup_pane.send_keys(cmd)
       time.sleep(2)
   
-  def ovstap_add(self, br_name, tap_name, script_dir):
+  def ovstap_add(self, br_name, tap_name, multi_queue, script_dir):
       cmd = "cd {}".format(script_dir)
       self.setup_pane.send_keys(cmd)
       time.sleep(1)
-      cmd = "sudo bash ovstap-add.sh {} {}".format(br_name, tap_name)
+      cmd = "sudo bash ovstap-add.sh {} {} {}".format(
+          br_name, tap_name, multi_queue)
       self.setup_pane.send_keys(cmd)
       time.sleep(2)
 
