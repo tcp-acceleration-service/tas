@@ -34,12 +34,12 @@ class Config:
 
         server0_config = ServerConfig(pane=self.defaults.s_server_pane,
                 idx=0, vmid=0, groupid=0,
-                port=1234, ncores=8, max_flows=4096, max_bytes=1024,
+                port=1234, ncores=8, max_flows=4096, max_bytes=4096,
                 bench_dir=self.defaults.default_obenchmark_dir_bare,
                 tas_dir=self.defaults.default_otas_dir_bare)
         server1_config = ServerConfig(pane=self.defaults.s_server_pane,
                 idx=1, vmid=0, groupid=1,
-                port=1235, ncores=8, max_flows=4096, max_bytes=1024,
+                port=1235, ncores=8, max_flows=4096, max_bytes=4096,
                 bench_dir=self.defaults.default_obenchmark_dir_bare,
                 tas_dir=self.defaults.default_otas_dir_bare)
                 

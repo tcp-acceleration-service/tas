@@ -11,7 +11,7 @@ import experiments.plot_utils as putils
 # from the experiment name, since client 0 and client 1
 # have a different message size
 def get_msize(fname):
-  regex = "(?<=_msize)[0-9]*"
+  regex = "(?<=-msize)[0-9]*"
   nconns = re.search(regex, fname).group(0)
   return nconns
 
@@ -82,7 +82,7 @@ def parse_data(parsed_md):
   return lat_list
 
 def save_dat_file(exp_lats):
-  header = "nconns bare-tas bare-vtas virt-tas\n"
+  header = "nconns bare-tas bare-vtas virt-tas ovs-linux ovs-tas\n"
   
   msizes = list(exp_lats.keys())
   msizes = sorted(msizes) 
@@ -95,11 +95,13 @@ def save_dat_file(exp_lats):
       f.write(header)
 
       for msize in msizes:
-        f.write("{} {} {} {}\n".format(
+        f.write("{} {} {} {} {} {}\n".format(
           msize,
           exp_lats[msize]['bare-tas'][percentile],
           exp_lats[msize]['bare-vtas'][percentile],
-          exp_lats[msize]['virt-tas'][percentile])
+          exp_lats[msize]['virt-tas'][percentile],
+          exp_lats[msize]['ovs-linux'][percentile],
+          exp_lats[msize]['ovs-tas'][percentile],)
         )
         
 def main():

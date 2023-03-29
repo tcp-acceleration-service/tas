@@ -10,7 +10,7 @@ import experiments.plot_utils as putils
 # from the experiment name, since client 0 and client 1
 # have different message sizes
 def get_msize(fname):
-  regex = "(?<=_msize)[0-9]*"
+  regex = "(?<=-msize)[0-9]*"
   msize = re.search(regex, fname).group(0)
   return msize
 
@@ -102,7 +102,7 @@ def save_dat_file(avg_tps, fname):
   header = "msize bare-tas bare-vtas virt-tas ovs-linux ovs-tas\n"
   f.write(header)
   for tp in avg_tps:
-    f.write("{} {} {} {}\n".format(
+    f.write("{} {} {} {} {} {}\n".format(
       tp["msize"],
       tp["bare-tas"],
       tp["bare-vtas"],

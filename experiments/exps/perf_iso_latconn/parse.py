@@ -11,7 +11,7 @@ import experiments.plot_utils as putils
 # from the experiment name, since client 0 and client 1
 # have a different number of connections
 def get_conns(fname):
-  regex = "(?<=_conns)[0-9]*"
+  regex = "(?<=-conns)[0-9]*"
   nconns = re.search(regex, fname).group(0)
   return nconns
 
@@ -53,6 +53,10 @@ def parse_metadata():
 
   for f in os.listdir(dir_path):
     fname = os.fsdecode(f)
+
+    if "tas_c" == fname:
+      continue
+
     nconns = get_conns(fname)
     cid = putils.get_client_id(fname)
     nid = putils.get_node_id(fname)
@@ -82,10 +86,10 @@ def parse_data(parsed_md):
   return lat_list
 
 def save_dat_file(exp_lats):
-  header = "nconns bare-tas bare-vtas virt-tas\n"
+  header = "nconns bare-tas bare-vtas virt-tas ovs-linux ovs-tas\n"
   
   nconns = list(exp_lats.keys())
-  nconns = sorted(nconns) 
+  nconns = list(map(str, sorted(map(int, nconns))))
   stacks =  list(exp_lats[nconns[0]].keys())
   percentiles =  list(exp_lats[nconns[0]][stacks[0]].keys())
 
@@ -95,11 +99,13 @@ def save_dat_file(exp_lats):
       f.write(header)
 
       for nconn in nconns:
-        f.write("{} {} {} {}\n".format(
+        f.write("{} {} {} {} {} {}\n".format(
           nconn,
           exp_lats[nconn]['bare-tas'][percentile],
           exp_lats[nconn]['bare-vtas'][percentile],
-          exp_lats[nconn]['virt-tas'][percentile])
+          exp_lats[nconn]['virt-tas'][percentile],
+          exp_lats[nconn]['ovs-linux'][percentile],
+          exp_lats[nconn]['ovs-tas'][percentile])
         )
         
 def main():

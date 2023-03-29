@@ -30,8 +30,7 @@ if [[ "$stack" == 'virt-tas' ]]; then
     -machine accel=kvm,type=q35 \
     -cpu host \
     -smp 12 \
-    -m 12G \
-    -snapshot \
+    -m 25G \
     -device virtio-net-pci,netdev=net0 \
     -netdev user,id=net0,hostfwd=tcp::222${vm_id}-:22 \
     -chardev socket,path="/run/tasproxy",id="tas" \
@@ -45,7 +44,7 @@ elif [[ "$stack" == 'virt-linux' ]]; then
       -machine accel=kvm,type=q35 \
       -cpu host \
       -smp 12 \
-      -m 12G \
+      -m 25G \
       -snapshot \
       -netdev user,id=net0 \
       -device virtio-net-pci,netdev=net0 \
@@ -60,7 +59,7 @@ elif [[ "$stack" == 'ovs-linux' ]]; then
     -machine accel=kvm,type=q35 \
     -cpu host \
     -smp 12 \
-    -m 12G \
+    -m 25G \
     -snapshot \
     -netdev user,id=net0 \
     -device virtio-net-pci,netdev=net0 \
@@ -75,7 +74,7 @@ elif [[ "$stack" == 'ovs-tas' ]]; then
     -machine accel=kvm,type=q35 \
     -cpu host \
     -smp 12 \
-    -m 12G \
+    -m 25G \
     -snapshot \
     -netdev user,id=net0 \
     -device virtio-net-pci,netdev=net0 \
@@ -92,7 +91,7 @@ elif [[ "$stack" == 'tap-tas' ]]; then
     -machine accel=kvm,type=q35 \
     -cpu host \
     -smp 12 \
-    -m 12G \
+    -m 25G \
     -snapshot \
     -netdev user,id=net0 \
     -device virtio-net-pci,netdev=net0 \

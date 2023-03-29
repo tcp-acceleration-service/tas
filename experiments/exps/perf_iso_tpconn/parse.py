@@ -10,7 +10,7 @@ import experiments.plot_utils as putils
 # from the experiment name, since client 0 and client 1
 # have a different number of connections
 def get_conns(fname):
-  regex = "(?<=_conns)[0-9]*"
+  regex = "(?<=-conns)[0-9]*"
   nconns = re.search(regex, fname).group(0)
   return nconns
 
@@ -102,7 +102,7 @@ def save_dat_file(avg_tps, fname):
   header = "nconns bare-tas bare-vtas virt-tas ovs-linux ovs-tas\n"
   f.write(header)
   for tp in avg_tps:
-    f.write("{} {} {} {}\n".format(
+    f.write("{} {} {} {} {} {}\n".format(
       tp["nconns"],
       tp["bare-tas"],
       tp["bare-vtas"],

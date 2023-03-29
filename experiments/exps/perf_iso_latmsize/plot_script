@@ -20,30 +20,30 @@ set title offset 0,-0.6
 unset xtics
 set yrange [0:]
 set title "50p Latency"
-plot 'lat_50p.dat' using 1:2 title 'bare-tas' linetype 2 w lp, \
-     'lat_50p.dat' using 1:3 title 'bare-vtas' linetype 3 w lp, \
-     'lat_50p.dat' using 1:4 title 'virt-tas' linetype 4 w lp, \
+plot 'lat_50p.dat' using 1:2 title 'bare-tas' linetype 2 ps 0.3 w lp, \
+     'lat_50p.dat' using 1:3 title 'bare-vtas' linetype 3 ps 0.3 w lp, \
+     'lat_50p.dat' using 1:4 title 'virt-tas' linetype 4 ps 0.3 w lp, \
 
 # Plot 90p latency
 unset xtics
 set yrange [0:]
 set title "90p Latency"
-plot 'lat_90p.dat' using 1:2 title 'bare-tas' linetype 2 w lp, \
-     'lat_90p.dat' using 1:3 title 'bare-vtas' linetype 3 w lp, \
-     'lat_90p.dat' using 1:4 title 'virt-tas' linetype 4 w lp, \
+plot 'lat_90p.dat' using 1:2 title 'bare-tas' linetype 2 ps 0.3 w lp, \
+     'lat_90p.dat' using 1:3 title 'bare-vtas' linetype 3 ps 0.3 w lp, \
+     'lat_90p.dat' using 1:4 title 'virt-tas' linetype 4 ps 0.3 w lp, \
 
 # Plot 99p latency
 set xtics
 set yrange [0:]
 set title "99p Latency"
-plot 'lat_99p.dat' using 1:2:xtic(1) title 'bare-tas' linetype 2 w lp, \
-     'lat_99p.dat' using 1:3:xtic(1) title 'bare-vtas' linetype 3 w lp, \
-     'lat_99p.dat' using 1:4:xtic(1) title 'virt-tas' linetype 4 w lp, \
+plot 'lat_99p.dat' using 1:2:xtic(1) title 'bare-tas' linetype 2 ps 0.3 w lp, \
+     'lat_99p.dat' using 1:3:xtic(1) title 'bare-vtas' linetype 3 ps 0.3 w lp, \
+     'lat_99p.dat' using 1:4:xtic(1) title 'virt-tas' linetype 4 ps 0.3 w lp, \
 
 # Plot 99.9p latency
 set xtics
 set yrange [0:]
 set title "99.9p Latency"
-plot 'lat_99.9p.dat' using 1:2:xtic(1) title 'bare-tas' linetype 2 w lp, \
-     'lat_99.9p.dat' using 1:3:xtic(1) title 'bare-vtas' linetype 3 w lp, \
-     'lat_99.9p.dat' using 1:4:xtic(1) title 'virt-tas' linetype 4 w lp, \
+plot 'lat_99.9p.dat' using 1:2:xtic(1) title 'bare-tas' linetype 2 ps 0.3 w lp, \
+     'lat_99.9p.dat' using 1:3:xtic(1) title 'bare-vtas' linetype 3 ps 0.3 w lp, \
+     'lat_99.9p.dat' using 1:4:xtic(1) title 'virt-tas' linetype 4 ps 0.3 w lp, \

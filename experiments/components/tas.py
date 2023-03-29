@@ -29,6 +29,7 @@ class TAS:
         self.pane.send_keys(ssh_com)
         time.sleep(3)
         self.pane.send_keys("tas")
+        time.sleep(3)
         
         tas_args = self.tas_config.args
         utils.compile_and_run(pane=self.pane,
@@ -49,3 +50,4 @@ class TAS:
 
         dest = out_dir + "/" + self.tas_config.out_file
         os.rename(self.tas_config.out, dest)
+        os.remove(self.client_config.out)

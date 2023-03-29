@@ -24,6 +24,7 @@ class Client:
         self.pane.send_keys(ssh_com)
         time.sleep(3)
         self.pane.send_keys("tas")
+        time.sleep(3)
         self.run_benchmark_rpc(w_sudo, ld_preload)
 
     def run_benchmark_rpc(self, w_sudo, ld_preload):
@@ -65,6 +66,14 @@ class Client:
         self.save_logs_pane.send_keys(suppress_history=False, cmd='tas')
         time.sleep(1)
 
+        # Remove log from remote machine
+        ssh_com = utils.get_ssh_command(self.machine_config, self.vm_config)
+        ssh_com += " 'rm {}'".format(self.client_config.out)
+        self.save_logs_pane.send_keys(ssh_com)
+        time.sleep(3)
+        self.save_logs_pane.send_keys(suppress_history=False, cmd='tas')
+        time.sleep(1)
+
     def save_log_bare(self, exp_path):
         # self.exp_path is set in the run.py file
         split_path = exp_path.split("/")
@@ -76,3 +85,4 @@ class Client:
 
         dest = out_dir + "/" + self.client_config.out_file
         os.rename(self.client_config.out, dest)
+        os.remove(self.client_config.out)

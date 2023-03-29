@@ -23,9 +23,10 @@ class VM:
     def enable_hugepages(self):
         cmd = "sudo mount -t hugetlbfs nodev /dev/hugepages"
         self.pane.send_keys(cmd)
+        time.sleep(1)
         cmd = "echo 8192 | sudo tee /sys/devices/system/node/node*/hugepages/hugepages-2048kB/nr_hugepages"
         self.pane.send_keys(cmd)
-        time.sleep(3)
+        time.sleep(5)
 
     def enable_noiommu(self, vendor_id):
         self.pane.send_keys("sudo su -")
