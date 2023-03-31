@@ -18,8 +18,6 @@ struct channel * channel_init(void* tx_addr, void* rx_addr, uint64_t size)
     goto free_chan;
   }
 
-  /* Only init the tx channel, since the other side will
-     already have initialized the rx channel */
   tx_buf = shmring_init(tx_addr, CHAN_SIZE);
   if (tx_buf == NULL)
   {

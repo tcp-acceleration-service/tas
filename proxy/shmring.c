@@ -16,8 +16,6 @@ pthread_mutexattr_t * init_mutex_attr();
 struct ring_buffer* shmring_init(void *base_addr, size_t size)
 {
     struct ring_buffer *ring;
-    struct ring_header *hdr;
-    pthread_mutexattr_t *attr;
 
     ring = (struct ring_buffer *) malloc(sizeof(struct ring_buffer));
     if (ring == NULL)
@@ -30,30 +28,28 @@ struct ring_buffer* shmring_init(void *base_addr, size_t size)
     ring->buf_addr = base_addr + sizeof(struct ring_header);
     ring->size = size;
 
+    return ring;
+}
+
+/* Resets read and write pos to zero and sets ring size to full */
+void shmring_reset(struct ring_buffer *ring, size_t size)
+{
+    pthread_mutexattr_t *attr;
+    struct ring_header *hdr = ring->hdr_addr;
+
     if ((attr = init_mutex_attr()) == NULL)
     {
       fprintf(stderr, "shmring_init: failed to init mutex attr.\n");
-      return NULL;
+      return;
     }
 
     hdr = ring->hdr_addr;
     if (pthread_mutex_init(&hdr->mux, attr) < 0)
     {
       fprintf(stderr, "shmring_init: failed to init mutex.\n");
-      goto free_attr;
+      free(attr);
+      return;
     }
-
-    return ring;
-
-free_attr:
-    free(attr);
-    return NULL;
-}
-
-/* Resets read and write pos to zero and sets ring size to full */
-void shmring_reset(struct ring_buffer *ring, size_t size)
-{
-    struct ring_header *hdr = ring->hdr_addr;
 
     hdr->read_pos = 0;
     hdr->write_pos = 0;
