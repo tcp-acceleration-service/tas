@@ -358,7 +358,15 @@ pthread_mutexattr_t * init_mutex_attr()
   {
     fprintf(stderr, "init_mutex_attr: failed to set attr to shared.\n");
     goto free_attr;
-  };
+  }
+
+  // Set mutex to normal type. Default type may have underfined behaviour
+  // when relocking
+  if (pthread_mutexattr_settype(attr, PTHREAD_MUTEX_NORMAL) < 0)
+  {
+    fprintf(stderr, "init_mutex_attr: failed to set mutex type to normal.\n");
+    goto free_attr;
+  }
   
   // Subsequent attempts to lock will succeed if process dies with lock
   if (pthread_mutexattr_setrobust(attr, PTHREAD_MUTEX_ROBUST) < 0)

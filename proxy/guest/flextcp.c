@@ -338,8 +338,7 @@ static int vflextcp_uxsocket_accept(struct guest_proxy *pxy)
         "failed to write req_msg to chan.\n");
     return -1;
   }
-  /* Notify host and retrieve response from channel to continue
-     registration */
+  /* Notify host */
   ivshmem_notify_host(pxy);
 
   return 0;

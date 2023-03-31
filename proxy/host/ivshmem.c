@@ -42,7 +42,7 @@ static int uxsocket_handle_error();
 static int uxsocket_send_int(int fd, int64_t i);
 static int uxsocket_sendfd(int uxfd, int fd, int64_t i);
 
-static int ctxs_poll();
+static int app_ctxs_poll();
 
 static int channel_poll();
 static int channel_poll_vm(struct v_machine *vm);
@@ -130,7 +130,7 @@ int ivshmem_poll()
         return -1;
     }
 
-    if (ctxs_poll() != 0) 
+    if (app_ctxs_poll() != 0) 
     {
         fprintf(stderr, "ivshmem_poll: failed to poll ctxs fds.\n");
         return -1;
@@ -629,7 +629,6 @@ static int channel_handle_newapp(struct v_machine *vm,
 
     notify_guest(vm->ifd);
 
-
     return 0;
 }
 
@@ -652,7 +651,7 @@ static void channel_handle_poke_tas_core(struct v_machine *vm,
 /*****************************************************************************/
 /* App contexts */
 
-static int ctxs_poll() 
+static int app_ctxs_poll() 
 {
     int i, n, ret;
     struct vmcontext_req *vctx;
