@@ -8,8 +8,7 @@ from exps.perf_iso_tpmsize.configs.ovs_tas import Config as OVSTasConf
 
 experiments = []
 
-# msize = [64, 128, 256, 512, 1024, 2048]
-msize = [2048]
+msize = [64, 128, 256, 512, 1024, 2048]
 
 for n in msize:
   exp_name = "perf-iso-tpconn-msize{}_".format(n)
@@ -20,8 +19,8 @@ for n in msize:
   ovs_tas_exp = exp.Experiment(OVSTasConf(exp_name + "ovs-tas", n), name=exp_name)
 
   experiments.append(tas_bare_exp)
-  # experiments.append(vtas_bare_exp)
-  # experiments.append(tas_virt_exp)
-  # experiments.append(ovs_tas_exp)
-  # experiments.append(ovs_linux_exp)
+  experiments.append(vtas_bare_exp)
+  experiments.append(tas_virt_exp)
+  experiments.append(ovs_tas_exp)
+  experiments.append(ovs_linux_exp)
   

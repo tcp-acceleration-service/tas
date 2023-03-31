@@ -12,8 +12,8 @@ import experiments.plot_utils as putils
 # have a different message size
 def get_msize(fname):
   regex = "(?<=-msize)[0-9]*"
-  nconns = re.search(regex, fname).group(0)
-  return nconns
+  msize = re.search(regex, fname).group(0)
+  return msize
 
 def check_msize(data, msize):
   if msize not in data:
@@ -53,6 +53,10 @@ def parse_metadata():
 
   for f in os.listdir(dir_path):
     fname = os.fsdecode(f)
+    
+    if "tas_c" == fname:
+      continue
+
     msize = get_msize(fname)
     cid = putils.get_client_id(fname)
     nid = putils.get_node_id(fname)
@@ -85,7 +89,7 @@ def save_dat_file(exp_lats):
   header = "nconns bare-tas bare-vtas virt-tas ovs-linux ovs-tas\n"
   
   msizes = list(exp_lats.keys())
-  msizes = sorted(msizes) 
+  msizes = list(map(str, sorted(map(int, msizes))))
   stacks =  list(exp_lats[msizes[0]].keys())
   percentiles =  list(exp_lats[msizes[0]][stacks[0]].keys())
 

@@ -18,9 +18,9 @@ for n in msize:
   ovs_linux_exp = exp.Experiment(OVSLinuxConf(exp_name + "ovs-linux", n), name=exp_name)
   ovs_tas_exp = exp.Experiment(OVSTasConf(exp_name + "ovs-tas", n), name=exp_name)
 
-  # experiments.append(tas_bare_exp)
-  # experiments.append(vtas_bare_exp)
+  experiments.append(tas_bare_exp)
+  experiments.append(vtas_bare_exp)
   experiments.append(tas_virt_exp)
-  # experiments.append(ovs_tas_exp)
-  # experiments.append(ovs_linux_exp)
+  experiments.append(ovs_tas_exp)
+  experiments.append(ovs_linux_exp)
   

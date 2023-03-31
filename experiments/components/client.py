@@ -33,11 +33,10 @@ class Client:
         self.pane.send_keys("cd " + self.client_config.tas_dir)
         time.sleep(3)
 
-        cmd = ''
-        stack = self.machine_config.stack
+        cmd = 'stdbuf -oL '
         
         if w_sudo:
-            cmd = 'sudo '
+            cmd += 'sudo '
         
         if ld_preload:
             cmd += 'LD_PRELOAD=' + self.client_config.lib_so + ' '
@@ -51,6 +50,14 @@ class Client:
         self.pane.send_keys(cmd)
     
     def save_log_virt(self, exp_path):
+        # kill process to force flush to file
+        # ssh_com = utils.get_ssh_command(self.machine_config, self.vm_config)
+        # ssh_com += " 'sudo pkill testclient'"
+        # self.save_logs_pane.send_keys(ssh_com)
+        # time.sleep(3)
+        # self.save_logs_pane.send_keys(suppress_history=False, cmd='tas')
+        # time.sleep(1)
+
         split_path = exp_path.split("/")
         n = len(split_path)
         
@@ -75,6 +82,9 @@ class Client:
         time.sleep(1)
 
     def save_log_bare(self, exp_path):
+        # kill process to force flush to file
+        # self.save_logs_pane.send_keys("sudo pkill testclient")
+
         # self.exp_path is set in the run.py file
         split_path = exp_path.split("/")
         n = len(split_path)
@@ -85,4 +95,3 @@ class Client:
 
         dest = out_dir + "/" + self.client_config.out_file
         os.rename(self.client_config.out, dest)
-        os.remove(self.client_config.out)

@@ -31,6 +31,7 @@ if [[ "$stack" == 'virt-tas' ]]; then
     -cpu host \
     -smp 12 \
     -m 25G \
+    -snapshot \
     -device virtio-net-pci,netdev=net0 \
     -netdev user,id=net0,hostfwd=tcp::222${vm_id}-:22 \
     -chardev socket,path="/run/tasproxy",id="tas" \

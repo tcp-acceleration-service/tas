@@ -41,6 +41,9 @@ class TAS:
                 save_log=True)
 
     def save_log_bare(self, exp_path):
+        # # kill process to force flush to file
+        # self.pane.send_keys("sudo pkill tas")
+        
         split_path = exp_path.split("/")
         n = len(split_path)
         
@@ -50,4 +53,3 @@ class TAS:
 
         dest = out_dir + "/" + self.tas_config.out_file
         os.rename(self.tas_config.out, dest)
-        os.remove(self.client_config.out)
