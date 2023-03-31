@@ -657,10 +657,10 @@ static int ctxs_poll()
     int i, n, ret;
     struct vmcontext_req *vctx;
     struct _msg;
-    struct epoll_event evs[32];
+    struct epoll_event evs[2];
     struct poke_app_ctx_msg msg;
 
-    n = epoll_wait(ctx_epfd, evs, 32, 0);
+    n = epoll_wait(ctx_epfd, evs, 2, 0);
 
     if (n < 0)
     {
