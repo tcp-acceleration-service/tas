@@ -125,7 +125,7 @@ int ivshmem_channel_poll(struct guest_proxy *pxy)
       fprintf(stderr, "ivshmem_channel_poll: unknown message.\n");
   }
 
-  return 0;
+  return 1;
 }
 
 static int channel_handle_hello(struct guest_proxy *pxy)

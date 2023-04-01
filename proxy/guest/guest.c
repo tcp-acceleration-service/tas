@@ -50,7 +50,8 @@ struct guest_proxy *guest_init_proxy()
 
 int main(int argc, char *argv[])
 {
-  unsigned int n;
+  int ret;
+  unsigned int n, i;
   struct guest_proxy *pxy = guest_init_proxy();
 
   if (ivshmem_init(pxy) < 0)
@@ -69,7 +70,15 @@ int main(int argc, char *argv[])
   while (exited == 0)
   {
     n = 0;
-    n += ivshmem_channel_poll(pxy);
+
+    for (i = 0; i < CHANNEL_POLL_ROUNDS; i++)
+    {
+      ret = ivshmem_channel_poll(pxy);
+      n += ret;
+      if (ret == 0)
+        break;
+    }
+
     n += vflextcp_poll(pxy);
   }
 

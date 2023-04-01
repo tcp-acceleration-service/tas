@@ -47,20 +47,11 @@ free_chan:
 
 size_t channel_write(struct channel *chan, void *buf, size_t size)
 {
-  size_t free_sz;
   size_t ret;
 
-  /* If channel is full try again until
-     a read clears enough space */
-  do {
-    shmring_lock(chan->tx);
-    free_sz = shmring_get_freesz(chan->tx);
-
-    if (free_sz >= size)
-      ret = shmring_push(chan->tx, buf, size);
-
-    shmring_unlock(chan->tx);
-  } while(free_sz < size);
+  shmring_lock(chan->tx);
+  ret = shmring_push(chan->tx, buf, size);
+  shmring_unlock(chan->tx);
 
   if (ret == 0)
   {

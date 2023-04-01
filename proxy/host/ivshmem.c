@@ -426,7 +426,7 @@ static int uxsocket_handle_error()
 
 static int channel_poll()
 {
-    int i;
+    int i, j, ret;
     struct v_machine *vm;
 
     for(i = 0; i < next_vm_id; i++)
@@ -434,7 +434,12 @@ static int channel_poll()
         vm = &vms[i];
         if (vm != NULL)
         {
-            channel_poll_vm(vm);
+            for (j = 0; j < CHANNEL_POLL_ROUNDS; j++)
+            {
+                ret = channel_poll_vm(vm);
+                if (ret == 0)
+                    break;
+            }
         }
     }
 
@@ -489,7 +494,7 @@ static int channel_poll_vm(struct v_machine *vm)
             fprintf(stderr, "ivshmem_uxsocket_handle_msg: unknown message.\n");
     }
 
-    return 0;
+    return 1;
 }
 
 /* Handles tasinfo request */
@@ -663,10 +668,10 @@ static int app_ctxs_poll()
     int i, n, ret;
     struct vmcontext_req *vctx;
     struct _msg;
-    struct epoll_event evs[2];
+    struct epoll_event evs[1];
     struct poke_app_ctx_msg msg;
 
-    n = epoll_wait(ctx_epfd, evs, 2, 0);
+    n = epoll_wait(ctx_epfd, evs, 1, 0);
 
     if (n < 0)
     {
