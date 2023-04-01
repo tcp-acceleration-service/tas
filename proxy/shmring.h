@@ -21,6 +21,7 @@ struct ring_buffer {
 struct ring_buffer* shmring_init(void *base_addr, size_t size);
 void shmring_reset(struct ring_buffer *ring, size_t size);
 int shmring_is_empty(struct ring_buffer *ring);
+int shmring_init_mux(struct ring_buffer *ring);
 int shmring_lock(struct ring_buffer *ring);
 int shmring_unlock(struct ring_buffer *ring);
 size_t shmring_pop(struct ring_buffer *rx_ring, void *buf, size_t size);

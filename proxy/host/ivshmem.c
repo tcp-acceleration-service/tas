@@ -370,6 +370,12 @@ static int uxsocket_accept()
         goto close_ifd;
     }
 
+    shmring_reset(chan->tx, CHAN_SIZE);
+    shmring_reset(chan->rx, CHAN_SIZE);
+
+    shmring_init_mux(chan->tx);
+    shmring_init_mux(chan->rx);
+
     /* Write number of cores to channel for guest proxy to receive */
     h_msg.msg_type = MSG_TYPE_HELLO;
     h_msg.n_cores = flexnic_info_pxy->cores_num;
@@ -629,6 +635,7 @@ static int channel_handle_newapp(struct v_machine *vm,
 
     notify_guest(vm->ifd);
 
+    printf("REGISTERED APP IN VM=%d\n", vm->id);
     return 0;
 }
 

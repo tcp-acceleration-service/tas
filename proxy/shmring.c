@@ -15,46 +15,31 @@ pthread_mutexattr_t * init_mutex_attr();
 
 struct ring_buffer* shmring_init(void *base_addr, size_t size)
 {
-    struct ring_buffer *ring;
+  struct ring_buffer *ring;
 
-    ring = (struct ring_buffer *) malloc(sizeof(struct ring_buffer));
-    if (ring == NULL)
-    {
-      fprintf(stderr, "shmring_init: failed to allocate ring buffer.\n");
-      return NULL;
-    }
+  ring = (struct ring_buffer *) malloc(sizeof(struct ring_buffer));
+  if (ring == NULL)
+  {
+    fprintf(stderr, "shmring_init: failed to allocate ring buffer.\n");
+    return NULL;
+  }
 
-    ring->hdr_addr = base_addr;
-    ring->buf_addr = base_addr + sizeof(struct ring_header);
-    ring->size = size;
+  ring->hdr_addr = base_addr;
+  ring->buf_addr = base_addr + sizeof(struct ring_header);
+  ring->size = size;
 
-    return ring;
+  return ring;
 }
 
 /* Resets read and write pos to zero and sets ring size to full */
 void shmring_reset(struct ring_buffer *ring, size_t size)
 {
-    pthread_mutexattr_t *attr;
-    struct ring_header *hdr = ring->hdr_addr;
+  struct ring_header *hdr = ring->hdr_addr;
 
-    if ((attr = init_mutex_attr()) == NULL)
-    {
-      fprintf(stderr, "shmring_init: failed to init mutex attr.\n");
-      return;
-    }
-
-    hdr = ring->hdr_addr;
-    if (pthread_mutex_init(&hdr->mux, attr) < 0)
-    {
-      fprintf(stderr, "shmring_init: failed to init mutex.\n");
-      free(attr);
-      return;
-    }
-
-    hdr->read_pos = 0;
-    hdr->write_pos = 0;
-    hdr->full = 0;
-    hdr->ring_size = size - sizeof(struct ring_header);
+  hdr->read_pos = 0;
+  hdr->write_pos = 0;
+  hdr->full = 0;
+  hdr->ring_size = size - sizeof(struct ring_header);
 }
 
 int shmring_is_empty(struct ring_buffer *ring)
@@ -64,6 +49,28 @@ int shmring_is_empty(struct ring_buffer *ring)
   if (!hdr->full && (hdr->write_pos == hdr->read_pos))
   {
     return 1;
+  }
+
+  return 0;
+}
+
+int shmring_init_mux(struct ring_buffer *ring)
+{
+  struct ring_header *hdr = ring->hdr_addr;
+  pthread_mutexattr_t *attr; 
+
+  if ((attr = init_mutex_attr()) == NULL)
+  {
+    fprintf(stderr, "shmring_init: failed to init mutex attr.\n");
+    return -1;
+  }
+
+  hdr = ring->hdr_addr;
+  if (pthread_mutex_init(&hdr->mux, attr) < 0)
+  {
+    fprintf(stderr, "shmring_init: failed to init mutex.\n");
+    free(attr);
+    return -1;
   }
 
   return 0;
@@ -356,8 +363,8 @@ pthread_mutexattr_t * init_mutex_attr()
     goto free_attr;
   }
 
-  // Set mutex to normal type. Default type may have underfined behaviour
-  // when relocking
+  /* Set mutex to normal type. Default type may have 
+     underfined behaviour when relocking */
   if (pthread_mutexattr_settype(attr, PTHREAD_MUTEX_NORMAL) < 0)
   {
     fprintf(stderr, "init_mutex_attr: failed to set mutex type to normal.\n");
