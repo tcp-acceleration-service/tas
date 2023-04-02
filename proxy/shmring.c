@@ -132,12 +132,7 @@ size_t shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
 
   hdr->read_pos += size;
   hdr->read_pos %= hdr->ring_size;
-
-  /* Mark the ring as not full */
-  if (hdr->write_pos != hdr->read_pos)
-  {
-    hdr->full = 0;
-  }
+  hdr->full = 0;
 
   return size;
 }
@@ -171,12 +166,7 @@ size_t pop_fragmented(struct ring_buffer *rx_ring,
 
   hdr->read_pos += size;
   hdr->read_pos %= hdr->ring_size;
-
-  /* Mark the ring as not full */
-  if (hdr->write_pos != hdr->read_pos)
-  {
-    hdr->full = 0;
-  }
+  hdr->full = 0;
 
   return size;
 }

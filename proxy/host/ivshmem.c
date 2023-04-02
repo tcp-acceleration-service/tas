@@ -426,7 +426,7 @@ static int uxsocket_handle_error()
 
 static int channel_poll()
 {
-    int i, j, ret;
+    int i;
     struct v_machine *vm;
 
     for(i = 0; i < next_vm_id; i++)
@@ -434,12 +434,7 @@ static int channel_poll()
         vm = &vms[i];
         if (vm != NULL)
         {
-            for (j = 0; j < CHANNEL_POLL_ROUNDS; j++)
-            {
-                ret = channel_poll_vm(vm);
-                if (ret == 0)
-                    break;
-            }
+            channel_poll_vm(vm);
         }
     }
 
@@ -476,18 +471,23 @@ static int channel_poll_vm(struct v_machine *vm)
     switch(msg_type)
     {
         case MSG_TYPE_TASINFO_REQ:
+            printf("MSG_TYPE_TASINFO_REQ\n");
             channel_handle_tasinforeq_msg(vm);
             break;
         case MSG_TYPE_CONTEXT_REQ:
+            printf("MSG_TYPE_CONTEXT_REQ\n");
             channel_handle_ctx_req(vm, msg);
             break;
         case MSG_TYPE_NEWAPP_REQ:
+            printf("MSG_TYPE_NEWAPP_REQ\n");
             channel_handle_newapp(vm, msg);
             break;
         case MSG_TYPE_POKE_TAS_CORE:
+            printf("MSG_TYPE_POKE_TAS_CORE\n");
             channel_handle_poke_tas_core(vm, msg);
             break;
         case MSG_TYPE_POKE_TAS_KERNEL:
+            printf("MSG_TYPE_POKE_TAS_KERNEL\n");
             channel_handle_poke_tas_kernel(vm, msg);
             break;
         default:
@@ -668,10 +668,10 @@ static int app_ctxs_poll()
     int i, n, ret;
     struct vmcontext_req *vctx;
     struct _msg;
-    struct epoll_event evs[1];
+    struct epoll_event evs[2];
     struct poke_app_ctx_msg msg;
 
-    n = epoll_wait(ctx_epfd, evs, 1, 0);
+    n = epoll_wait(ctx_epfd, evs, 2, 0);
 
     if (n < 0)
     {

@@ -5,10 +5,10 @@
 #include <pthread.h>
 
 struct ring_header {
-  volatile int write_pos;
-  volatile int read_pos;
-  volatile int full;
-  volatile size_t ring_size;
+  int write_pos;
+  int read_pos;
+  int full;
+  size_t ring_size;
   pthread_mutex_t mux;
 } __attribute__((packed));
 

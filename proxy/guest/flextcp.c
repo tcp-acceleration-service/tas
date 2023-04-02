@@ -518,9 +518,9 @@ static int vflextcp_uxsocket_handle_msg(struct guest_proxy *pxy,
 static int vflextcp_tas_poke_poll(struct guest_proxy *pxy) {
   int n, i;
   struct poke_event *poke_ev;
-  struct epoll_event evs[1];
+  struct epoll_event evs[2];
 
-  n = epoll_wait(pxy->epfd, evs, 1, 0);
+  n = epoll_wait(pxy->epfd, evs, 2, 0);
   if (n < 0) 
   {
     perror("vflextcp_tas_poke_poll: epoll_wait");

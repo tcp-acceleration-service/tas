@@ -8,8 +8,6 @@
 
 #define HOST_PEERID 255
 
-#define CHANNEL_POLL_ROUNDS 10
-
 struct proxy_context_req {
   int actx_evfd;
   int ctxreq_id;
