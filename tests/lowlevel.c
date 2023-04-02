@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  if (flextcp_context_create(&ctx)) {
+  if (flextcp_context_create(&ctx, NULL, NULL)) {
     fprintf(stderr, "flextcp_context_create failed\n");
     return -1;
   }

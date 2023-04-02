@@ -304,7 +304,7 @@ int main(int argc, char *argv[])
 
     for (i = 0; i < num_threads; i++) {
         cs->cn = i;
-        if (flextcp_context_create(&cs->context) != 0) {
+        if (flextcp_context_create(&cs->context, NULL, NULL) != 0) {
             fprintf(stderr, "flextcp_context_create failed %d\n", i);
             return EXIT_FAILURE;
         }

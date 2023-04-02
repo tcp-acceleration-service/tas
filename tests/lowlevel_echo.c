@@ -149,12 +149,12 @@ int main(int argc, char *argv[])
   }
   port = atoi(argv[argc - 1]);
 
-  if (flextcp_init()) {
+  if (flextcp_init(0)) {
     fprintf(stderr, "flextcp_init failed\n");
     return -1;
   }
 
-  if (flextcp_context_create(&ctx)) {
+  if (flextcp_context_create(&ctx, NULL, NULL)) {
     fprintf(stderr, "flextcp_context_create failed\n");
     return -1;
   }
