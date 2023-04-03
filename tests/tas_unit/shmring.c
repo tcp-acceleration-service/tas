@@ -343,12 +343,88 @@ void test_fragmented_pop()
 
 void test_ring_is_empty()
 {
+    int ret;
+    void *base_addr, *msg, *dst;
+    struct ring_buffer *ring;
+    size_t RING_SIZE = 100;
 
+    base_addr = malloc(RING_SIZE);
+    ring = shmring_init(base_addr, RING_SIZE);
+    shmring_reset(ring, RING_SIZE);
+
+    ret = shmring_is_empty(ring);
+    test_assert("ring is empty after initialization", ret);
+
+    size_t hdr_size = sizeof(struct ring_header);
+    msg = malloc(RING_SIZE - hdr_size);
+    dst = malloc(RING_SIZE - hdr_size);
+
+    shmring_push(ring, msg, 10);
+    ret = shmring_is_empty(ring);
+    test_assert("ring is not empty after pushing one message", ret == 0);
+
+    shmring_pop(ring, dst, 10);
+    ret = shmring_is_empty(ring);
+    test_assert("ring is empty after pushing and popping message", ret);
+
+    shmring_push(ring, msg, RING_SIZE - hdr_size);
+    ret = shmring_is_empty(ring);
+    test_assert("ring is not empty when full", ret == 0);
+
+    shmring_pop(ring, dst, RING_SIZE - hdr_size);
+    ret = shmring_is_empty(ring);
+    test_assert("ring is empty after being full and popped completely", ret);
+
+    shmring_push(ring, msg, RING_SIZE - hdr_size);
+    shmring_pop(ring, dst, 10);
+    shmring_push(ring, msg, 5);
+    ret = shmring_is_empty(ring);
+    test_assert("ring is not empty when write_pos < read_pos", ret == 0);
 }
 
 void test_ring_get_freesz()
 {
+    int ret;
+    void *base_addr, *msg, *dst;
+    struct ring_buffer *ring;
+    size_t RING_SIZE = 100;
 
+    base_addr = malloc(RING_SIZE);
+    ring = shmring_init(base_addr, RING_SIZE);
+    shmring_reset(ring, RING_SIZE);
+    size_t hdr_size = sizeof(struct ring_header);
+
+    ret = shmring_get_freesz(ring);
+    test_assert("get free size after initialization",
+                ret == RING_SIZE - hdr_size);
+
+    msg = malloc(RING_SIZE - hdr_size);
+    dst = malloc(RING_SIZE - hdr_size);
+
+    shmring_push(ring, msg, 10);
+    ret = shmring_get_freesz(ring);
+    test_assert("get free size after pushing one message", 
+                ret == RING_SIZE - hdr_size - 10);
+
+    shmring_pop(ring, dst, 10);
+    ret = shmring_get_freesz(ring);
+    test_assert("get free size after pushing and popping message", 
+                ret == RING_SIZE - hdr_size);
+
+    shmring_push(ring, msg, RING_SIZE - hdr_size);
+    ret = shmring_get_freesz(ring);
+    test_assert("get free size when full", ret == 0);
+
+    shmring_pop(ring, dst, RING_SIZE - hdr_size);
+    ret = shmring_get_freesz(ring);
+    test_assert("get free size after being full and popped completely", 
+                ret == RING_SIZE - hdr_size);
+
+    shmring_push(ring, msg, RING_SIZE - hdr_size);
+    shmring_pop(ring, dst, 10);
+    shmring_push(ring, msg, 5);
+    ret = shmring_get_freesz(ring);
+    test_assert("get free size when write_pos < read_pos", ret == 5);
 }
 
 int main(int argc, char *argv[])
@@ -380,6 +456,12 @@ int main(int argc, char *argv[])
         ret = 1;
 
     if (test_subcase("pop frag write to ring", test_fragmented_pop, NULL))
+        ret = 1;
+
+    if (test_subcase("ring is empty check", test_ring_is_empty, NULL))
+        ret = 1;
+
+    if (test_subcase("get free size", test_ring_get_freesz, NULL))
         ret = 1;
 
 
