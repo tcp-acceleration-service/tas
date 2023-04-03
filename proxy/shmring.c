@@ -28,7 +28,6 @@ struct ring_buffer* shmring_init(void *base_addr, size_t size)
   ring->buf_addr = base_addr + sizeof(struct ring_header);
   ring->size = size;
 
-  memset(base_addr, 0, size);
   return ring;
 }
 
@@ -37,6 +36,7 @@ void shmring_reset(struct ring_buffer *ring, size_t size)
 {
   struct ring_header *hdr = ring->hdr_addr;
 
+  memset(ring->hdr_addr, 0, size);
   hdr->read_pos = 0;
   hdr->write_pos = 0;
   hdr->full = 0;
