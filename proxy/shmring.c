@@ -134,6 +134,10 @@ size_t shmring_pop(struct ring_buffer *rx_ring, void *dst, size_t size)
   hdr->read_pos %= hdr->ring_size;
   hdr->full = 0;
 
+  int is_empty = shmring_is_empty(rx_ring);
+  printf("shmring_pop: write_pos=%d read_pos=%d ring_size=%ld full=%d is_empty=%d\n",
+      hdr->write_pos, hdr->read_pos, hdr->ring_size, hdr->full, is_empty);
+
   return size;
 }
 
@@ -167,6 +171,10 @@ size_t pop_fragmented(struct ring_buffer *rx_ring,
   hdr->read_pos += size;
   hdr->read_pos %= hdr->ring_size;
   hdr->full = 0;
+
+  int is_empty = shmring_is_empty(rx_ring);
+  printf("pop_fragmented: write_pos=%d read_pos=%d ring_size=%ld full=%d is_empty=%d\n",
+      hdr->write_pos, hdr->read_pos, hdr->ring_size, hdr->full, is_empty);
 
   return size;
 }
@@ -275,6 +283,9 @@ size_t shmring_push(struct ring_buffer *tx_ring, void *src, size_t size)
     hdr->full = 1;
   }
 
+  int is_empty = shmring_is_empty(tx_ring);
+  printf("shmring_push: write_pos=%d read_pos=%d ring_size=%ld full=%d is_empty=%d\n",
+      hdr->write_pos, hdr->read_pos, hdr->ring_size, hdr->full, is_empty);
   return size;
 }
 
@@ -310,6 +321,10 @@ size_t push_fragmented(struct ring_buffer *tx_ring,
   {
     hdr->full = 1;
   }
+
+  int is_empty = shmring_is_empty(tx_ring);
+  printf("push_fragmented: write_pos=%d read_pos=%d ring_size=%ld full=%d is_empty=%d\n",
+      hdr->write_pos, hdr->read_pos, hdr->ring_size, hdr->full, is_empty);
 
   return size;
 }
