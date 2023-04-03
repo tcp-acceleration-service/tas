@@ -52,10 +52,12 @@ size_t channel_write(struct channel *chan, void *buf, size_t size)
   do {
     shmring_lock(chan->tx);
     free_sz = shmring_get_freesz(chan->tx);
-
-    if (free_sz >= size)
+    if (free_sz >= size) 
+    {
       ret = shmring_push(chan->tx, buf, size);
-    
+      shmring_unlock(chan->tx);
+      break;
+    }
     shmring_unlock(chan->tx);
   } while(free_sz < size);
 

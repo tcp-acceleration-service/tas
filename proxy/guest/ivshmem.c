@@ -89,7 +89,6 @@ int ivshmem_channel_poll(struct guest_proxy *pxy)
   is_empty = shmring_is_empty(pxy->chan->rx);
   shmring_unlock(pxy->chan->rx);
 
-  MEM_BARRIER();
   if (is_empty)
   {
     return 0;
