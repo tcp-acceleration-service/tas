@@ -451,7 +451,9 @@ static int channel_poll_vm(struct v_machine *vm)
     /* Move on if rx channel for this vm is empty */
     shmring_lock(vm->chan->rx);
     is_empty = shmring_is_empty(vm->chan->rx);
-    shmring_unlock(vm->chan->rx); 
+    shmring_unlock(vm->chan->rx);
+
+    MEM_BARRIER();
     if (is_empty)
     {
         return 0;
