@@ -142,8 +142,8 @@ static int channel_handle_hello(struct guest_proxy *pxy)
 
   /* Send tasinfo request and wait for the response in the channel poll */
   treq_msg.msg_type = MSG_TYPE_TASINFO_REQ;
-  printf("MSG_TYPE_TASINFO_REQ\n");
   ret = channel_write(pxy->chan, &treq_msg, sizeof(struct tasinfo_req_msg));
+  printf("MSG_TYPE_TASINFO_REQ\n");
   if (ret != sizeof(struct tasinfo_req_msg))
   {
     fprintf(stderr, "channel_handle_hello: failed to write tasinfo req msg.\n");
