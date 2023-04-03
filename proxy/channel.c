@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <assert.h>
 
 #include "channel.h"
 #include "shmring.h"
@@ -55,6 +56,7 @@ size_t channel_write(struct channel *chan, void *buf, size_t size)
     if (free_sz >= size) 
     {
       ret = shmring_push(chan->tx, buf, size);
+      assert(ret == size || ret == 0);
       shmring_unlock(chan->tx);
       break;
     }

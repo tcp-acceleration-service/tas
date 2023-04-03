@@ -85,10 +85,12 @@ int ivshmem_channel_poll(struct guest_proxy *pxy)
   size_t msg_size;
   
   /* Return if there are no messages in channel */
+  MEM_BARRIER();
   shmring_lock(pxy->chan->rx);
   is_empty = shmring_is_empty(pxy->chan->rx);
   shmring_unlock(pxy->chan->rx);
 
+  MEM_BARRIER();
   if (is_empty)
   {
     return 0;
