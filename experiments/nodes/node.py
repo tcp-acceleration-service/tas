@@ -22,7 +22,7 @@ class Node:
     cmd = "cd {}".format(script_dir)
     self.setup_pane.send_keys(cmd)
     time.sleep(1)
-    cmd = "sudo bash tap_up.sh {} {}".format(interface, multi_queue)
+    cmd = "sudo bash tap-up.sh {} {}".format(interface, multi_queue)
     self.setup_pane.send_keys(cmd)
     time.sleep(2)
 
@@ -30,7 +30,7 @@ class Node:
     cmd = "cd {}".format(script_dir)
     self.cleanup_pane.send_keys(cmd)
     time.sleep(1)
-    cmd = "sudo bash tap_down.sh {}".format(interface)
+    cmd = "sudo bash tap-down.sh {}".format(interface)
     self.cleanup_pane.send_keys(cmd)
     time.sleep(2)
 
@@ -40,7 +40,7 @@ class Node:
       cmd = "cd {}".format(script_dir)
       self.setup_pane.send_keys(cmd)
       time.sleep(1)
-      cmd = "sudo bash br_up.sh {} {}/24".format(interface, ip)
+      cmd = "sudo bash br-up.sh {} {}/24".format(interface, ip)
       self.setup_pane.send_keys(cmd)
       time.sleep(2)
   
@@ -50,17 +50,23 @@ class Node:
       cmd = "cd {}".format(script_dir)
       self.cleanup_pane.send_keys(cmd)
       time.sleep(1)
-      cmd = "sudo bash br_down.sh {} {}/24".format(interface, ip)
+      cmd = "sudo bash br-down.sh {} {}/24".format(interface, ip)
       self.cleanup_pane.send_keys(cmd)
       time.sleep(2)
 
-  def start_ovs(self, ovsctl_path):
-      cmd = "sudo {} start".format(ovsctl_path)
+  def start_ovs(self, script_dir):
+      cmd = "cd {}".format(script_dir)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(1)
+      cmd = "sudo bash ovs-start.sh"
       self.setup_pane.send_keys(cmd)
       time.sleep(2)
 
-  def stop_ovs(self, ovsctl_path):
-      cmd = "sudo {} stop".format(ovsctl_path)
+  def stop_ovs(self, script_dir):
+      cmd = "cd {}".format(script_dir)
+      self.cleanup_pane.send_keys(cmd)
+      time.sleep(1)
+      cmd = "sudo bash ovs-stop.sh"
       self.cleanup_pane.send_keys(cmd)
       time.sleep(2)
 
@@ -69,6 +75,14 @@ class Node:
       self.setup_pane.send_keys(cmd)
       time.sleep(1)
       cmd = "sudo bash ovsbr-add.sh {} {} {}".format(br_name, ip, interface)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(2)
+
+  def dpdk_ovsbr_add(self, br_name, ip, interface, script_dir):
+      cmd = "cd {}".format(script_dir)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(1)
+      cmd = "sudo bash dpdk-ovsbr-add.sh {} {} {}".format(br_name, ip, interface)
       self.setup_pane.send_keys(cmd)
       time.sleep(2)
 

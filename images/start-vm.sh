@@ -4,6 +4,7 @@ set -ex
 
 stack=$1
 vm_id=$2
+interface=$3
 
 stty intr ^]
 stty susp ^]
@@ -23,6 +24,8 @@ printf -v alt_mac '02:00:00:%02X:%02X:%02X' $((RANDOM%256)) $((RANDOM%256)) $((R
 
 echo $mac
 echo $alt_mac
+
+# Note: vectors=<2 + 2 * queues_nr>
 
 if [[ "$stack" == 'virt-tas' ]]; then
   sudo qemu-system-x86_64 \
@@ -77,12 +80,11 @@ elif [[ "$stack" == 'ovs-tas' ]]; then
     -smp 12 \
     -m 25G \
     -snapshot \
-    -netdev user,id=net0 \
+    -netdev user,id=net0,hostfwd=tcp::222${vm_id}-:22 \
     -device virtio-net-pci,netdev=net0 \
-    -netdev tap,ifname=$tap,script=no,downscript=no,vhost=on,id=net1 \
-    -device virtio-net-pci,mac=$mac,netdev=net1 \
-    -netdev tap,ifname=$ovstap,script=no,downscript=no,vhost=on,queues=10,id=net2 \
-    -device virtio-net-pci,mac=$alt_mac,vectors=18,mq=on,rss=on,hash=off,netdev=net2 \
+    -chardev socket,id=char0,path=/usr/local/var/run/openvswitch/$interface \
+    -netdev type=vhost-user,chardev=char0,vhostforce=on,queues=12,id=net1 \
+    -device virtio-net-pci,netdev=net1,mac=$alt_mac,mq=on,vectors=26 \
     -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
     -drive if=virtio,format=raw,file="seed.img" \
     ;

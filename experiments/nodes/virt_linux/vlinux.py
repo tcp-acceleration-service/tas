@@ -33,6 +33,9 @@ class VirtLinux(Node):
     for vm_config in self.vm_configs:
       self.tap_down("tap{}".format(vm_config.id), vm_config.manager_dir)
 
+    for vm in self.vms:
+      vm.shutdown()
+
   def start_vm(self, vm, vm_config):
     vm.start()
     vm.init_interface(vm_config.vm_ip, self.defaults.vm_interface)

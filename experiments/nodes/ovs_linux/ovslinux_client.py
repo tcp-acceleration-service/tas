@@ -17,6 +17,9 @@ class OvsLinuxClient(OvsLinux):
     self.cnum = config.cnum
     self.clients = []
 
+  def cleanup(self):
+    super().cleanup()
+
   def start_clients(self):
     for i in range(self.nodenum):
       vm_config = self.vm_configs[i]

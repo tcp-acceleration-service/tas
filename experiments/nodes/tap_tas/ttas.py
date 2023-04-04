@@ -39,6 +39,9 @@ class TapTas(Node):
       self.tap_down("tap{}".format(vm_config.id), vm_config.manager_dir)
       self.tap_down("tastap{}".format(vm_config.id), vm_config.manager_dir)
 
+    for vm in self.vms:
+      vm.shutdown()
+
   def start_tas(self):
     for i in range(self.nodenum):
       tas_config = self.tas_configs[i]

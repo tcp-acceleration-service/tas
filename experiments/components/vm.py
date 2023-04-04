@@ -12,8 +12,9 @@ class VM:
     
     def start(self):
         self.pane.send_keys('cd ' + self.vm_config.manager_dir)
-        start_vm_cmd = "sudo bash start-vm.sh {} {}".format(
-                self.machine_config.stack, self.vm_config.id)
+        start_vm_cmd = "sudo bash start-vm.sh {} {} {}".format(
+                self.machine_config.stack, self.vm_config.id,
+                self.machine_config.interface)
         self.pane.send_keys(start_vm_cmd)
        
         print("Started VM")
@@ -46,7 +47,7 @@ class VM:
     def dpdk_bind(self, ip, interface, pci_id):
         cmd = 'cd ' + self.vm_config.manager_dir_virt
         self.pane.send_keys(cmd)
-        cmd = 'bash dpdk_bind.sh {} {} {}'.format(ip, interface, pci_id)
+        cmd = 'bash dpdk-bind.sh {} {} {}'.format(ip, interface, pci_id)
         self.pane.send_keys(cmd)
         time.sleep(3)
 
@@ -56,3 +57,15 @@ class VM:
         self.pane.send_keys(suppress_history=False, cmd='tas')
         self.pane.enter()
         time.sleep(5)
+
+    def shutdown(self):
+        self.pane.send_keys(suppress_history=False, cmd='whoami')
+        
+        captured_pane = self.pane.capture_pane()
+        user = captured_pane[len(captured_pane) - 2]
+        
+        # This means we are in the vm, so we don't 
+        # accidentally shutdown machine
+        if user == 'tas':
+            self.pane.send_keys(suppress_history=False, cmd='sudo shutdown -h now')
+            time.sleep(2)

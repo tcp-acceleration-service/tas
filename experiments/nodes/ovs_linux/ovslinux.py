@@ -19,7 +19,7 @@ class OvsLinux(Node):
   def setup(self):
     super().setup()
 
-    self.start_ovs(self.defaults.ovs_ctl_path)
+    self.start_ovs(self.vm_configs[0].manager_dir)
     self.ovsbr_add("br0", 
                    self.machine_config.ip + "/24", 
                    self.machine_config.interface,
@@ -35,7 +35,7 @@ class OvsLinux(Node):
   def cleanup(self):
     super().cleanup()
     self.ovsbr_del("br0")
-    self.stop_ovs(self.defaults.ovs_ctl_path)
+    self.stop_ovs(self.vm_configs[0].manager_dir)
 
     cmd = "sudo ip addr add {} dev {}".format(self.machine_config.ip + "/24",
                                               self.machine_config.interface)
@@ -48,6 +48,9 @@ class OvsLinux(Node):
 
     for vm_config in self.vm_configs:
       self.tap_down("tap{}".format(vm_config.id), vm_config.manager_dir)
+
+    for vm in self.vms:
+      vm.shutdown()
     
   def start_vm(self, vm, vm_config):
     vm.start()

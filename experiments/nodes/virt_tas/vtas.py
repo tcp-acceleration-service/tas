@@ -24,6 +24,11 @@ class VirtTas(Node):
     vm.start()
     vm.enable_noiommu("1af4 1110")
 
+  def cleanup(self):
+    super().cleanup()
+    for vm in self.vms:
+      vm.shutdown()
+
   def start_vms(self):
     threads = []
     for vm_config in self.vm_configs:

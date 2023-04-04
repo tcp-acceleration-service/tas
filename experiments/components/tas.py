@@ -19,10 +19,12 @@ class TAS:
         utils.compile_and_run(pane=self.pane,
                 comp_dir=self.tas_config.comp_dir,
                 comp_cmd=self.tas_config.comp_cmd,
+                clean_cmd=self.tas_config.clean_cmd,
                 exec_file=self.tas_config.exec_file,
                 out=self.tas_config.out,
                 args=tas_args,
-                save_log=True)
+                save_log=True,
+                clean=False)
 
     def run_virt(self):
         ssh_com = utils.get_ssh_command(self.machine_config, self.vm_config)
@@ -35,10 +37,12 @@ class TAS:
         utils.compile_and_run(pane=self.pane,
                 comp_dir=self.tas_config.comp_dir,
                 comp_cmd=self.tas_config.comp_cmd,
+                clean_cmd=self.tas_config.clean_cmd,
                 exec_file=self.tas_config.exec_file,
                 out=self.tas_config.out,
                 args=tas_args,
-                save_log=True)
+                save_log=True,
+                clean=False)
 
     def save_log_bare(self, exp_path):
         # # kill process to force flush to file
