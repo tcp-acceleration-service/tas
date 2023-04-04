@@ -37,7 +37,7 @@ class Config:
                     machine_config=self.s_machine_config,
                     project_dir=self.defaults.default_otas_dir_virt,
                     ip=vm_config.tas_tap_ip,
-                    n_cores=10, dpdk_extra="00:04.0")
+                    n_cores=10, dpdk_extra="00:03.0")
             self.s_tas_configs.append(tas_config)
 
             for j in range(self.snum):
@@ -75,7 +75,7 @@ class Config:
                 machine_config=self.c_machine_config,
                 project_dir=self.defaults.default_otas_dir_virt,
                 ip=vm_config.tas_tap_ip,
-                n_cores=10, dpdk_extra="00:04.0")
+                n_cores=10, dpdk_extra="00:03.0")
             self.c_tas_configs.append(tas_config)
 
             for j in range(self.cnum):

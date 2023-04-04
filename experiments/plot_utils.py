@@ -1,4 +1,53 @@
+
 import re
+
+def init_latencies():
+  latencies = {
+    "50p": 0,
+    "90p": 0,
+    "99p": 0,
+    "99.9p": 0,
+    "99.99p": 0
+  }
+
+  return latencies
+
+def divide_latencies(latencies, den):
+  latencies["50p"] /= den
+  latencies["90p"] /= den
+  latencies["99p"] /= den
+  latencies["99.9p"] /= den
+  latencies["99.99p"] /= den
+
+def add_latencies(latencies, fname_c0):
+  f = open(fname_c0)
+  lines = f.readlines()
+
+  # Latencies are already accumulated over all time
+  # period in the logs
+  line = lines[len(lines) - 1]
+  latencies["50p"] += int(get_50p_lat(line))
+  latencies["90p"] += int(get_90p_lat(line))
+  latencies["99p"] += int(get_99p_lat(line))
+  latencies["99.9p"] += int(get_99_9p_lat(line))
+  latencies["99.99p"] += int(get_99_99p_lat(line))
+
+  return latencies
+
+def get_expname_msize(fname):
+  regex = "(?<=-msize)[0-9]*"
+  msize = re.search(regex, fname).group(0)
+  return msize
+
+def get_expname_run(fname):
+  run_id_regex = "(?<=-run)[0-9]*"
+  run_id = re.search(run_id_regex, fname).group(0)
+  return run_id
+
+def get_expname_conns(fname):
+  regex = "(?<=-conns)[0-9]*"
+  nconns = re.search(regex, fname).group(0)
+  return nconns
 
 def get_stack(line):
   stack_regex = "(?<=_)([a-z]+-[a-z]+)(?=_)"

@@ -71,7 +71,7 @@ class Config:
                 machine_config=self.c_machine_config,
                 project_dir=self.defaults.default_otas_dir_virt,
                 ip=vm0_config.tas_tap_ip,
-                n_cores=1, dpdk_extra="00:04.0")
+                n_cores=1, dpdk_extra="00:03.0")
         tas0_config.args = tas0_config.args + ' --shm-len=4294967296'
         
 
@@ -84,7 +84,7 @@ class Config:
                 machine_config=self.c_machine_config,
                 project_dir=self.defaults.default_otas_dir_virt,
                 ip=vm1_config.tas_tap_ip,
-                n_cores=1, dpdk_extra="00:04.0")
+                n_cores=1, dpdk_extra="00:03.0")
         tas1_config.args = tas1_config.args + ' --shm-len=4294967296'
 
 

@@ -71,7 +71,7 @@ class Config:
                 machine_config=self.c_machine_config,
                 project_dir=self.defaults.default_otas_dir_virt,
                 ip=vm0_config.tas_tap_ip,
-                n_cores=1, dpdk_extra="00:04.0")
+                n_cores=1, dpdk_extra="00:03.0")
         tas0_config.args = tas0_config.args + ' --shm-len=4294967296'
         
 
@@ -84,7 +84,7 @@ class Config:
                 machine_config=self.c_machine_config,
                 project_dir=self.defaults.default_otas_dir_virt,
                 ip=vm1_config.tas_tap_ip,
-                n_cores=1, dpdk_extra="00:04.0")
+                n_cores=1, dpdk_extra="00:03.0")
         tas1_config.args = tas1_config.args + ' --shm-len=4294967296'
 
 
@@ -96,8 +96,8 @@ class Config:
         client0_config = ClientConfig(exp_name=exp_name, 
                 pane=self.defaults.c_client_pane,
                 idx=0, vmid=0, stack=self.cstack,
-                ip=self.defaults.server_ip, port=1234, ncores=3,
-                msize=64, mpending=64, nconns=128,
+                ip=self.defaults.server_ip, port=1234, ncores=1,
+                msize=64, mpending=64, nconns=1,
                 open_delay=15, max_msgs_conn=0, max_pend_conns=1,
                 bench_dir=self.defaults.default_obenchmark_dir_virt,
                 tas_dir=self.defaults.default_otas_dir_virt)

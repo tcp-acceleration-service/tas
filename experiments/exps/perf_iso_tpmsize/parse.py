@@ -2,17 +2,8 @@ import sys
 sys.path.append("../../../")
 
 import os
-import re
 import experiments.plot_utils as putils
 
-
-# For this experiment get the message size
-# from the experiment name, since client 0 and client 1
-# have different message sizes
-def get_msize(fname):
-  regex = "(?<=-msize)[0-9]*"
-  msize = re.search(regex, fname).group(0)
-  return msize
 
 def check_msize(data, msize):
   if msize not in data:
@@ -22,13 +13,17 @@ def check_stack(data, msize, stack):
   if stack not in data[msize]:
     data[msize][stack] = {}
 
-def check_nid(data, msize, stack, nid):
-  if nid not in data[msize][stack]:
-    data[msize][stack][nid] = {}
+def check_run(data, msize, stack, run):
+  if run not in data[msize][stack]:
+    data[msize][stack][run] = {}
 
-def check_cid(data, msize, stack, nid, cid):
-  if cid not in data[msize][stack][nid]:
-    data[msize][stack][nid][cid] = ""
+def check_nid(data, msize, stack, run, nid):
+  if nid not in data[msize][stack][run]:
+    data[msize][stack][run][nid] = {}
+
+def check_cid(data, msize, stack, run, nid, cid):
+  if cid not in data[msize][stack][run][nid]:
+    data[msize][stack][run][nid][cid] = ""
 
 def get_avg_tp(fname_c0, fname_c1):
   n_messages = 0
@@ -48,7 +43,7 @@ def get_avg_tp(fname_c0, fname_c1):
   msize = int(putils.get_msize(fname_c0))
   n = len(lines) - idx
 
-  return str((n_messages * msize * 8 / n) / 1000000)
+  return (n_messages * msize * 8 / n) / 1000000
 
 def parse_metadata():
   dir_path = "./out/"
@@ -60,17 +55,19 @@ def parse_metadata():
     if "tas_c" == fname:
       continue
 
-    msize = get_msize(fname)
+    run = putils.get_expname_run(fname)
+    msize = putils.get_expname_msize(fname)
     cid = putils.get_client_id(fname)
     nid = putils.get_node_id(fname)
     stack = putils.get_stack(fname)
 
     check_msize(data, msize)
     check_stack(data, msize, stack)
-    check_nid(data, msize, stack, nid)
-    check_cid(data, msize, stack, nid, cid)
+    check_run(data, msize, stack, run)
+    check_nid(data, msize, stack, run, nid)
+    check_cid(data, msize, stack, run, nid, cid)
 
-    data[msize][stack][nid][cid] = fname
+    data[msize][stack][run][nid][cid] = fname
 
   return data
 
@@ -80,17 +77,19 @@ def parse_data(parsed_md):
   for msize in parsed_md:
     data_point = {"msize": msize}
     for stack in parsed_md[msize]:
-      is_virt = stack == "virt-tas" or stack == "ovs-tas" or stack == "ovs-linux"
-      if is_virt:
-        c0_fname = out_dir + parsed_md[msize][stack]["0"]["0"]
-        c1_fname = out_dir + parsed_md[msize][stack]["1"]["0"]
-      else:
-        c0_fname = out_dir + parsed_md[msize][stack]["0"]["0"]
-        c1_fname = out_dir + parsed_md[msize][stack]["0"]["1"]
+      avg_tp = 0
+      for run in parsed_md[msize][stack]:
+        is_virt = stack == "virt-tas" or stack == "ovs-tas" or stack == "ovs-linux"
+        if is_virt:
+          c0_fname = out_dir + parsed_md[msize][stack][run]["0"]["0"]
+          c1_fname = out_dir + parsed_md[msize][stack][run]["1"]["0"]
+        else:
+          c0_fname = out_dir + parsed_md[msize][stack][run]["0"]["0"]
+          c1_fname = out_dir + parsed_md[msize][stack][run]["0"]["1"]
 
-      avg_tp = get_avg_tp(c0_fname, c1_fname)
+        avg_tp += get_avg_tp(c0_fname, c1_fname)
 
-      data_point[stack] = avg_tp
+      data_point[stack] = avg_tp / len(parsed_md[msize][stack])
   
     tp.append(data_point)
   

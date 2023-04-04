@@ -2,18 +2,8 @@ import sys
 sys.path.append("../../../")
 
 import os
-import re
-import functools
 import experiments.plot_utils as putils
 
-
-# For this experiment get the message size
-# from the experiment name, since client 0 and client 1
-# have a different message size
-def get_msize(fname):
-  regex = "(?<=-msize)[0-9]*"
-  msize = re.search(regex, fname).group(0)
-  return msize
 
 def check_msize(data, msize):
   if msize not in data:
@@ -23,29 +13,17 @@ def check_stack(data, nconns, stack):
   if stack not in data[nconns]:
     data[nconns][stack] = {}
 
-def check_nid(data, nconns, stack, nid):
-  if nid not in data[nconns][stack]:
-    data[nconns][stack][nid] = {}
+def check_run(data, msize, stack, run):
+  if run not in data[msize][stack]:
+    data[msize][stack][run] = {}
 
-def check_cid(data, nconns, stack, nid, cid):
-  if cid not in data[nconns][stack][nid]:
-    data[nconns][stack][nid][cid] = ""
+def check_nid(data, msize, stack, run, nid):
+  if nid not in data[msize][stack][run]:
+    data[msize][stack][run][nid] = {}
 
-def get_latencies(fname_c0):
-  f = open(fname_c0)
-  lines = f.readlines()
-
-  # Latencies are already accumulated over all time
-  # period in the logs
-  line = lines[len(lines) - 1]
-  latencies = {}
-  latencies["50p"] = putils.get_50p_lat(line)
-  latencies["90p"] = putils.get_90p_lat(line)
-  latencies["99p"] = putils.get_99p_lat(line)
-  latencies["99.9p"] = putils.get_99_9p_lat(line)
-  latencies["99.99p"] = putils.get_99_99p_lat(line)
-
-  return latencies
+def check_cid(data, msize, stack, run, nid, cid):
+  if cid not in data[msize][stack][run][nid]:
+    data[msize][stack][run][nid][cid] = ""
 
 def parse_metadata():
   dir_path = "./out/"
@@ -56,18 +34,20 @@ def parse_metadata():
     
     if "tas_c" == fname:
       continue
-
-    msize = get_msize(fname)
-    cid = putils.get_client_id(fname)
+    
+    run = putils.get_expname_runs(fname)
+    msize = putils.get_expname_msize(fname)
     nid = putils.get_node_id(fname)
+    cid = putils.get_client_id(fname)
     stack = putils.get_stack(fname)
 
     check_msize(data, msize)
     check_stack(data, msize, stack)
-    check_nid(data, msize, stack, nid)
-    check_cid(data, msize, stack, nid, cid)
+    check_run(data, msize, stack, run)
+    check_nid(data, msize, stack, run, nid)
+    check_cid(data, msize, stack, run, nid, cid)
 
-    data[msize][stack][nid][cid] = fname
+    data[msize][stack][run][nid][cid] = fname
 
   return data
 
@@ -77,8 +57,12 @@ def parse_data(parsed_md):
   for msize in parsed_md:
     data_point = {}
     for stack in parsed_md[msize]:
-      fname_c0 = out_dir + parsed_md[msize][stack]['0']['0']
-      latencies = get_latencies(fname_c0)
+      latencies = putils.init_latencies()
+      for run in parsed_md[msize][stack]:
+        fname_c0 = out_dir + parsed_md[msize][stack][run]['0']['0']
+        putils.add_latencies(latencies, fname_c0)
+      
+      putils.divide_latencies(latencies, len(parsed_md[msize][stack]))
       data_point[stack] = latencies
   
     lat_list[msize] = data_point
