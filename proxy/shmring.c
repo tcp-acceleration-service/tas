@@ -79,24 +79,24 @@ int shmring_init_mux(struct ring_buffer *ring)
 
 int shmring_lock(struct ring_buffer *ring)
 {
-  struct ring_header *hdr = ring->hdr_addr;
-  if (pthread_mutex_lock(&hdr->mux) < 0)
-  {
-    fprintf(stderr, "shmring_lock: failed to acquire lock.\n");
-    return -1;
-  }
+  // struct ring_header *hdr = ring->hdr_addr;
+  // if (pthread_mutex_lock(&hdr->mux) < 0)
+  // {
+  //   fprintf(stderr, "shmring_lock: failed to acquire lock.\n");
+  //   return -1;
+  // }
 
   return 0;
 }
 
 int shmring_unlock(struct ring_buffer *ring)
 {
-  struct ring_header *hdr = ring->hdr_addr;
-  if (pthread_mutex_unlock(&hdr->mux) < 0)
-  {
-    fprintf(stderr, "shmring_lock: failed to release lock.\n");
-    return -1;
-  }
+  // struct ring_header *hdr = ring->hdr_addr;
+  // if (pthread_mutex_unlock(&hdr->mux) < 0)
+  // {
+  //   fprintf(stderr, "shmring_lock: failed to release lock.\n");
+  //   return -1;
+  // }
   return 0;
 }
 
