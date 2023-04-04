@@ -60,7 +60,7 @@ class TapTas(Node):
       vm.start()
       vm.enable_hugepages()
       vm.enable_noiommu("1af4 1110")
-      vm.init_interface(vm_config.vm_ip, self.defaults.vm_interface)
+      vm.init_interface(vm_config.vm_ip, self.defaults.tas_interface)
       vm.init_interface(vm_config.tas_tap_ip, self.defaults.tas_interface)
       vm.dpdk_bind(vm_config.tas_tap_ip, self.defaults.tas_interface,
           self.defaults.pci_id)

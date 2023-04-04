@@ -71,7 +71,7 @@ def parse_data(parsed_md):
   return lat_list
 
 def save_dat_file(exp_lats):
-  header = "nconns bare-tas bare-vtas virt-tas ovs-linux ovs-tas\n"
+  header = "nconns bare-tas bare-vtas\n"
   
   nconns = list(exp_lats.keys())
   nconns = list(map(str, sorted(map(int, nconns))))
@@ -84,13 +84,10 @@ def save_dat_file(exp_lats):
       f.write(header)
 
       for nconn in nconns:
-        f.write("{} {} {} {} {} {}\n".format(
+        f.write("{} {} {}\n".format(
           nconn,
           exp_lats[nconn]['bare-tas'][percentile],
-          exp_lats[nconn]['bare-vtas'][percentile],
-          exp_lats[nconn]['virt-tas'][percentile],
-          exp_lats[nconn]['ovs-linux'][percentile],
-          exp_lats[nconn]['ovs-tas'][percentile])
+          exp_lats[nconn]['bare-vtas'][percentile])
         )
         
 def main():

@@ -2,7 +2,7 @@ import time
 
 def get_ssh_command(machine_config, vm_config):
     stack = machine_config.stack
-    if stack == "virt-tas" or stack == "ovs-tas":
+    if stack == "virt-tas" or stack == "ovs-tas" or stack == "ovs-linux":
         ssh_com = "ssh -p 222{} tas@localhost".format(vm_config.id)
     else:
         ssh_com = "ssh tas@{}".format(vm_config.vm_ip)
@@ -12,7 +12,8 @@ def get_ssh_command(machine_config, vm_config):
 def get_scp_command(machine_config, vm_config, src_path, save_path):
     ip = vm_config.vm_ip
     idx = vm_config.id
-    if machine_config.stack == "virt-tas":
+    stack = machine_config.stack
+    if stack == "virt-tas" or stack == "ovs-tas" or stack == "ovs-linux":
         ssh_com = "scp -P 222{} tas@localhost:{} {}".format(idx, src_path, save_path)
     else:
         ssh_com = "scp tas@{}:{} {}".format(ip, src_path, save_path)

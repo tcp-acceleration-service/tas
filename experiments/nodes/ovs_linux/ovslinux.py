@@ -27,10 +27,9 @@ class OvsLinux(Node):
     
     for vm_config in self.vm_configs:
       # Tap that allows us to ssh to VM
-      self.ovstap_add("br0", 
-                      "tap{}".format(vm_config.id),
-                      0,
-                      vm_config.manager_dir)
+      self.ovsvhost_add("br0", 
+                        "vhost{}".format(vm_config.id),
+                         vm_config.manager_dir)
 
   def cleanup(self):
     super().cleanup()
@@ -45,9 +44,6 @@ class OvsLinux(Node):
     cmd = "sudo ip link set dev {} up".format(self.machine_config.interface)
     self.cleanup_pane.send_keys(cmd)
     time.sleep(1)
-
-    for vm_config in self.vm_configs:
-      self.tap_down("tap{}".format(vm_config.id), vm_config.manager_dir)
 
     for vm in self.vms:
       vm.shutdown()

@@ -13,6 +13,7 @@ interface=$3
 
 # Create bridge using OvS
 ovs-vsctl add-br $br_name
+
 ovs-vsctl add-port $br_name $interface
 
 # Delete ip config from interface so that it can be added to bridge
