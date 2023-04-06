@@ -3,6 +3,7 @@ sys.path.append("../../../")
 
 import os
 import re
+import numpy as np
 import experiments.plot_utils as putils
 
 def check_nconns(data, nconns):
@@ -72,12 +73,12 @@ def parse_metadata():
   return data
 
 def parse_data(parsed_md):
-  tp = []
+  data = []
   out_dir = "./out/"
   for nconns in parsed_md:
     data_point = {"nconns": nconns}
     for stack in parsed_md[nconns]:
-      avg_tp = 0
+      tp_x = np.array([])
       for run in parsed_md[nconns][stack]:
         is_virt = stack == "virt-tas" or stack == "ovs-tas" or stack == "ovs-linux"
         if is_virt:
@@ -87,33 +88,39 @@ def parse_data(parsed_md):
           c0_fname = out_dir + parsed_md[nconns][stack][run]["0"]["0"]
           c1_fname = out_dir + parsed_md[nconns][stack][run]["0"]["1"]
 
-        avg_tp += get_avg_tp(c0_fname, c1_fname)
+        tp = get_avg_tp(c0_fname, c1_fname)
+        if tp > 0:
+          tp_x = np.append(tp_x, tp)
 
-      data_point[stack] = avg_tp / len(parsed_md[nconns][stack])
+      data_point[stack] = {
+        "tp": tp_x.mean(),
+        "std": tp_x.std(),
+      }
   
-    tp.append(data_point)
+    data.append(data_point)
   
-  tp = sorted(tp, key=lambda d: int(d['nconns']))
-  return tp
+  data = sorted(data, key=lambda d: int(d['nconns']))
+  return data
 
-def save_dat_file(avg_tps, fname):
+def save_dat_file(data, fname):
   f = open(fname, "w+")
-  header = "nconns bare-tas bare-vtas virt-tas ovs-linux ovs-tas\n"
+  header = "nconns bare-tas-avg bare-vtas-avg " + \
+      "virt-tas-avg ovs-linux-avg ovs-tas-avg " + \
+      "bare-tas-std " + \
+      "virt-tas-std ovs-linux-std\n"
   f.write(header)
-  for tp in avg_tps:
-    f.write("{} {} {} {} {} {}\n".format(
-      tp["nconns"],
-      tp["bare-tas"],
-      tp["bare-vtas"],
-      tp["virt-tas"],
-      tp["ovs-linux"],
-      tp["ovs-tas"]
-    ))
+  for dp in data:
+    f.write("{} {} {} {} {} {} {} {} {}\n".format(
+      dp["nconns"],
+      dp["bare-tas"]["tp"], dp["bare-vtas"]["tp"], dp["virt-tas"]["tp"],
+      dp["ovs-linux"]["tp"],
+      dp["bare-tas"]["std"], dp["bare-vtas"]["std"], dp["virt-tas"]["std"],
+      dp["ovs-linux"]["std"]))
         
 def main():
   parsed_md = parse_metadata()
-  avg_tps = parse_data(parsed_md)
-  save_dat_file(avg_tps, "./tp.dat")
+  data = parse_data(parsed_md)
+  save_dat_file(data, "./tp.dat")
 
 if __name__ == '__main__':
   main()
