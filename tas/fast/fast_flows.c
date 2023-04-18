@@ -419,7 +419,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
     }
   }
 
-#ifdef FLEXNIC_PL_OOO_RECV
+#ifdef FLEXNIC_PL_OOO_RECV  
   /* check if we should drop this segment */
   if (UNLIKELY(tcp_trim_rxbuf(fs, seq, payload_bytes, &trim_start, &trim_end) != 0)) {
     /* packet is completely outside of unused receive buffer */
