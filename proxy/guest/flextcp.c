@@ -332,7 +332,6 @@ static int vflextcp_uxsocket_accept(struct guest_proxy *pxy)
   req_msg.msg_type = MSG_TYPE_NEWAPP_REQ;
   req_msg.cfd = cfd;
   ret = channel_write(pxy->chan, &req_msg, sizeof(req_msg));
-  printf("MSG_TYPE_NEWAPP_REQ\n");
   if (ret != sizeof(req_msg))
   {
     fprintf(stderr, "vflextcp_uxsocket_accept: "
@@ -500,7 +499,6 @@ static int vflextcp_uxsocket_handle_msg(struct guest_proxy *pxy,
     msg.actx_evfd = ctx_req->actx_evfd;
 
     ret = channel_write(pxy->chan, &msg, sizeof(struct context_req_msg)); 
-    printf("MSG_TYPE_CONTEXT_REQ\n");
     if (ret < sizeof(struct context_req_msg))
     {
       fprintf(stderr, "vflextcp_uxsocket_handle_msg: "
@@ -554,7 +552,6 @@ static int vflextcp_handle_tas_kernel_poke(struct guest_proxy *pxy,
 
   ivshmem_drain_evfd(pxy->kernel_notifyfd);
   ret = channel_write(pxy->chan, msg, sizeof(struct poke_tas_kernel_msg));
-  printf("MSG_TYPE_POKE_TAS_KERNEL\n");
 
   if (ret != sizeof(struct poke_tas_kernel_msg))
   {
@@ -574,7 +571,6 @@ static int vflextcp_handle_tas_core_poke(struct guest_proxy *pxy,
 
   ivshmem_drain_evfd(pxy->core_evfds[msg->core_id]);
   ret = channel_write(pxy->chan, msg, sizeof(struct poke_tas_core_msg));
-  printf("MSG_TYPE_POKE_TAS_CORE\n");
 
   if (ret != sizeof(struct poke_tas_core_msg))
   {

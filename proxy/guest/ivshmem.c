@@ -110,23 +110,18 @@ int ivshmem_channel_poll(struct guest_proxy *pxy)
   switch(msg_type)
   {
     case MSG_TYPE_HELLO:
-      printf("MSG_TYPE_HELLO\n");
       channel_handle_hello(pxy);
       break;
     case MSG_TYPE_TASINFO_RES:
-      printf("MSG_TYPE_TASINFO_RES\n");
       channel_handle_tasinfo_res(pxy, (struct tasinfo_res_msg *) msg);
       break;
     case MSG_TYPE_NEWAPP_RES:
-      printf("MSG_TYPE_NEWAPP_RES\n");
       channel_handle_newapp_res(pxy, (struct newapp_res_msg *) msg);
       break;
     case MSG_TYPE_CONTEXT_RES:
-      printf("MSG_TYPE_CONTEXT_RES\n");
       channel_handle_ctx_res(pxy, (struct context_res_msg *) msg);
       break;
     case MSG_TYPE_POKE_APP_CTX:
-      printf("MSG_TYPE_POKE_APP_CTX\n");
       channel_handle_vpoke(pxy, (struct poke_app_ctx_msg *) msg);
       break;
     default:

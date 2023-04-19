@@ -381,7 +381,6 @@ static int uxsocket_accept()
     h_msg.n_cores = flexnic_info_pxy->cores_num;
 
     ret = channel_write(chan, &h_msg, sizeof(struct hello_msg));
-    printf("MSG_TYPE_HELLO\n");
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send number "
@@ -473,23 +472,18 @@ static int channel_poll_vm(struct v_machine *vm)
     switch(msg_type)
     {
         case MSG_TYPE_TASINFO_REQ:
-            printf("MSG_TYPE_TASINFO_REQ\n");
             channel_handle_tasinforeq_msg(vm);
             break;
         case MSG_TYPE_CONTEXT_REQ:
-            printf("MSG_TYPE_CONTEXT_REQ\n");
             channel_handle_ctx_req(vm, msg);
             break;
         case MSG_TYPE_NEWAPP_REQ:
-            printf("MSG_TYPE_NEWAPP_REQ\n");
             channel_handle_newapp(vm, msg);
             break;
         case MSG_TYPE_POKE_TAS_CORE:
-            printf("MSG_TYPE_POKE_TAS_CORE\n");
             channel_handle_poke_tas_core(vm, msg);
             break;
         case MSG_TYPE_POKE_TAS_KERNEL:
-            printf("MSG_TYPE_POKE_TAS_KERNEL\n");
             channel_handle_poke_tas_kernel(vm, msg);
             break;
         default:
@@ -523,7 +517,6 @@ static int channel_handle_tasinforeq_msg(struct v_machine *vm)
     }
 
     ret = channel_write(vm->chan, msg, sizeof(struct tasinfo_res_msg));
-    printf("MSG_TYPE_TASINFO_RES\n");
     if (ret < sizeof(struct tasinfo_res_msg))
     {
         fprintf(stderr, "ivshmem_handle_tasinforeq_msg: "
@@ -594,7 +587,6 @@ static int channel_handle_ctx_req(struct v_machine *vm,
   res_msg.app_id = msg->app_id;
 
   ret = channel_write(vm->chan, &res_msg, sizeof(struct context_res_msg));
-  printf("MSG_TYPE_CONTEXT_RES\n");
   if (ret < sizeof(struct context_res_msg))
   {
     fprintf(stderr, "ivshmem_handle_ctxreq: failed to send ctx res.\n");
@@ -634,7 +626,6 @@ static int channel_handle_newapp(struct v_machine *vm,
     msg_res.cfd = msg_req->cfd;
 
     ret = channel_write(vm->chan, &msg_res, sizeof(msg_res));
-    printf("MSG_TYPE_NEWAPP_RES\n");
     
     if (ret != sizeof(msg_res))
     {
@@ -693,8 +684,6 @@ static int app_ctxs_poll()
             msg.msg_type = MSG_TYPE_POKE_APP_CTX;
             msg.ctxreq_id = vctx->ctxreq_id;
             ret = channel_write(vctx->vm->chan, &msg, sizeof(struct poke_app_ctx_msg));
-            printf("MSG_TYPE_POKE_APP_CTX\n");
-        
 
             if (ret != sizeof(struct poke_app_ctx_msg))
             {
