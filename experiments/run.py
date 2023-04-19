@@ -52,7 +52,6 @@ for e in experiments:
             continue
     print('******' + e.get_name() + '********')
     e.run()
-    time.sleep(80)
+    time.sleep(120)
     e.save_logs()
-    time.sleep(15)
     e.reset()

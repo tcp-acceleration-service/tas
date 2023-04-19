@@ -2,6 +2,7 @@ import sys
 sys.path.append("../../../")
 
 import os
+import numpy as np
 import experiments.plot_utils as putils
 
 
@@ -52,7 +53,7 @@ def parse_metadata():
   return data
 
 def parse_data(parsed_md):
-  lat_list = {}
+  data = {}
   out_dir = "./out/"
   for msize in parsed_md:
     data_point = {}
@@ -60,22 +61,27 @@ def parse_data(parsed_md):
       latencies = putils.init_latencies()
       for run in parsed_md[msize][stack]:
         fname_c0 = out_dir + parsed_md[msize][stack][run]['0']['0']
-        putils.add_latencies(latencies, fname_c0)
-      
-      putils.divide_latencies(latencies, len(parsed_md[msize][stack]))
-      data_point[stack] = latencies
-  
-    lat_list[msize] = data_point
-  
-  return lat_list
+        putils.append_latencies(latencies, fname_c0)
 
-def save_dat_file(exp_lats):
-  header = "nconns bare-tas bare-vtas virt-tas ovs-linux ovs-tas\n"
+      data_point[stack] = {
+        "lat": putils.get_latency_avg(latencies),
+        "std": putils.get_latency_std(latencies)
+      }
+    data[msize] = data_point
   
-  msizes = list(exp_lats.keys())
+  return data
+
+def save_dat_file(data):
+  header = "msize " + \
+      "bare-tas-avg bare-vtas-avg virt-tas-avg " + \
+      "ovs-linux-avg " + \
+      "bare-tas-std bare-vtas-std virt-tas-std " + \
+      "ovs-linux-std\n"
+  
+  msizes = list(data.keys())
   msizes = list(map(str, sorted(map(int, msizes))))
-  stacks =  list(exp_lats[msizes[0]].keys())
-  percentiles =  list(exp_lats[msizes[0]][stacks[0]].keys())
+  stacks =  list(data[msizes[0]].keys())
+  percentiles =  list(data[msizes[0]][stacks[0]]['lat'].keys())
 
   for percentile in percentiles:
       fname = "./lat_{}.dat".format(percentile)
@@ -83,14 +89,17 @@ def save_dat_file(exp_lats):
       f.write(header)
 
       for msize in msizes:
-        f.write("{} {} {} {} {} {}\n".format(
+        f.write("{} {} {} {} {} {} {} {} {}\n".format(
           msize,
-          exp_lats[msize]['bare-tas'][percentile],
-          exp_lats[msize]['bare-vtas'][percentile],
-          exp_lats[msize]['virt-tas'][percentile],
-          exp_lats[msize]['ovs-linux'][percentile],
-          exp_lats[msize]['ovs-tas'][percentile])
-        )
+          data[msize]['bare-tas']['lat'][percentile],
+          data[msize]['bare-vtas']["lat"][percentile],
+          data[msize]['virt-tas']["lat"][percentile],
+          data[msize]['ovs-linux']["lat"][percentile],
+          data[msize]['bare-tas']["std"][percentile],
+          data[msize]['bare-vtas']["std"][percentile],
+          data[msize]['virt-tas']["std"][percentile],
+          data[msize]['ovs-linux']["std"][percentile]))
+
         
 def main():
   parsed_md = parse_metadata()

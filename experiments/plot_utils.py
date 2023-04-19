@@ -1,38 +1,64 @@
-
+import numpy as np
 import re
 
 def init_latencies():
   latencies = {
-    "50p": 0,
-    "90p": 0,
-    "99p": 0,
-    "99.9p": 0,
-    "99.99p": 0
+    "50p": np.array([]),
+    "90p": np.array([]),
+    "99p": np.array([]),
+    "99.9p": np.array([]),
+    "99.99p": np.array([])
   }
 
   return latencies
 
-def divide_latencies(latencies, den):
-  latencies["50p"] /= den
-  latencies["90p"] /= den
-  latencies["99p"] /= den
-  latencies["99.9p"] /= den
-  latencies["99.99p"] /= den
-
-def add_latencies(latencies, fname_c0):
+def append_latencies(latencies, fname_c0):
   f = open(fname_c0)
   lines = f.readlines()
 
   # Latencies are already accumulated over all time
   # period in the logs
   line = lines[len(lines) - 1]
-  latencies["50p"] += int(get_50p_lat(line))
-  latencies["90p"] += int(get_90p_lat(line))
-  latencies["99p"] += int(get_99p_lat(line))
-  latencies["99.9p"] += int(get_99_9p_lat(line))
-  latencies["99.99p"] += int(get_99_99p_lat(line))
 
-  return latencies
+  lat = int(get_50p_lat(line))
+  if lat > 0:
+    latencies["50p"] = np.append(latencies["50p"], lat)
+
+  lat = int(get_90p_lat(line))
+  if lat > 0:
+    latencies["90p"] = np.append(latencies["90p"], lat)
+
+  lat = int(get_99p_lat(line))
+  if lat > 0:
+    latencies["99p"] = np.append(latencies["99p"], lat)
+
+  lat = int(get_99_9p_lat(line))
+  if lat > 0:
+    latencies["99.9p"] = np.append(latencies["99.9p"], lat)
+
+  lat = int(get_99_99p_lat(line))
+  if lat > 0:
+    latencies["99.99p"] = np.append(latencies["99.99p"], lat)
+
+def get_latency_avg(latencies):
+  avg_lats = {
+    "50p": latencies["50p"].mean(),
+    "90p": latencies["90p"].mean(),
+    "99p": latencies["99p"].mean(),
+    "99.9p": latencies["99.9p"].mean(),
+    "99.99p": latencies["99.99p"].mean()
+  }
+  
+  return avg_lats 
+
+def get_latency_std(latencies):
+  return {
+    "50p": latencies["50p"].std(),
+    "90p": latencies["90p"].std(),
+    "99p": latencies["99p"].std(),
+    "99.9p": latencies["99.9p"].std(),
+    "99.99p": latencies["99.99p"].std()
+  }
 
 def get_expname_msize(fname):
   regex = "(?<=-msize)[0-9]*"

@@ -64,14 +64,14 @@ elif [[ "$stack" == 'ovs-linux' ]]; then
     -machine accel=kvm,type=q35 \
     -cpu host \
     -smp 12 \
-    -m 10G \
+    -m 25G \
     -snapshot \
     -netdev user,id=net0,hostfwd=tcp::222${vm_id}-:22 \
     -device virtio-net-pci,netdev=net0 \
     -chardev socket,id=char0,path=/usr/local/var/run/openvswitch/$vhost \
     -netdev type=vhost-user,chardev=char0,vhostforce=on,queues=12,id=net1 \
     -device virtio-net-pci,netdev=net1,mac=$alt_mac,mq=on,vectors=26 \
-    -object memory-backend-file,id=mem,size=10G,mem-path=/dev/hugepages,share=on \
+    -object memory-backend-file,id=mem,size=25G,mem-path=/dev/hugepages,share=on \
     -numa node,memdev=mem -mem-prealloc \
     -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
     -drive if=virtio,format=raw,file="seed.img" \
@@ -82,14 +82,14 @@ elif [[ "$stack" == 'ovs-tas' ]]; then
     -machine accel=kvm,type=q35 \
     -cpu host \
     -smp 12 \
-    -m 10G \
+    -m 25G \
     -snapshot \
     -netdev user,id=net0,hostfwd=tcp::222${vm_id}-:22 \
     -device virtio-net-pci,netdev=net0 \
     -chardev socket,id=char0,path=/usr/local/var/run/openvswitch/$vhost \
     -netdev type=vhost-user,chardev=char0,vhostforce=on,queues=12,id=net1 \
     -device virtio-net-pci,netdev=net1,mac=$alt_mac,mq=on,vectors=26 \
-    -object memory-backend-file,id=mem,size=10G,mem-path=/dev/hugepages,share=on \
+    -object memory-backend-file,id=mem,size=25G,mem-path=/dev/hugepages,share=on \
     -numa node,memdev=mem -mem-prealloc \
     -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
     -drive if=virtio,format=raw,file="seed.img" \
@@ -100,7 +100,7 @@ elif [[ "$stack" == 'tap-tas' ]]; then
     -machine accel=kvm,type=q35 \
     -cpu host \
     -smp 12 \
-    -m 6G \
+    -m 25G \
     -snapshot \
     -netdev user,id=net0 \
     -device virtio-net-pci,netdev=net0 \

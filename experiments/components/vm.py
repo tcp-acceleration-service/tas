@@ -31,8 +31,11 @@ class VM:
 
     def enable_noiommu(self, vendor_id):
         self.pane.send_keys("sudo su -")
+        time.sleep(1)
         self.pane.send_keys("sudo echo 1 > /sys/module/vfio/parameters/enable_unsafe_noiommu_mode")
+        time.sleep(1)
         self.pane.send_keys("sudo echo {} > /sys/bus/pci/drivers/vfio-pci/new_id".format(vendor_id))
+        time.sleep(1)
         self.pane.send_keys("exit")
         time.sleep(1)
 
