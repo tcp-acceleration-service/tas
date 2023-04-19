@@ -178,7 +178,7 @@ static inline uint32_t flow_queue_new_ts(struct qman_thread *t, struct flow_queu
 /*****************************************************************************/
 /* Top level queue manager */
 
-int qman_thread_init(struct dataplane_context *ctx)
+int tas_qman_thread_init(struct dataplane_context *ctx)
 {
   struct qman_thread *t = &ctx->qman;
 
@@ -195,7 +195,7 @@ int qman_thread_init(struct dataplane_context *ctx)
   return 0;
 }
 
-int qman_poll(struct dataplane_context *ctx, unsigned num, unsigned *vm_ids,
+int tas_qman_poll(struct dataplane_context *ctx, unsigned num, unsigned *vm_ids,
               unsigned *q_ids, uint16_t *q_bytes)
 {
   int ret;
@@ -207,7 +207,7 @@ int qman_poll(struct dataplane_context *ctx, unsigned num, unsigned *vm_ids,
   return ret;
 }
 
-int qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t flow_id, uint32_t rate,
+int tas_qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t flow_id, uint32_t rate,
              uint32_t avail, uint16_t max_chunk, uint8_t flags)
 {
   int ret;
@@ -216,7 +216,7 @@ int qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t flow_id, uint32_t r
   return ret;
 }
 
-uint32_t qman_next_ts(struct qman_thread *t, uint32_t cur_ts)
+uint32_t tas_qman_next_ts(struct qman_thread *t, uint32_t cur_ts)
 {
   struct vm_queue *vq;
   struct flow_qman *fqman;
@@ -260,7 +260,7 @@ uint32_t qman_next_ts(struct qman_thread *t, uint32_t cur_ts)
   return -1;
 }
 
-uint32_t qman_timestamp(uint64_t cycles)
+uint32_t tas_qman_timestamp(uint64_t cycles)
 {
   static uint64_t freq = 0;
 
@@ -579,6 +579,7 @@ int flowcont_init(struct vm_queue *vq)
 
 static inline int flow_qman_poll(struct qman_thread *t, struct vm_queue *vqueue, 
     struct flow_qman *fqman, unsigned num, unsigned *q_ids, uint16_t *q_bytes)
+
 {
   unsigned x, y;
   uint32_t ts = timestamp();

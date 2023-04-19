@@ -37,9 +37,9 @@ class Defaults:
         # Network interface used to set ip for a VM
         self.vm_interface = "enp0s3"
         # Network interface used to bind TAS in tap VM
-        self.tas_interface = "enp0s4"
+        self.tas_interface = "enp0s3"
         # PCI Id of tas interface
-        self.pci_id = "0000:00:04.0"
+        self.pci_id = "0000:00:03.0"
 
         self.remote_connect_cmd = 'ssh swsnetlab04'
 
@@ -82,13 +82,14 @@ class TasConfig:
         self.out = self.out_dir + '/' + self.out_file
         
         self.comp_dir = self.project_dir
-        self.comp_cmd = 'make'
+        self.comp_cmd = 'make -j6'
+        self.clean_cmd = 'make clean'
         self.lib_so = self.comp_dir + 'lib/libtas_interpose.so'
         self.exec_file = self.comp_dir + '/tas/tas'
         self.args = '--ip-addr={}/24 --fp-cores-max={}'.format(ip, n_cores) + \
             ' --cc=const-rate --cc-const-rate=0' + \
-            ' --fp-no-autoscale --fp-no-ints' + \
-            ' --dpdk-extra="-w{}"'.format(dpdk_extra)   
+            ' --fp-no-autoscale --fp-no-ints --fp-no-xsumoffload --fp-no-rss' + \
+            ' --dpdk-extra="-a{}"'.format(dpdk_extra)   
         
         self.pane = pane
         self.ip = ip
@@ -119,7 +120,8 @@ class ProxyConfig:
         self.ivshm_socket_path = '/run/tasproxy'
         
         self.comp_dir = comp_dir
-        self.comp_cmd = 'make'
+        self.comp_cmd = 'make -j6'
+        self.clean_cmd = 'make clean'
 
 class HostProxyConfig(ProxyConfig):
     def __init__(self, pane, machine_config, comp_dir):
@@ -152,7 +154,8 @@ class ClientConfig:
         self.tas_dir = tas_dir
        
         self.comp_dir = bench_dir + "/micro_rpc"
-        self.comp_cmd = 'make'
+        self.comp_cmd = 'make -j6'
+        self.clean_cmd = 'make clean'
        
         self.bench_dir = bench_dir
         self.lib_so = tas_dir + '/lib/libtas_interpose.so'
@@ -180,7 +183,8 @@ class ServerConfig:
         
         self.bench_dir = bench_dir
         self.comp_dir = bench_dir + "/micro_rpc"
-        self.comp_cmd = 'make'
+        self.comp_cmd = 'make -j6'
+        self.clean_cmd = 'make clean'
         self.lib_so = tas_dir + '/lib/libtas_interpose.so'
         self.exec_file = self.comp_dir + '/echoserver_linux'
         self.args = '{} {} foo {} {}'.format(port, ncores, \

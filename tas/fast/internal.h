@@ -68,13 +68,13 @@ extern volatile unsigned fp_scale_to;
 #define IDXLIST_INVAL (-1U)
 
 /** Qman functions */
-int qman_thread_init(struct dataplane_context *ctx);
-int qman_poll(struct dataplane_context *ctx, unsigned num, unsigned *vm_id, 
+int tas_qman_thread_init(struct dataplane_context *ctx);
+int tas_qman_poll(struct dataplane_context *ctx, unsigned num, unsigned *vm_id, 
     unsigned *q_ids, uint16_t *q_bytes);
-int qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t flow_id, uint32_t rate,
+int tas_qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t flow_id, uint32_t rate,
     uint32_t avail, uint16_t max_chunk, uint8_t flags);
-uint32_t qman_timestamp(uint64_t tsc);
-uint32_t qman_next_ts(struct qman_thread *t, uint32_t cur_ts);
+uint32_t tas_qman_timestamp(uint64_t tsc);
+uint32_t tas_qman_next_ts(struct qman_thread *t, uint32_t cur_ts);
 /** Helper functions for unit tests */
 uint32_t qman_vm_get_avail(struct dataplane_context *ctx, uint32_t vm_id);
 void qman_free_vm_cont(struct dataplane_context *ctx);

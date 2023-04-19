@@ -29,7 +29,7 @@
 #endif
 macaddr_t eth_addr;
 
-void *tas_shm = (void *) 0;
+void **vm_shm = (void *) 0;
 
 struct flextcp_pl_mem state_base;
 struct flextcp_pl_mem *fp_state = &state_base;
@@ -47,7 +47,8 @@ struct qman_set_op {
   uint8_t flags;
 } qm_set_op = { .got_op = 0 };
 
-int qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id, uint32_t rate, uint32_t avail,
+int tas_qman_set(struct qman_thread *t, uint32_t app_id, uint32_t flow_id,
+    uint32_t rate, uint32_t avail,
     uint16_t max_chunk, uint8_t flags)
 {
   qm_set_op.got_op = 1;

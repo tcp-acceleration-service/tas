@@ -29,13 +29,12 @@
 
 #include <tas.h>
 #include "internal.h"
+#include "appif.h"
 
 #define CONF_MSS 1400
 
-int cc_init(void)
-{
-  return 0;
-}
+static void cc_next_ts_vm(uint32_t cur_ts, int vmid, uint32_t *ts);
+static unsigned cc_poll_vm(int vmid, unsigned n, uint32_t diff_ts);
 
 static inline void issue_retransmits(struct connection *c,
     struct nicif_connection_stats *stats, uint32_t cur_ts);
@@ -59,50 +58,89 @@ static inline void const_rate_update(struct connection *c,
 static inline uint32_t window_to_rate(uint32_t window, uint32_t rtt);
 
 static uint32_t last_ts = 0;
-static struct connection *cc_conns = NULL;
-static struct connection *next_conn = NULL;
+int next_vm = 0;
+static struct connection *cc_conns[FLEXNIC_PL_VMST_NUM];
+static struct connection *next_conn[FLEXNIC_PL_VMST_NUM];
+
+int cc_init(void)
+{
+  int i;
+  
+  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
+  {
+    cc_conns[i] = NULL;
+    next_conn[i] = NULL;
+  }
+  
+  return 0;
+}
 
 uint32_t cc_next_ts(uint32_t cur_ts)
 {
-  struct connection *c;
+  int i;
   assert(cur_ts >= last_ts);
   uint32_t ts = -1U;
 
-  for (c = cc_conns; c != NULL; c = c->cc_next) {
-    if (c->status != CONN_OPEN)
-      continue;
-
-    int32_t next_ts = (c->cc_rtt * config.cc_control_interval) - (cur_ts - c->cc_last_ts);
-    if(next_ts >= 0) {
-      ts = MIN(ts, next_ts);
-    } else {
-      ts = 0;
-    }
+  for (i = 0; i < FLEXNIC_PL_VMST_NUM; i++)
+  {
+    cc_next_ts_vm(cur_ts, i, &ts);
   }
 
   return (ts == -1U ? -1U : MAX(ts, config.cc_control_granularity - (cur_ts - last_ts)));
 }
 
+static void cc_next_ts_vm(uint32_t cur_ts, int vmid, uint32_t *ts)
+{
+  struct connection *c;
+
+  for (c = cc_conns[vmid]; c != NULL; c = c->cc_next) {
+    if (c->status != CONN_OPEN)
+      continue;
+
+    int32_t next_ts = (c->cc_rtt * config.cc_control_interval) - (cur_ts - c->cc_last_ts);
+    if(next_ts >= 0) {
+      *ts = MIN(*ts, next_ts);
+    } else {
+      *ts = 0;
+    }
+  }
+}
+
 unsigned cc_poll(uint32_t cur_ts)
 {
-  struct connection *c, *c_first;
-  struct nicif_connection_stats stats;
-  uint32_t diff_ts;
-  uint32_t last;
+  int i, vmid; 
   unsigned n = 0;
+  uint32_t diff_ts;
 
   diff_ts = cur_ts - last_ts;
   if (0 && diff_ts < config.cc_control_granularity)
     return 0;
 
-  c = c_first = (next_conn != NULL ? next_conn : cc_conns);
+
+  for(i = 0; i < FLEXNIC_PL_VMST_NUM && n < 128; i++)
+  {
+    vmid = (next_vm + i) % FLEXNIC_PL_VMST_NUM;
+    n = cc_poll_vm(vmid, n, diff_ts);
+  }
+
+  last_ts = cur_ts;
+  next_vm = (vmid + 1) % FLEXNIC_PL_VMST_NUM;
+  return n;
+}
+
+static unsigned cc_poll_vm(int vmid, unsigned n, uint32_t diff_ts)
+{
+  struct connection *c, *c_first;
+  struct nicif_connection_stats stats;
+  uint32_t last;
+
+  c = c_first = (next_conn[vmid] != NULL ? next_conn[vmid] : cc_conns[vmid]);
   if (c == NULL) {
-    last_ts = cur_ts;
-    return 0;
+    return n;
   }
 
   for (; n < 128 && (n == 0 || c != c_first);
-      c = (c->cc_next != NULL ? c->cc_next : cc_conns), n++)
+      c = (c->cc_next != NULL ? c->cc_next : cc_conns[vmid]), n++)
   {
     if (c->status != CONN_OPEN)
       continue;
@@ -164,18 +202,17 @@ unsigned cc_poll(uint32_t cur_ts)
     nicif_connection_setrate(c->flow_id, c->cc_rate);
 
     c->cc_last_ts = cur_ts;
-
   }
 
-  next_conn = c;
-  last_ts = cur_ts;
+  next_conn[vmid] = c;
   return n;
 }
 
 void cc_conn_init(struct connection *conn)
 {
-  conn->cc_next = cc_conns;
-  cc_conns = conn;
+  int vmid = conn->ctx->app->vm_id;
+  conn->cc_next = cc_conns[vmid];
+  cc_conns[vmid] = conn;
 
   conn->cc_last_ts = cur_ts;
   conn->cc_rtt = config.tcp_rtt_init;
@@ -209,15 +246,16 @@ void cc_conn_init(struct connection *conn)
 void cc_conn_remove(struct connection *conn)
 {
   struct connection *cp = NULL;
+  int vmid = conn->ctx->app->vm_id;
 
-  if (next_conn == conn) {
-    next_conn = conn->cc_next;
+  if (next_conn[vmid] == conn) {
+    next_conn[vmid] = conn->cc_next;
   }
 
-  if (cc_conns == conn) {
-    cc_conns = conn->cc_next;
+  if (cc_conns[vmid] == conn) {
+    cc_conns[vmid] = conn->cc_next;
   } else {
-    for (cp = cc_conns; cp != NULL && cp->cc_next != conn;
+    for (cp = cc_conns[vmid]; cp != NULL && cp->cc_next != conn;
         cp = cp->cc_next);
     if (cp == NULL) {
       fprintf(stderr, "conn_unregister: connection not found\n");

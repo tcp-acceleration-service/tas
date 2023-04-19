@@ -1,0 +1,70 @@
+Only in netperf-netperf-2.7.0: config.h
+Only in netperf-netperf-2.7.0: config.log
+Only in netperf-netperf-2.7.0: config.status
+Only in netperf-netperf-2.7.0/doc/examples: Makefile
+Only in netperf-netperf-2.7.0/doc: Makefile
+Only in netperf-netperf-2.7.0: Makefile
+Only in netperf-netperf-2.7.0: netperf.spec
+Only in netperf-netperf-2.7.0/src: .deps
+Only in netperf-netperf-2.7.0/src: dscp.o
+Only in netperf-netperf-2.7.0/src: Makefile
+Only in netperf-netperf-2.7.0/src/missing: .deps
+Only in netperf-netperf-2.7.0/src/missing/m4: Makefile
+Only in netperf-netperf-2.7.0/src/missing: Makefile
+Only in netperf-netperf-2.7.0/src: netcpu_procstat.o
+Only in netperf-netperf-2.7.0/src: netlib.o
+Only in netperf-netperf-2.7.0/src: netperf
+Only in netperf-netperf-2.7.0/src: netperf.o
+Only in netperf-netperf-2.7.0/src: netperf_version.h
+Only in netperf-netperf-2.7.0/src: netserver
+Only in netperf-netperf-2.7.0/src: netserver.o
+Only in netperf-netperf-2.7.0/src: netsh.o
+Only in netperf-netperf-2.7.0/src: nettest_bsd.o
+Only in netperf-netperf-2.7.0/src: nettest_dlpi.o
+diff -ur netperf-netperf-2.7.0.orig/src/nettest_omni.c netperf-netperf-2.7.0/src/nettest_omni.c
+--- netperf-netperf-2.7.0.orig/src/nettest_omni.c	2015-07-20 19:39:35.000000000 +0200
++++ netperf-netperf-2.7.0/src/nettest_omni.c	2023-01-16 23:37:55.531646323 +0100
+@@ -2916,24 +2916,39 @@
+     }
+   }
+   else {
++    int ret;
++    len = 0;
++
++    while ((uint32_t) len != bytes_to_send) {
+     if (!use_write) {
+-      len = send(data_socket,
++      ret = send(data_socket,
+ 		 send_ring->buffer_ptr,
+-		 bytes_to_send,
++		 bytes_to_send - len,
+ 		 0);
+     }
+     else {
+ #ifndef WIN32
+-      len = write(data_socket,
++      ret = write(data_socket,
+ 		  send_ring->buffer_ptr,
+-		  bytes_to_send);
++		  bytes_to_send - len);
+ #else
+       fprintf(where,"I'm sorry Dave I cannot write() under Windows\n");
+       fflush(where);
+       return -3;
+ #endif
+     }
++
++    if (ret <= 0) {
++      len = ret;
++      break;
++    } else if (SOCKET_EINTR(ret)) {
++      len = ret;
++      break;
++    }
++    len += ret;
++  }
+   }
++
+   if(len != bytes_to_send) {
+     /* don't forget that some platforms may do a partial send upon
+        receipt of the interrupt and not return an EINTR... */

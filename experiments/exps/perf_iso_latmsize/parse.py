@@ -2,18 +2,9 @@ import sys
 sys.path.append("../../../")
 
 import os
-import re
-import functools
+import numpy as np
 import experiments.plot_utils as putils
 
-
-# For this experiment get the message size
-# from the experiment name, since client 0 and client 1
-# have a different message size
-def get_msize(fname):
-  regex = "(?<=_msize)[0-9]*"
-  nconns = re.search(regex, fname).group(0)
-  return nconns
 
 def check_msize(data, msize):
   if msize not in data:
@@ -23,29 +14,17 @@ def check_stack(data, nconns, stack):
   if stack not in data[nconns]:
     data[nconns][stack] = {}
 
-def check_nid(data, nconns, stack, nid):
-  if nid not in data[nconns][stack]:
-    data[nconns][stack][nid] = {}
+def check_run(data, msize, stack, run):
+  if run not in data[msize][stack]:
+    data[msize][stack][run] = {}
 
-def check_cid(data, nconns, stack, nid, cid):
-  if cid not in data[nconns][stack][nid]:
-    data[nconns][stack][nid][cid] = ""
+def check_nid(data, msize, stack, run, nid):
+  if nid not in data[msize][stack][run]:
+    data[msize][stack][run][nid] = {}
 
-def get_latencies(fname_c0):
-  f = open(fname_c0)
-  lines = f.readlines()
-
-  # Latencies are already accumulated over all time
-  # period in the logs
-  line = lines[len(lines) - 1]
-  latencies = {}
-  latencies["50p"] = putils.get_50p_lat(line)
-  latencies["90p"] = putils.get_90p_lat(line)
-  latencies["99p"] = putils.get_99p_lat(line)
-  latencies["99.9p"] = putils.get_99_9p_lat(line)
-  latencies["99.99p"] = putils.get_99_99p_lat(line)
-
-  return latencies
+def check_cid(data, msize, stack, run, nid, cid):
+  if cid not in data[msize][stack][run][nid]:
+    data[msize][stack][run][nid][cid] = ""
 
 def parse_metadata():
   dir_path = "./out/"
@@ -53,41 +32,56 @@ def parse_metadata():
 
   for f in os.listdir(dir_path):
     fname = os.fsdecode(f)
-    msize = get_msize(fname)
-    cid = putils.get_client_id(fname)
+    
+    if "tas_c" == fname:
+      continue
+    
+    run = putils.get_expname_run(fname)
+    msize = putils.get_expname_msize(fname)
     nid = putils.get_node_id(fname)
+    cid = putils.get_client_id(fname)
     stack = putils.get_stack(fname)
 
     check_msize(data, msize)
     check_stack(data, msize, stack)
-    check_nid(data, msize, stack, nid)
-    check_cid(data, msize, stack, nid, cid)
+    check_run(data, msize, stack, run)
+    check_nid(data, msize, stack, run, nid)
+    check_cid(data, msize, stack, run, nid, cid)
 
-    data[msize][stack][nid][cid] = fname
+    data[msize][stack][run][nid][cid] = fname
 
   return data
 
 def parse_data(parsed_md):
-  lat_list = {}
+  data = {}
   out_dir = "./out/"
   for msize in parsed_md:
     data_point = {}
     for stack in parsed_md[msize]:
-      fname_c0 = out_dir + parsed_md[msize][stack]['0']['0']
-      latencies = get_latencies(fname_c0)
-      data_point[stack] = latencies
-  
-    lat_list[msize] = data_point
-  
-  return lat_list
+      latencies = putils.init_latencies()
+      for run in parsed_md[msize][stack]:
+        fname_c0 = out_dir + parsed_md[msize][stack][run]['0']['0']
+        putils.append_latencies(latencies, fname_c0)
 
-def save_dat_file(exp_lats):
-  header = "nconns bare-tas bare-vtas virt-tas\n"
+      data_point[stack] = {
+        "lat": putils.get_latency_avg(latencies),
+        "std": putils.get_latency_std(latencies)
+      }
+    data[msize] = data_point
   
-  msizes = list(exp_lats.keys())
-  msizes = sorted(msizes) 
-  stacks =  list(exp_lats[msizes[0]].keys())
-  percentiles =  list(exp_lats[msizes[0]][stacks[0]].keys())
+  return data
+
+def save_dat_file(data):
+  header = "msize " + \
+      "bare-tas-avg bare-vtas-avg virt-tas-avg " + \
+      "ovs-linux-avg " + \
+      "bare-tas-std bare-vtas-std virt-tas-std " + \
+      "ovs-linux-std\n"
+  
+  msizes = list(data.keys())
+  msizes = list(map(str, sorted(map(int, msizes))))
+  stacks =  list(data[msizes[0]].keys())
+  percentiles =  list(data[msizes[0]][stacks[0]]['lat'].keys())
 
   for percentile in percentiles:
       fname = "./lat_{}.dat".format(percentile)
@@ -95,12 +89,17 @@ def save_dat_file(exp_lats):
       f.write(header)
 
       for msize in msizes:
-        f.write("{} {} {} {}\n".format(
+        f.write("{} {} {} {} {} {} {} {} {}\n".format(
           msize,
-          exp_lats[msize]['bare-tas'][percentile],
-          exp_lats[msize]['bare-vtas'][percentile],
-          exp_lats[msize]['virt-tas'][percentile])
-        )
+          data[msize]['bare-tas']['lat'][percentile],
+          data[msize]['bare-vtas']["lat"][percentile],
+          data[msize]['virt-tas']["lat"][percentile],
+          data[msize]['ovs-linux']["lat"][percentile],
+          data[msize]['bare-tas']["std"][percentile],
+          data[msize]['bare-vtas']["std"][percentile],
+          data[msize]['virt-tas']["std"][percentile],
+          data[msize]['ovs-linux']["std"][percentile]))
+
         
 def main():
   parsed_md = parse_metadata()

@@ -24,5 +24,5 @@ sudo ip link set $interface down
 
 # Bind vnic to dpdk
 sudo modprobe vfio-pci
-cd /home/tas/programs/dpdk-stable-19.11.14/usertools
+cd /home/tas/programs/dpdk-stable-21.11.3/usertools
 sudo python3 dpdk-devbind.py -b vfio-pci $pci_id

@@ -22,9 +22,11 @@ class ProxyHost(Proxy):
                 pane=self.pane,
                 comp_dir=self.proxy_config.comp_dir,
                 comp_cmd=self.proxy_config.comp_cmd,
+                clean_cmd=self.proxy_config.clean_cmd,
                 exec_file=self.proxy_config.exec_file,
                 out=self.proxy_config.out,
-                args='')
+                args='',
+                clean=False)
 
 class ProxyGuest(Proxy):
     
@@ -44,7 +46,9 @@ class ProxyGuest(Proxy):
                 pane=self.pane,
                 comp_dir=self.proxy_config.comp_dir,
                 comp_cmd=self.proxy_config.comp_cmd,
+                clean_cmd=self.proxy_config.clean_cmd,
                 exec_file=self.proxy_config.exec_file,
                 out=self.proxy_config.out,
                 args='',
-                bg=False)
+                bg=False,
+                clean=False)

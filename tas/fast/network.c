@@ -134,6 +134,12 @@ int network_init(unsigned n_threads)
     goto error_exit;
   }
 
+  /* turn off rss */
+  if (config.fp_rss == 0)
+  {
+    port_conf.rxmode.mq_mode = ETH_MQ_RX_NONE;
+  }
+
   /* mask unsupported RSS hash functions */
   if ((port_conf.rx_adv_conf.rss_conf.rss_hf &
        eth_devinfo.flow_type_rss_offloads) !=
@@ -270,6 +276,7 @@ int network_thread_init(struct dataplane_context *ctx)
       }
     }
 
+    /* setting up RETA failed */
     if (reta_setup() != 0) {
       fprintf(stderr, "RETA setup failed\n");
       goto error_tx_queue;

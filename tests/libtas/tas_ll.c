@@ -23,7 +23,7 @@ static void test_poll_empty(void *p)
     test_error("flextcp_init failed");
 
   test_randinit(&ctx, sizeof(ctx));
-  if (flextcp_context_create(&ctx) != 0)
+  if (flextcp_context_create(&ctx, NULL, NULL) != 0)
     test_error("flextcp_context_create failed");
 
   num = flextcp_context_poll(&ctx, 4, evs);
@@ -47,7 +47,7 @@ static void test_connect_success(void *p)
     test_error("flextcp_init failed");
 
   test_randinit(&ctx, sizeof(ctx));
-  if (flextcp_context_create(&ctx) != 0)
+  if (flextcp_context_create(&ctx, NULL, NULL) != 0)
     test_error("flextcp_context_create failed");
 
   /* initiate connect */
@@ -107,7 +107,7 @@ static void test_connect_fail(void *p)
     test_error("flextcp_init failed");
 
   test_randinit(&ctx, sizeof(ctx));
-  if (flextcp_context_create(&ctx) != 0)
+  if (flextcp_context_create(&ctx, NULL, NULL) != 0)
     test_error("flextcp_context_create failed");
 
   /* initiate connect */
@@ -148,7 +148,7 @@ static void test_full_rxbuf(void *p)
     test_error("flextcp_init failed");
 
   test_randinit(&ctx, sizeof(ctx));
-  if (flextcp_context_create(&ctx) != 0)
+  if (flextcp_context_create(&ctx, NULL, NULL) != 0)
     test_error("flextcp_context_create failed");
 
   /* initiate connect */
@@ -249,7 +249,7 @@ static void test_full_txbuf(void *p)
     test_error("flextcp_init failed");
 
   test_randinit(&ctx, sizeof(ctx));
-  if (flextcp_context_create(&ctx) != 0)
+  if (flextcp_context_create(&ctx, NULL, NULL) != 0)
     test_error("flextcp_context_create failed");
 
   /* initiate connect */

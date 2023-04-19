@@ -221,7 +221,7 @@ static int start_threads(void)
   }
 
   /* start common threads */
-  RTE_LCORE_FOREACH_SLAVE(core) {
+  RTE_LCORE_FOREACH_WORKER(core) {
     if (threads_launched < fp_cores_max) {
       arg = (void *) (uintptr_t) threads_launched;
       if (rte_eal_remote_launch(common_thread, arg, core) != 0) {

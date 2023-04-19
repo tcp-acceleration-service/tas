@@ -29,7 +29,6 @@ experiments = []
 
 for path in args.experiments:
     modname, _ = os.path.splitext(os.path.basename(path))
-    print(modname)
     spec = importlib.util.spec_from_file_location(modname, path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -53,8 +52,6 @@ for e in experiments:
             continue
     print('******' + e.get_name() + '********')
     e.run()
-    print(e.get_name()) 
-    time.sleep(80)
+    time.sleep(120)
     e.save_logs()
-    time.sleep(3)
     e.reset()

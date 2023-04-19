@@ -85,9 +85,12 @@ int ivshmem_channel_poll(struct guest_proxy *pxy)
   size_t msg_size;
   
   /* Return if there are no messages in channel */
+  MEM_BARRIER();
   shmring_lock(pxy->chan->rx);
   is_empty = shmring_is_empty(pxy->chan->rx);
   shmring_unlock(pxy->chan->rx);
+
+  MEM_BARRIER();
   if (is_empty)
   {
     return 0;
@@ -107,25 +110,30 @@ int ivshmem_channel_poll(struct guest_proxy *pxy)
   switch(msg_type)
   {
     case MSG_TYPE_HELLO:
+      printf("MSG_TYPE_HELLO\n");
       channel_handle_hello(pxy);
       break;
     case MSG_TYPE_TASINFO_RES:
+      printf("MSG_TYPE_TASINFO_RES\n");
       channel_handle_tasinfo_res(pxy, (struct tasinfo_res_msg *) msg);
       break;
     case MSG_TYPE_NEWAPP_RES:
+      printf("MSG_TYPE_NEWAPP_RES\n");
       channel_handle_newapp_res(pxy, (struct newapp_res_msg *) msg);
       break;
     case MSG_TYPE_CONTEXT_RES:
+      printf("MSG_TYPE_CONTEXT_RES\n");
       channel_handle_ctx_res(pxy, (struct context_res_msg *) msg);
       break;
     case MSG_TYPE_POKE_APP_CTX:
+      printf("MSG_TYPE_POKE_APP_CTX\n");
       channel_handle_vpoke(pxy, (struct poke_app_ctx_msg *) msg);
       break;
     default:
       fprintf(stderr, "ivshmem_channel_poll: unknown message.\n");
   }
 
-  return 0;
+  return 1;
 }
 
 static int channel_handle_hello(struct guest_proxy *pxy)
@@ -136,6 +144,7 @@ static int channel_handle_hello(struct guest_proxy *pxy)
   /* Send tasinfo request and wait for the response in the channel poll */
   treq_msg.msg_type = MSG_TYPE_TASINFO_REQ;
   ret = channel_write(pxy->chan, &treq_msg, sizeof(struct tasinfo_req_msg));
+  printf("MSG_TYPE_TASINFO_REQ\n");
   if (ret != sizeof(struct tasinfo_req_msg))
   {
     fprintf(stderr, "channel_handle_hello: failed to write tasinfo req msg.\n");

@@ -25,6 +25,7 @@ TESTS_AUTO := \
   tests/libtas/tas_ll \
   tests/libtas/tas_sockets \
   tests/tas_unit/fastpath \
+  tests/tas_unit/shmring \
   tests/tas_unit/qman_rr \
   tests/tas_unit/activelist
 
@@ -65,6 +66,13 @@ tests/tas_unit/fastpath: LDLIBS+= -lrte_eal
 tests/tas_unit/fastpath: tests/tas_unit/fastpath.o tests/testutils.o \
   tas/fast/fast_flows.o
 
+tests/tas_unit/shmring: CPPFLAGS+= -Itas/include $(DPDK_CPPFLAGS)
+tests/tas_unit/shmring: CFLAGS+= $(DPDK_CFLAGS)
+tests/tas_unit/shmring: LDFLAGS+= $(DPDK_LDFLAGS)
+tests/tas_unit/shmring: LDLIBS+= -lrte_eal
+tests/tas_unit/shmring: tests/tas_unit/shmring.o tests/testutils.o \
+  proxy/shmring.o
+
 tests/tas_unit/qman_rr: CPPFLAGS+= -Itas/include -Ilib/tas/include/ $(DPDK_CPPFLAGS)
 tests/tas_unit/qman_rr: CFLAGS+= $(DPDK_CFLAGS)
 tests/tas_unit/qman_rr: LDFLAGS+= $(DPDK_LDFLAGS)
@@ -87,6 +95,7 @@ run-tests: $(TESTS_AUTO)
 	tests/libtas/tas_ll
 	tests/libtas/tas_sockets
 	tests/tas_unit/fastpath
+	tests/tas_unit/shmring
 	tests/tas_unit/qman_rr
 	tests/tas_unit/activelist
 

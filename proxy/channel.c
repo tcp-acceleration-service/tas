@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <assert.h>
 
 #include "channel.h"
 #include "shmring.h"
@@ -18,8 +19,6 @@ struct channel * channel_init(void* tx_addr, void* rx_addr, uint64_t size)
     goto free_chan;
   }
 
-  /* Only init the tx channel, since the other side will
-     already have initialized the rx channel */
   tx_buf = shmring_init(tx_addr, CHAN_SIZE);
   if (tx_buf == NULL)
   {
@@ -33,10 +32,6 @@ struct channel * channel_init(void* tx_addr, void* rx_addr, uint64_t size)
     fprintf(stderr, "channel_init: failed to malloc rx_buf.\n");
     goto free_tx_buf;
   }
-
-  /* Only reset tx_ring since other side will have already
-     reset the rx_ring */
-  shmring_reset(tx_buf, CHAN_SIZE);
 
   chan->tx = tx_buf;
   chan->rx = rx_buf; 
@@ -53,18 +48,18 @@ free_chan:
 
 size_t channel_write(struct channel *chan, void *buf, size_t size)
 {
-  size_t free_sz;
-  size_t ret;
+  size_t ret, free_sz;
 
-  /* If channel is full try again until
-     a read clears enough space */
   do {
     shmring_lock(chan->tx);
     free_sz = shmring_get_freesz(chan->tx);
-
-    if (free_sz >= size)
+    if (free_sz >= size) 
+    {
       ret = shmring_push(chan->tx, buf, size);
-
+      assert(ret == size || ret == 0);
+      shmring_unlock(chan->tx);
+      break;
+    }
     shmring_unlock(chan->tx);
   } while(free_sz < size);
 

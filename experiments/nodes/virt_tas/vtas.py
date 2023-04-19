@@ -1,4 +1,5 @@
 import time
+import threading
 
 from components.vm import VM
 from components.proxy import ProxyGuest
@@ -19,12 +20,26 @@ class VirtTas(Node):
     self.proxyg_configs = proxyg_configs
     self.vms = []
 
+  def start_vm(self, vm):
+    vm.start()
+    vm.enable_noiommu("1af4 1110")
+
+  def cleanup(self):
+    super().cleanup()
+    for vm in self.vms:
+      vm.shutdown()
+
   def start_vms(self):
+    threads = []
     for vm_config in self.vm_configs:
       vm = VM(self.defaults, self.machine_config, vm_config, self.wmanager)
       self.vms.append(vm)
-      vm.start()
-      vm.enable_noiommu("1af4 1110")
+      vm_thread = threading.Thread(target=self.start_vm, args=(vm,))
+      threads.append(vm_thread)
+      vm_thread.start()
+
+    for t in threads:
+      t.join()
 
   def start_guest_proxies(self):
     for i in range(len(self.vm_configs)):
