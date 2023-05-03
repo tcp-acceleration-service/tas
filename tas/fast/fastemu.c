@@ -410,8 +410,8 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
       fs = fss[i];
       /* at this point we know fss[i] is a flow state struct */
       ret = fast_flows_packet(ctx, bhs[i], fss[i], &tcpopts[i], ts);
-      ctx->vm_counters[fs->vm_id] += 1;
       ctx->counters_total += 1;
+      ctx->vm_counters[fs->vm_id] += 1;
     }
     else
     {
@@ -454,7 +454,6 @@ static unsigned poll_queues(struct dataplane_context *ctx, uint32_t ts)
   }
   ctx->poll_rounds = (ctx->poll_rounds + 1) % MAX_POLL_ROUNDS;
 
-  ctx->counters_total = total;
   return total;
 }
 
@@ -642,9 +641,7 @@ static unsigned poll_qman(struct dataplane_context *ctx, uint32_t ts)
     if (use == 0)
       off++;
 
-    ctx->vm_counters[vq_ids[i]] += 1;
   }
-  ctx->counters_total = ret;
   
   /* apply buffer reservations */
   bufcache_alloc(ctx, off);

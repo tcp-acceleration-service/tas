@@ -659,7 +659,6 @@ int fast_flows_bump(struct dataplane_context *ctx, uint32_t flow_id,
   struct flextcp_pl_flowst *fs = &fp_state->flowst[flow_id];
   uint32_t rx_avail_prev, old_avail, new_avail, tx_avail;
   int ret = -1;
-  ctx->vm_counters[fs->vm_id] += 1;
 
   fs_lock(fs);
 #ifdef FLEXNIC_TRACING

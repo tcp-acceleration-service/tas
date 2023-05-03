@@ -56,12 +56,6 @@
 
 #define QUANTA BATCH_SIZE * TCP_MSS
 
-/** Node in a list of out of budget VMs to be activated */
-struct out_of_budget_vm {
-  uint32_t vmid;
-  struct out_of_budget_vm *next;
-};
-
 /** Queue container for a virtual machine */
 struct vm_qman {
   /** VM queue */
@@ -130,8 +124,7 @@ static inline int timestamp_lessthaneq(struct qman_thread *t, uint32_t a,
 
 /** Qman functions for VM */
 static inline int vmcont_init(struct qman_thread *t);
-static inline int vm_qman_poll(struct qman_thread *t, 
-    struct vm_qman *vqman, struct vm_budget *budgets,
+static inline int vm_qman_poll(struct dataplane_context *ctx,
     unsigned num, unsigned *vm_id, unsigned *q_ids, uint16_t *q_bytes);
 static inline int vm_qman_set(struct qman_thread *t, uint32_t vm_id, uint32_t flow_id,
     uint32_t rate, uint32_t avail, uint16_t max_chunk, uint8_t flags);
@@ -199,11 +192,8 @@ int tas_qman_poll(struct dataplane_context *ctx, unsigned num, unsigned *vm_ids,
               unsigned *q_ids, uint16_t *q_bytes)
 {
   int ret;
-  struct qman_thread *t = &ctx->qman;
-  struct vm_budget *budgets = ctx->budgets;
-  struct vm_qman *vqman = t->vqman;
 
-  ret = vm_qman_poll(t, vqman, budgets, num, vm_ids, q_ids, q_bytes);
+  ret = vm_qman_poll(ctx, num, vm_ids, q_ids, q_bytes);
   return ret;
 }
 
@@ -374,12 +364,19 @@ int vmcont_init(struct qman_thread *t)
   return 0;
 }
 
-static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman, 
-    struct vm_budget *budgets, unsigned num, 
-    unsigned *vm_ids, unsigned *q_ids, uint16_t *q_bytes)
+static inline int vm_qman_poll(struct dataplane_context *ctx, 
+    unsigned num, unsigned *vm_ids, 
+    unsigned *q_ids, uint16_t *q_bytes)
 {
   uint32_t idx;
   int i, cnt, x;
+  
+  struct qman_thread *t = &ctx->qman;
+  struct vm_budget *budgets = ctx->budgets;
+  struct vm_qman *vqman = t->vqman;
+  struct flow_qman *fqman;
+  struct vm_queue *vq;
+  
   struct out_of_budget_vm *oob_vm, *prev_oob_vm;
   struct out_of_budget_vm *oob_head = NULL;
   struct out_of_budget_vm *oob_tail = NULL;
@@ -387,7 +384,7 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
   for (cnt = 0; cnt < num && vqman->head_idx != IDXLIST_INVAL;)
   {
     idx = vqman->head_idx;
-    struct vm_queue *vq = &vqman->queues[idx];
+    vq = &vqman->queues[idx];
     vqman->head_idx = vq->next_idx;
     vq->flags &= ~FLAG_INNOLIMITL;
 
@@ -399,7 +396,7 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
     if (budgets[idx].budget > 0)
     {
       vq->dc += QUANTA;
-      struct flow_qman *fqman = vq->fqman;
+      fqman = vq->fqman;
       x = flow_qman_poll(t, vq, fqman, num - cnt, q_ids + cnt, q_bytes + cnt);
 
       cnt += x;
@@ -414,6 +411,9 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
       {
         vm_queue_fire(vqman, vq, idx, q_bytes, cnt - x, cnt);
       }
+
+      ctx->vm_counters[idx] += 1;
+      ctx->counters_total += 1;
 
     } else
     {
@@ -441,10 +441,37 @@ static inline int vm_qman_poll(struct qman_thread *t, struct vm_qman *vqman,
   while(oob_vm != NULL)
   {
     idx = oob_vm->vmid;
-    vm_queue_activate(vqman, &vqman->queues[idx], idx);
+    struct vm_queue *vq = &vqman->queues[idx];
+    vq->flags &= ~FLAG_INNOLIMITL;
+
+
+    if (cnt < num)
+    {
+      vq->dc += QUANTA;
+      struct flow_qman *fqman = vq->fqman;
+      x = flow_qman_poll(t, vq, fqman, num - cnt, q_ids + cnt, q_bytes + cnt);
+
+      cnt += x;
+
+      // Update vm_id list
+      for (i = cnt - x; i < cnt; i++)
+      {
+        vm_ids[i] = idx;
+      }
+
+      if (vq->avail > 0)
+      {
+        vm_queue_fire(vqman, vq, idx, q_bytes, cnt - x, cnt);
+      }
+    } else 
+    {
+      vm_queue_activate(vqman, &vqman->queues[idx], idx);
+    }
+
     prev_oob_vm = oob_vm;
     oob_vm = oob_vm->next;
     free(prev_oob_vm);
+
   }
 
   return cnt;

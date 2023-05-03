@@ -64,6 +64,12 @@ extern volatile unsigned fp_scale_to;
 
 #define TCP_MSS 1448
 
+/** Node in a list of out of budget VMs to be activated */
+struct out_of_budget_vm {
+  uint32_t vmid;
+  struct out_of_budget_vm *next;
+};
+
 /** Index list: invalid index */
 #define IDXLIST_INVAL (-1U)
 

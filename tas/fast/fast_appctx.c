@@ -178,7 +178,11 @@ int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
 {
   uint16_t k = 0;
   uint32_t vmid;
+  unsigned total_prev;
   struct polled_vm *act_vm;
+  struct out_of_budget_vm *oob_vm, *prev_oob_vm;
+  struct out_of_budget_vm *oob_head = NULL;
+  struct out_of_budget_vm *oob_tail = NULL;
   
   vmid = ctx->act_head;
   do {
@@ -186,12 +190,51 @@ int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
 
     if (ctx->budgets[vmid].budget > 0)
     {
+      total_prev = *total;
       fast_appctx_poll_fetch_active_vm(ctx, act_vm, &k, max, total, 
           n_rem, rem_ctxs, aqes);
+      
+      if (*total > total_prev)
+      {
+        ctx->vm_counters[vmid] += 1;
+        ctx->counters_total += 1;
+      }
+    } else
+    {
+      oob_vm = malloc(sizeof(struct out_of_budget_vm));
+      oob_vm->vmid = vmid;
+      oob_vm->next = NULL;
+
+      if (oob_head == NULL) 
+      {
+        oob_head = oob_vm;
+        oob_tail = oob_vm;
+      }
+      else {
+        oob_tail->next = oob_vm;
+        oob_tail = oob_vm;
+      }
     }
 
     vmid = ctx->polled_vms[vmid].next; 
   } while (vmid != ctx->act_head && k < max);
+
+  oob_vm = oob_head;
+  while(oob_vm != NULL)
+  {
+    vmid = oob_vm->vmid;
+    act_vm = &ctx->polled_vms[vmid];
+
+    if (k < max)
+    {
+      fast_appctx_poll_fetch_active_vm(ctx, act_vm, &k, max, total, n_rem, 
+          rem_ctxs, aqes);
+    }
+
+    prev_oob_vm = oob_vm;
+    oob_vm = oob_vm->next;
+    free(prev_oob_vm);
+  }
 
   return k;
 }
@@ -264,9 +307,12 @@ void fast_appctx_poll_fetch_all_vm(struct dataplane_context *ctx,
 int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
     unsigned *total, void *aqes[BATCH_SIZE])
 {
-  unsigned i_v;
+  unsigned i_v, total_prev;
   uint16_t k = 0;
   uint32_t vmid;
+  struct out_of_budget_vm *oob_vm, *prev_oob_vm;
+  struct out_of_budget_vm *oob_head = NULL;
+  struct out_of_budget_vm *oob_tail = NULL;
 
   for (i_v = 0; i_v < FLEXNIC_PL_VMST_NUM && k < max; i_v++)
   {
@@ -274,8 +320,48 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
 
     if (ctx->budgets[vmid].budget > 0)
     {
+      total_prev = *total;
+      fast_appctx_poll_fetch_all_vm(ctx, vmid, &k, max, total, aqes);
+
+      if (*total > total_prev)
+      {
+        ctx->vm_counters[vmid] += 1;
+        ctx->counters_total += 1;
+      }
+
+    } else 
+    {
+      oob_vm = malloc(sizeof(struct out_of_budget_vm));
+      oob_vm->vmid = vmid;
+      oob_vm->next = NULL;
+
+      if (oob_head == NULL) 
+      {
+        oob_head = oob_vm;
+        oob_tail = oob_vm;
+      }
+      else {
+        oob_tail->next = oob_vm;
+        oob_tail = oob_vm;
+      }
+    }
+    ctx->poll_next_vm = (ctx->poll_next_vm + 1) % (FLEXNIC_PL_VMST_NUM);
+  }
+
+  oob_vm = oob_head;
+  while(oob_vm != NULL)
+  {
+    vmid = oob_vm->vmid;
+
+    if (k < max)
+    {
       fast_appctx_poll_fetch_all_vm(ctx, vmid, &k, max, total, aqes);
     }
+
+    prev_oob_vm = oob_vm;
+    oob_vm = oob_vm->next;
+    free(prev_oob_vm);
+
     ctx->poll_next_vm = (ctx->poll_next_vm + 1) % (FLEXNIC_PL_VMST_NUM);
   }
 
