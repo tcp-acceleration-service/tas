@@ -438,6 +438,7 @@ static inline int vm_qman_poll(struct dataplane_context *ctx,
 
   /* Enqueue VMs out of budget that still have packets to send*/
   oob_vm = oob_head;
+  int o_cnt = cnt;
   while(oob_vm != NULL)
   {
     idx = oob_vm->vmid;
@@ -445,7 +446,7 @@ static inline int vm_qman_poll(struct dataplane_context *ctx,
     vq->flags &= ~FLAG_INNOLIMITL;
 
 
-    if (cnt < num)
+    if (cnt < num && o_cnt == 0)
     {
       vq->dc += QUANTA;
       struct flow_qman *fqman = vq->fqman;

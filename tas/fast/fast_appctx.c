@@ -220,12 +220,13 @@ int fast_appctx_poll_fetch_active(struct dataplane_context *ctx, uint16_t max,
   } while (vmid != ctx->act_head && k < max);
 
   oob_vm = oob_head;
+  int o_k = k;
   while(oob_vm != NULL)
   {
     vmid = oob_vm->vmid;
     act_vm = &ctx->polled_vms[vmid];
 
-    if (k < max)
+    if (k < max && o_k == 0)
     {
       fast_appctx_poll_fetch_active_vm(ctx, act_vm, &k, max, total, n_rem, 
           rem_ctxs, aqes);
@@ -349,11 +350,12 @@ int fast_appctx_poll_fetch_all(struct dataplane_context *ctx, uint16_t max,
   }
 
   oob_vm = oob_head;
+  int o_k = k;
   while(oob_vm != NULL)
   {
     vmid = oob_vm->vmid;
-
-    if (k < max)
+    
+    if (k < max && o_k == 0)
     {
       fast_appctx_poll_fetch_all_vm(ctx, vmid, &k, max, total, aqes);
     }
