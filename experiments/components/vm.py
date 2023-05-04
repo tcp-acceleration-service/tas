@@ -61,6 +61,20 @@ class VM:
         self.pane.enter()
         time.sleep(5)
 
+    def add_dummy_intf(self, interface, ip, mac):
+        cmd = 'cd ' + self.vm_config.manager_dir_virt
+        self.pane.send_keys(cmd)
+        cmd = "bash dummy-intf-add.sh {} {} {}".format(interface, ip, mac)
+        self.pane.send_keys(cmd)
+        time.sleep(1)
+
+    def del_dummy_intf(self, interface, ip):
+        cmd = 'cd ' + self.vm_config.manager_dir_virt
+        self.pane.send_keys(cmd)
+        cmd = "bash dummy-intf-del.sh {} {} {}".format(interface, ip)
+        self.pane.send_keys(cmd)
+        time.sleep(1)
+
     def shutdown(self):
         self.pane.send_keys(suppress_history=False, cmd='whoami')
         

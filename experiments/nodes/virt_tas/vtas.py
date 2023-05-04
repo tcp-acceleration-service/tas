@@ -23,10 +23,12 @@ class VirtTas(Node):
   def start_vm(self, vm):
     vm.start()
     vm.enable_noiommu("1af4 1110")
+    vm.add_dummy_intf("eth0", vm.vm_config.vm_ip, "C8:D7:4A:4E:47:50")
 
   def cleanup(self):
     super().cleanup()
     for vm in self.vms:
+      vm.del_dummy_intf("eth0", vm.vm_config.vm_ip)
       vm.shutdown()
 
   def start_vms(self):
