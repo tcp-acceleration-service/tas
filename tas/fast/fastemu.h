@@ -114,6 +114,17 @@ static inline uint16_t tx_xsum_enable(struct network_buf_handle *nbh,
       ip_s, ip_d, IP_PROTO_TCP, l3_paylen);
 }
 
+static inline uint16_t tx_gre_xsum_enable(struct network_buf_handle *nbh,
+    struct ip_hdr *in_iph, struct ip_hdr *out_iph, uint16_t l3_paylen)
+{
+  beui32_t ip_s = in_iph->src;
+  beui32_t ip_d = in_iph->dest;
+
+  return network_buf_grexsums(nbh, 
+      sizeof(struct eth_hdr), sizeof(*in_iph), sizeof(*out_iph),
+      ip_s, ip_d, IP_PROTO_TCP, l3_paylen);
+}
+
 static inline void arx_cache_add(struct dataplane_context *ctx, uint16_t ctx_id,
     uint16_t vmid, uint64_t opaque, uint32_t rx_bump, uint32_t rx_pos, 
     uint32_t tx_bump, uint16_t type_flags)

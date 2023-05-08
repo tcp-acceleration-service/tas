@@ -186,6 +186,26 @@ static inline uint16_t network_buf_tcpxsums(struct network_buf_handle *bh, uint8
   return network_ip_phdr_xsum(ip_s, ip_d, ip_proto, l3_paylen);
 }
 
+static inline uint16_t network_buf_grexsums(struct network_buf_handle *bh,
+    uint8_t l2l, uint8_t in_l3l, uint8_t out_l3l,
+    beui32_t ip_s, beui32_t ip_d, uint8_t ip_proto,
+    uint16_t l3_paylen)
+{
+  struct rte_mbuf * restrict mb = (struct rte_mbuf *) bh;
+  mb->l2_len = 0;
+  mb->l3_len = in_l3l;
+  mb->l4_len = 0;
+
+  mb->outer_l2_len = l2l;
+  mb->outer_l3_len = out_l3l;
+
+  mb->ol_flags = RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM |
+    RTE_MBUF_F_TX_OUTER_IPV4 | RTE_MBUF_F_TX_OUTER_IP_CKSUM  |
+    RTE_MBUF_F_TX_TCP_CKSUM | RTE_MBUF_F_TX_TUNNEL_GRE;
+
+  return network_ip_phdr_xsum(ip_s, ip_d, ip_proto, l3_paylen);
+}
+
 static inline int network_buf_flowgroup(struct network_buf_handle *bh,
     uint16_t *fg, uint16_t core)
 {

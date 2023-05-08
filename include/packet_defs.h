@@ -100,6 +100,28 @@ struct ip_hdr {
 } __attribute__ ((packed));
 
 /******************************************************************************/
+/* GRE */
+
+#define GREH_C(hdr) ((hdr)->_c_k_s_ver >> 15)
+#define GREH_K(hdr) ((hdr)->_c_k_s_ver & 0b0010000000000000)
+#define GREH_S(hdr) ((hdr)->_c_k_s_ver & 0b0001000000000000)
+#define GREH_V(hdr) ((hdr)->_c_k_s_ver & 0b0000000000000111)
+
+#define GREH_CKSV_SET(hdr, c, k, s, v) (hdr)->_c_k_s_ver = \
+    (((c) << 15) | ((k) << 13) | ((s) << 12) | (v))
+
+#define GRE_PROTO_IP 0x0800
+
+struct gre_hdr {
+  /* checksum / key present / seq num / reserved / version */
+  uint16_t _c_k_s_ver;
+  /* protocol */
+  uint16_t proto;
+  /* key number used to identify a flow */
+  uint32_t key;
+} __attribute__ ((packed));
+
+/******************************************************************************/
 /* ARP */
 
 #define ARP_OPER_REQUEST 1
@@ -216,6 +238,14 @@ struct pkt_tcp {
   struct eth_hdr eth;
   struct ip_hdr  ip;
   struct tcp_hdr tcp;
+} __attribute__ ((packed));
+
+struct pkt_gre {
+  struct eth_hdr eth;
+  struct ip_hdr  out_ip;
+  struct gre_hdr gre;
+  struct ip_hdr  in_ip;
+  struct tcp_hdr tcp; 
 } __attribute__ ((packed));
 
 #endif

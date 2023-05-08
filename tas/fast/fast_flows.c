@@ -77,6 +77,8 @@ static void flow_reset_retransmit(struct flextcp_pl_flowst *fs);
 
 static inline void tcp_checksums(struct network_buf_handle *nbh,
     struct pkt_tcp *p, beui32_t ip_s, beui32_t ip_d, uint16_t l3_paylen);
+static inline void gre_checksums(struct network_buf_handle *nbh,
+    struct pkt_gre *p, uint16_t l3_paylen);
 
 void fast_flows_qman_pf(struct dataplane_context *ctx, uint32_t *queues,
     uint16_t n)
@@ -883,8 +885,9 @@ static void flow_tx_segment(struct dataplane_context *ctx,
     uint32_t seq, uint32_t ack, uint32_t rxwnd, uint16_t payload,
     uint32_t payload_pos, uint32_t ts_echo, uint32_t ts_my, uint8_t fin)
 {
+  uint32_t hdcoded_ip;
   uint16_t hdrs_len, optlen, fin_fl;
-  struct pkt_tcp *p = network_buf_buf(nbh);
+  struct pkt_gre *p = network_buf_buf(nbh);
   struct tcp_timestamp_opt *opt_ts;
 
   /* calculate header length depending on options */
@@ -896,21 +899,43 @@ static void flow_tx_segment(struct dataplane_context *ctx,
   memcpy(&p->eth.src, &eth_addr, ETH_ADDR_LEN);
   p->eth.type = t_beui16(ETH_TYPE_IP);
 
-  IPH_VHL_SET(&p->ip, 4, 5);
-  p->ip._tos = 0;
-  p->ip.len = t_beui16(hdrs_len - offsetof(struct pkt_tcp, ip) + payload);
-  p->ip.id = t_beui16(3); /* TODO: not sure why we have 3 here */
-  p->ip.offset = t_beui16(0);
-  p->ip.ttl = 0xff;
-  p->ip.proto = IP_PROTO_TCP;
-  p->ip.chksum = 0;
-  p->ip.src = fs->local_ip;
-  p->ip.dest = fs->remote_ip;
+  IPH_VHL_SET(&p->out_ip, 4, 5);
+  p->out_ip._tos = 0;
+  p->out_ip.len = t_beui16(hdrs_len - 
+      offsetof(struct pkt_gre, out_ip) + payload);
+  p->out_ip.id = t_beui16(3); /* TODO: not sure why we have 3 here */
+  p->out_ip.offset = t_beui16(0);
+  p->out_ip.ttl = 0xff;
+  p->out_ip.proto = IP_PROTO_TCP;
+  p->out_ip.chksum = 0;
+  p->out_ip.src = fs->local_ip;
+  p->out_ip.src = fs->local_ip;
+  p->out_ip.dest = fs->remote_ip;
 
   /* mark as ECN capable if flow marked so */
   if ((fs->rx_base_sp & FLEXNIC_PL_FLOWST_ECN) == FLEXNIC_PL_FLOWST_ECN) {
-    IPH_ECN_SET(&p->ip, IP_ECN_ECT0);
+    IPH_ECN_SET(&p->in_ip, IP_ECN_ECT0);
   }
+
+  GREH_CKSV_SET(&p->gre, 0, 1, 0, 0);
+  p->gre.proto = GRE_PROTO_IP;
+  // TODO: Hardcode tunnel as 0 for now but should set 
+  // it up in the control plane.
+  p->gre.key = 0;
+
+  IPH_VHL_SET(&p->in_ip, 4, 5);
+  p->in_ip._tos = 0;
+  p->in_ip.len = t_beui16(hdrs_len - 
+      offsetof(struct pkt_gre, in_ip) + payload);
+  p->in_ip.id = t_beui16(3); /* TODO: not sure why we have 3 here */
+  p->in_ip.offset = t_beui16(0);
+  p->in_ip.ttl = 0xff;
+  p->in_ip.proto = IP_PROTO_TCP;
+  p->in_ip.chksum = 0;
+  // TODO: Have this IP hardcoded for now but set it up in the control plane
+  util_parse_ipv4("192.168.10.20", &hdcoded_ip);
+  p->in_ip.src = t_beui32(hdcoded_ip);
+  p->in_ip.dest = fs->remote_ip;
 
   fin_fl = (fin ? TCP_FIN : 0);
 
@@ -937,13 +962,12 @@ static void flow_tx_segment(struct dataplane_context *ctx,
   }
 
   /* checksums */
-  tcp_checksums(nbh, p, fs->local_ip, fs->remote_ip, hdrs_len - offsetof(struct
-        pkt_tcp, tcp) + payload);
+  gre_checksums(nbh, p, hdrs_len - offsetof(struct pkt_gre, tcp) + payload);
 
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_txseg te_txseg = {
-      .local_ip = f_beui32(p->ip.src),
-      .remote_ip = f_beui32(p->ip.dest),
+      .local_ip = f_beui32(p->in_ip.src),
+      .remote_ip = f_beui32(p->in_ip.dest),
       .local_port = f_beui16(p->tcp.src),
       .remote_port = f_beui16(p->tcp.dest),
 
@@ -962,9 +986,9 @@ static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
     uint32_t ack, uint32_t rxwnd, uint32_t echots, uint32_t myts,
     struct network_buf_handle *nbh, struct tcp_timestamp_opt *ts_opt)
 {
-  struct pkt_tcp *p;
+  struct pkt_gre *p;
   struct eth_addr eth;
-  ip_addr_t ip;
+  ip_addr_t in_ip, out_ip;
   beui16_t port;
   uint16_t hdrlen;
   uint16_t ecn_flags = 0;
@@ -973,17 +997,20 @@ static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
 
 #ifdef PL_DEBUG_TCPACK
   fprintf(stderr, "FLOW local=%08x:%05u remote=%08x:%05u ACK: seq=%u ack=%u\n",
-      f_beui32(p->ip.dest), f_beui16(p->tcp.dest),
-      f_beui32(p->ip.src), f_beui16(p->tcp.src), seq, ack);
+      f_beui32(p->in_ip.dest), f_beui16(p->tcp.dest),
+      f_beui32(p->in_ip.src), f_beui16(p->tcp.src), seq, ack);
 #endif
 
   /* swap addresses */
   eth = p->eth.src;
   p->eth.src = p->eth.dest;
   p->eth.dest = eth;
-  ip = p->ip.src;
-  p->ip.src = p->ip.dest;
-  p->ip.dest = ip;
+  in_ip = p->in_ip.src;
+  out_ip = p->out_ip.src;
+  p->in_ip.src = p->in_ip.dest;
+  p->in_ip.dest = in_ip;
+  p->out_ip.src = p->out_ip.dest;
+  p->out_ip.dest = out_ip;
   port = p->tcp.src;
   p->tcp.src = p->tcp.dest;
   p->tcp.dest = port;
@@ -991,12 +1018,12 @@ static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
   hdrlen = sizeof(*p) + (TCPH_HDRLEN(&p->tcp) - 5) * 4;
 
   /* If ECN flagged, set TCP response flag */
-  if (IPH_ECN(&p->ip) == IP_ECN_CE) {
+  if (IPH_ECN(&p->out_ip) == IP_ECN_CE) {
     ecn_flags = TCP_ECE;
   }
 
   /* mark ACKs as ECN in-capable */
-  IPH_ECN_SET(&p->ip, IP_ECN_NONE);
+  IPH_ECN_SET(&p->out_ip, IP_ECN_NONE);
 
   /* change TCP header to ACK */
   p->tcp.seqno = t_beui32(seq);
@@ -1009,17 +1036,18 @@ static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
   ts_opt->ts_val = t_beui32(myts);
   ts_opt->ts_ecr = t_beui32(echots);
 
-  p->ip.len = t_beui16(hdrlen - offsetof(struct pkt_tcp, ip));
-  p->ip.ttl = 0xff;
+  p->in_ip.len = t_beui16(hdrlen - offsetof(struct pkt_gre, in_ip));
+  p->out_ip.len = t_beui16(hdrlen - offsetof(struct pkt_gre, out_ip));
+  p->in_ip.ttl = 0xff;
+  p->out_ip.ttl = 0xff;
 
   /* checksums */
-  tcp_checksums(nbh, p, p->ip.src, p->ip.dest, hdrlen - offsetof(struct
-        pkt_tcp, tcp));
+  gre_checksums(nbh, p, hdrlen - offsetof(struct pkt_gre, tcp));
 
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_txack te_txack = {
-      .local_ip = f_beui32(p->ip.src),
-      .remote_ip = f_beui32(p->ip.dest),
+      .local_ip = f_beui32(p->in_ip.src),
+      .remote_ip = f_beui32(p->in_ip.dest),
       .local_port = f_beui16(p->tcp.src),
       .remote_port = f_beui16(p->tcp.dest),
 
@@ -1069,6 +1097,25 @@ static inline void tcp_checksums(struct network_buf_handle *nbh,
     p->tcp.chksum = 0;
     p->ip.chksum = rte_ipv4_cksum((void *) &p->ip);
     p->tcp.chksum = rte_ipv4_udptcp_cksum((void *) &p->ip, (void *) &p->tcp);
+  }
+}
+
+static inline void gre_checksums(struct network_buf_handle *nbh,
+    struct pkt_gre *p, uint16_t l3_paylen)
+{
+  p->in_ip.chksum = 0;
+  p->out_ip.chksum = 0;
+
+  if(config.fp_xsumoffload)
+  {
+    p->tcp.chksum = tx_gre_xsum_enable(nbh, &p->in_ip, &p->out_ip, l3_paylen);
+  } else
+  {
+    p->tcp.chksum = 0;
+    p->in_ip.chksum = rte_ipv4_cksum((void *) &p->in_ip);
+    p->out_ip.chksum = rte_ipv4_cksum((void *) &p->out_ip);
+    p->tcp.chksum = rte_ipv4_udptcp_cksum((void *) &p->out_ip, 
+        (void *) &p->tcp);
   }
 }
 
