@@ -250,6 +250,9 @@ struct flextcp_pl_flowst {
   /** Length of transmit buffer */
   uint32_t tx_len;
 
+  /* GRE ID used to identify tunnel */
+  uint32_t tunnel_id;
+
   beui32_t local_ip;
   beui32_t remote_ip;
 

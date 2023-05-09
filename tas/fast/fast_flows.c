@@ -45,6 +45,7 @@
 struct flow_key {
   ip_addr_t local_ip;
   ip_addr_t remote_ip;
+  uint32_t tunnel_id;
   beui16_t local_port;
   beui16_t remote_port;
 } __attribute__((packed));
@@ -235,7 +236,7 @@ void fast_flows_packet_parse(struct dataplane_context *ctx,
     struct network_buf_handle **nbhs, void **fss, struct tcp_opts *tos,
     uint16_t n)
 {
-  struct pkt_tcp *p;
+  struct pkt_gre *p;
   uint16_t i, len;
 
   for (i = 0; i < n; i++) {
@@ -248,11 +249,15 @@ void fast_flows_packet_parse(struct dataplane_context *ctx,
     int cond =
         (len < sizeof(*p)) |
         (f_beui16(p->eth.type) != ETH_TYPE_IP) |
-        (p->ip.proto != IP_PROTO_TCP) |
-        (IPH_V(&p->ip) != 4) |
-        (IPH_HL(&p->ip) != 5) |
+        (p->out_ip.proto != IP_PROTO_TCP) |
+        (p->in_ip.proto != IP_PROTO_TCP) |
+        (p->gre.proto != GRE_PROTO_IP) |
+        (IPH_V(&p->out_ip) != 4) |
+        (IPH_HL(&p->out_ip) != 5) |
+        (IPH_V(&p->in_ip) != 4) |
+        (IPH_HL(&p->in_ip) != 5) |
         (TCPH_HDRLEN(&p->tcp) < 5) |
-        (len < f_beui16(p->ip.len) + sizeof(p->eth)) |
+        (len < f_beui16(p->out_ip.len) + sizeof(p->eth)) |
         (tcp_parse_options(p, len, &tos[i]) != 0) |
         (tos[i].ts == NULL);
 
@@ -285,7 +290,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
     struct network_buf_handle *nbh, void *fsp, struct tcp_opts *opts,
     uint32_t ts)
 {
-  struct pkt_tcp *p = network_buf_bufoff(nbh);
+  struct pkt_gre *p = network_buf_bufoff(nbh);
   struct flextcp_pl_flowst *fs = fsp;
   uint32_t payload_bytes, payload_off, seq, ack, old_avail, new_avail,
            orig_payload;
@@ -299,14 +304,14 @@ int fast_flows_packet(struct dataplane_context *ctx,
   tcp_extra_hlen = (TCPH_HDRLEN(&p->tcp) - 5) * 4;
   payload_off = sizeof(*p) + tcp_extra_hlen;
   payload_bytes =
-      f_beui16(p->ip.len) - (sizeof(p->ip) + sizeof(p->tcp) + tcp_extra_hlen);
+      f_beui16(p->in_ip.len) - (sizeof(p->in_ip) + sizeof(p->tcp) + tcp_extra_hlen);
   orig_payload = payload_bytes;
 
 #ifdef PL_DEBUG_ARX
   fprintf(stderr, "FLOW local=%08x:%05u remote=%08x:%05u  RX: seq=%u ack=%u "
       "flags=%x payload=%u\n",
-      f_beui32(p->ip.dest), f_beui16(p->tcp.dest),
-      f_beui32(p->ip.src), f_beui16(p->tcp.src), f_beui32(p->tcp.seqno),
+      f_beui32(p->in_ip.dest), f_beui16(p->tcp.dest),
+      f_beui32(p->in_ip.src), f_beui16(p->tcp.src), f_beui32(p->tcp.seqno),
       f_beui32(p->tcp.ackno), TCPH_FLAGS(&p->tcp), payload_bytes);
 #endif
 
@@ -314,8 +319,8 @@ int fast_flows_packet(struct dataplane_context *ctx,
 
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_rxfs te_rxfs = {
-      .local_ip = f_beui32(p->ip.dest),
-      .remote_ip = f_beui32(p->ip.src),
+      .local_ip = f_beui32(p->in_ip.dest),
+      .remote_ip = f_beui32(p->in_ip.src),
       .local_port = f_beui16(p->tcp.dest),
       .remote_port = f_beui16(p->tcp.src),
 
@@ -340,8 +345,8 @@ int fast_flows_packet(struct dataplane_context *ctx,
   fprintf(stderr, "FLOW local=%08x:%05u remote=%08x:%05u  ST: op=%"PRIx64
       " rx_pos=%x rx_next_seq=%u rx_avail=%x  tx_pos=%x tx_next_seq=%u"
       " tx_sent=%u\n",
-      f_beui32(p->ip.dest), f_beui16(p->tcp.dest),
-      f_beui32(p->ip.src), f_beui16(p->tcp.src), fs->opaque, fs->rx_next_pos,
+      f_beui32(p->in_ip.dest), f_beui16(p->tcp.dest),
+      f_beui32(p->in_ip.src), f_beui16(p->tcp.src), fs->opaque, fs->rx_next_pos,
       fs->rx_next_seq, fs->rx_avail, fs->tx_next_pos, fs->tx_next_seq,
       fs->tx_sent);
 #endif
@@ -610,8 +615,8 @@ unlock:
         .flow_id = flow_id,
         .db_id = fs->db_id,
 
-        .local_ip = f_beui32(p->ip.dest),
-        .remote_ip = f_beui32(p->ip.src),
+        .local_ip = f_beui32(p->in_ip.dest),
+        .remote_ip = f_beui32(p->in_ip.src),
         .local_port = f_beui16(p->tcp.dest),
         .remote_port = f_beui16(p->tcp.src),
       };
@@ -1137,7 +1142,7 @@ void fast_flows_packet_fss(struct dataplane_context *ctx,
   uint32_t hashes[n];
   uint32_t h, k, j, eh, fid, ffid;
   uint16_t i;
-  struct pkt_tcp *p;
+  struct pkt_gre *p;
   struct flow_key key;
   struct flextcp_pl_flowhte *e;
   struct flextcp_pl_flowst *fs;
@@ -1146,8 +1151,9 @@ void fast_flows_packet_fss(struct dataplane_context *ctx,
   for (i = 0; i < n; i++) {
     p = network_buf_bufoff(nbhs[i]);
 
-    key.local_ip = p->ip.dest;
-    key.remote_ip = p->ip.src;
+    key.local_ip = p->in_ip.dest;
+    key.remote_ip = p->in_ip.src;
+    key.tunnel_id = p->gre.key;
     key.local_port = p->tcp.dest;
     key.remote_port = p->tcp.src;
     h = flow_hash(&key);
@@ -1199,8 +1205,9 @@ void fast_flows_packet_fss(struct dataplane_context *ctx,
 
       MEM_BARRIER();
       fs = &fp_state->flowst[fid];
-      if ((fs->local_ip.x == p->ip.dest.x) &
-          (fs->remote_ip.x == p->ip.src.x) &
+      if ((fs->local_ip.x == p->in_ip.dest.x) &
+          (fs->remote_ip.x == p->in_ip.src.x) &
+          (fs->tunnel_id == p->gre.key) &
           (fs->local_port.x == p->tcp.dest.x) &
           (fs->remote_port.x == p->tcp.src.x))
       {

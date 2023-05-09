@@ -465,6 +465,8 @@ struct connection {
    */
     /** Peer MAC address for connection. */
     uint64_t remote_mac;
+    /** GRE tunnel ID */
+    uint32_t tunnel_id;
     /** Peer IP address. */
     uint32_t remote_ip;
     /** Local IP to be used. */
