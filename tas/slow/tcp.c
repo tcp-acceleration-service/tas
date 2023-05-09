@@ -75,14 +75,14 @@ struct tcp_opts {
 };
 
 static int conn_arp_done(struct connection *conn);
-static void conn_packet(struct connection *c, const struct pkt_tcp *p,
+static void conn_packet(struct connection *c, const struct pkt_gre *p,
     const struct tcp_opts *opts, uint32_t fn_core, uint16_t flow_group);
 static inline struct connection *conn_alloc(int vmid);
 static inline void conn_free(struct connection *conn);
 static void conn_register(struct connection *conn);
 static void conn_unregister(struct connection *conn);
 static struct connection *conn_lookup(const struct pkt_tcp *p);
-static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
+static int conn_syn_sent_packet(struct connection *c, const struct pkt_gre *p,
     const struct tcp_opts *opts);
 static int conn_reg_synack(struct connection *c);
 static void conn_failed(struct connection *c, int status);
@@ -91,16 +91,16 @@ static void conn_timeout_disarm(struct connection *c);
 static void conn_close_timeout(struct connection *c);
 
 static struct listener *listener_lookup(const struct pkt_tcp *p);
-static void listener_packet(struct listener *l, const struct pkt_tcp *p,
+static void listener_packet(struct listener *l, const struct pkt_gre *p,
     const struct tcp_opts *opts, uint32_t fn_core, uint16_t flow_group);
 static void listener_accept(struct listener *l);
 
 static inline uint16_t port_alloc(void);
 static inline int send_control(const struct connection *conn, uint16_t flags,
     int ts_opt, uint32_t ts_echo, uint16_t mss_opt);
-static inline int send_reset(const struct pkt_tcp *p,
+static inline int send_reset(const struct pkt_gre *p,
     const struct tcp_opts *opts);
-static inline int parse_options(const struct pkt_tcp *p, uint16_t len,
+static inline int parse_options(const struct pkt_gre *p, uint16_t len,
     struct tcp_opts *opts);
 
 static uintptr_t ports[PORT_MAX + 1];
@@ -360,7 +360,7 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
 {
   struct connection *c;
   struct listener *l;
-  const struct pkt_tcp *p = pkt;
+  const struct pkt_gre *p = pkt;
   struct tcp_opts opts;
   int ret = 0;
 
@@ -370,9 +370,10 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
     return -1;
   }
 
-  if (f_beui32(p->ip.dest) != config.ip) {
+  // TODO: Also add check for inner ip address?
+  if (f_beui32(p->out_ip.dest) != config.ip) {
     fprintf(stderr, "tcp_packet: unexpected destination IP (%x received, "
-        "%x expected)\n", f_beui32(p->ip.dest), config.ip);
+        "%x expected)\n", f_beui32(p->out_ip.dest), config.ip);
     return -1;
   }
 
@@ -475,7 +476,7 @@ void tcp_timeout(struct timeout *to, enum timeout_type type)
   send_control(c, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS);
 }
 
-static void conn_packet(struct connection *c, const struct pkt_tcp *p,
+static void conn_packet(struct connection *c, const struct pkt_gre *p,
     const struct tcp_opts *opts, uint32_t fn_core, uint16_t flow_group)
 {
   int ret;
@@ -541,7 +542,7 @@ static int conn_arp_done(struct connection *conn)
   return 0;
 }
 
-static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
+static int conn_syn_sent_packet(struct connection *c, const struct pkt_gre *p,
     const struct tcp_opts *opts)
 {
   int vmid = c->ctx->app->vm_id;
@@ -834,13 +835,13 @@ static struct listener *listener_lookup(const struct pkt_tcp *p)
   return (struct listener *) (ports[local_port] & ~PORT_TYPE_MASK);
 }
 
-static void listener_packet(struct listener *l, const struct pkt_tcp *p,
+static void listener_packet(struct listener *l, const struct pkt_gre *p,
     const struct tcp_opts *opts, uint32_t fn_core, uint16_t flow_group)
 {
   struct backlog_slot *bls;
   uint16_t len;
   uint32_t bp, n;
-  struct pkt_tcp *bl_p;
+  struct pkt_gre *bl_p;
 
   if ((TCPH_FLAGS(&p->tcp) & ~(TCP_ECE | TCP_CWR)) != TCP_SYN) {
     fprintf(stderr, "listener_packet: Not a SYN (flags %x)\n",
@@ -850,7 +851,7 @@ static void listener_packet(struct listener *l, const struct pkt_tcp *p,
   }
 
   /* make sure packet is not too long */
-  len = sizeof(p->eth) + f_beui16(p->ip.len);
+  len = sizeof(p->eth) + f_beui16(p->out_ip.len);
   if (len > sizeof(bls->buf)) {
     fprintf(stderr, "listener_packet: SYN larger than backlog buffer, "
         "dropping\n");
@@ -862,9 +863,11 @@ static void listener_packet(struct listener *l, const struct pkt_tcp *p,
       n++, bp = (bp + 1) % l->backlog_len)
   {
     bls = l->backlog_ptrs[bp];
-    bl_p = (struct pkt_tcp *) bls->buf;
-    if (f_beui32(p->ip.src) == f_beui32(bl_p->ip.src) &&
-        f_beui32(p->ip.dest) == f_beui32(bl_p->ip.dest) &&
+    bl_p = (struct pkt_gre *) bls->buf;
+    if (f_beui32(p->out_ip.src) == f_beui32(bl_p->out_ip.src) &&
+        f_beui32(p->in_ip.src) == f_beui32(bl_p->in_ip.src) &&
+        f_beui32(p->out_ip.dest) == f_beui32(bl_p->out_ip.dest) &&
+        f_beui32(p->in_ip.dest) == f_beui32(bl_p->in_ip.dest) &&
         f_beui16(p->tcp.src) == f_beui16(bl_p->tcp.src) &&
         f_beui16(p->tcp.dest) == f_beui16(bl_p->tcp.dest))
     {
@@ -892,7 +895,7 @@ static void listener_packet(struct listener *l, const struct pkt_tcp *p,
 
   l->backlog_used++;
 
-  appif_listen_newconn(l, f_beui32(p->ip.src), f_beui16(p->tcp.src));
+  appif_listen_newconn(l, f_beui32(p->out_ip.src), f_beui16(p->tcp.src));
 
   /* check if there are pending accepts */
   if (l->wait_conns != NULL) {
@@ -905,7 +908,7 @@ static void listener_accept(struct listener *l)
   int vmid;
   struct connection *c = l->wait_conns;
   struct backlog_slot *bls;
-  const struct pkt_tcp *p;
+  const struct pkt_gre *p;
   struct tcp_opts opts;
   uint32_t ecn_flags, fn_core;
   uint16_t flow_group;
@@ -917,7 +920,7 @@ static void listener_accept(struct listener *l)
   bls = l->backlog_ptrs[l->backlog_pos];
   fn_core = l->backlog_cores[l->backlog_pos];
   flow_group = l->backlog_fgs[l->backlog_pos];
-  p = (const struct pkt_tcp *) bls->buf;
+  p = (const struct pkt_gre *) bls->buf;
   ret = parse_options(p, bls->len, &opts);
   if (ret != 0 || opts.ts == NULL) {
     fprintf(stderr, "listener_packet: parsing options failed or no timestamp "
@@ -929,8 +932,10 @@ static void listener_accept(struct listener *l)
   c->flow_group = flow_group;
   c->remote_mac = 0;
   memcpy(&c->remote_mac, &p->eth.src, ETH_ADDR_LEN);
-  c->remote_ip = f_beui32(p->ip.src);
-  c->local_ip = config.ip;
+  c->out_remote_ip = f_beui32(p->out_ip.src);
+  c->in_remote_ip = f_beui32(p->in_ip.src);
+  c->in_local_ip = config.ip; // TODO: get this from control plane
+  c->out_local_ip = config.ip;
   c->remote_port = f_beui16(p->tcp.src);
   c->local_port = l->port;
 
@@ -981,13 +986,14 @@ out:
   }
 }
 
-static inline int send_control_raw(uint64_t remote_mac, uint32_t remote_ip,
+static inline int send_control_raw(uint64_t remote_mac, 
+    uint32_t in_remote_ip, uint32_t out_remote_ip,
     uint16_t remote_port, uint16_t local_port, uint32_t local_seq,
     uint32_t remote_seq, uint16_t flags, int ts_opt, uint32_t ts_echo,
     uint16_t mss_opt)
 {
-  uint32_t new_tail;
-  struct pkt_tcp *p;
+  uint32_t new_tail, hdcoded_ip;
+  struct pkt_gre *p;
   struct tcp_mss_opt *opt_mss;
   struct tcp_timestamp_opt *opt_ts;
   uint8_t optlen;
@@ -1013,17 +1019,37 @@ static inline int send_control_raw(uint64_t remote_mac, uint32_t remote_ip,
   memcpy(&p->eth.src, &eth_addr, ETH_ADDR_LEN);
   p->eth.type = t_beui16(ETH_TYPE_IP);
 
-  /* fill ipv4 header */
-  IPH_VHL_SET(&p->ip, 4, 5);
-  p->ip._tos = 0;
-  p->ip.len = t_beui16(len - offsetof(struct pkt_tcp, ip));
-  p->ip.id = t_beui16(3); /* TODO: not sure why we have 3 here */
-  p->ip.offset = t_beui16(0);
-  p->ip.ttl = 0xff;
-  p->ip.proto = IP_PROTO_TCP;
-  p->ip.chksum = 0;
-  p->ip.src = t_beui32(config.ip);
-  p->ip.dest = t_beui32(remote_ip);
+  /* fill outer ipv4 header */
+  IPH_VHL_SET(&p->out_ip, 4, 5);
+  p->out_ip._tos = 0;
+  p->out_ip.len = t_beui16(len - offsetof(struct pkt_gre, out_ip));
+  p->out_ip.id = t_beui16(3); /* TODO: not sure why we have 3 here */
+  p->out_ip.offset = t_beui16(0);
+  p->out_ip.ttl = 0xff;
+  p->out_ip.proto = IP_PROTO_TCP;
+  p->out_ip.chksum = 0;
+  p->out_ip.src = t_beui32(config.ip);
+  p->out_ip.dest = t_beui32(out_remote_ip);
+
+  GREH_CKSV_SET(&p->gre, 0, 1, 0, 0);
+  p->gre.proto = GRE_PROTO_IP;
+  // TODO: Hardcode tunnel as 0 for now but should set 
+  // it up in the control plane.
+  p->gre.key = 0;
+
+  /* fill inner ipv4 header */
+  IPH_VHL_SET(&p->in_ip, 4, 5);
+  p->in_ip._tos = 0;
+  p->in_ip.len = t_beui16(len - offsetof(struct pkt_gre, in_ip));
+  p->in_ip.id = t_beui16(3); /* TODO: not sure why we have 3 here */
+  p->in_ip.offset = t_beui16(0);
+  p->in_ip.ttl = 0xff;
+  p->in_ip.proto = IP_PROTO_TCP;
+  p->in_ip.chksum = 0;
+  // TODO: Have this IP hardcoded for now but set it up in the control plane
+  util_parse_ipv4("192.168.10.20", &hdcoded_ip);
+  p->in_ip.src = t_beui32(hdcoded_ip);
+  p->in_ip.dest = t_beui32(out_remote_ip);
 
   /* fill tcp header */
   p->tcp.src = t_beui16(local_port);
@@ -1065,12 +1091,13 @@ static inline int send_control_raw(uint64_t remote_mac, uint32_t remote_ip,
 static inline int send_control(const struct connection *conn, uint16_t flags,
     int ts_opt, uint32_t ts_echo, uint16_t mss_opt)
 {
-  return send_control_raw(conn->remote_mac, conn->remote_ip, conn->remote_port,
+  return send_control_raw(conn->remote_mac, 
+      conn->in_remote_ip, conn->out_remote_ip, conn->remote_port,
       conn->local_port, conn->local_seq, conn->remote_seq, flags, ts_opt,
       ts_echo, mss_opt);
 }
 
-static inline int send_reset(const struct pkt_tcp *p,
+static inline int send_reset(const struct pkt_gre *p,
     const struct tcp_opts *opts)
 {
   int ts_opt = 0;
@@ -1083,12 +1110,14 @@ static inline int send_reset(const struct pkt_tcp *p,
   }
 
   memcpy(&remote_mac, &p->eth.src, ETH_ADDR_LEN);
-  return send_control_raw(remote_mac, f_beui32(p->ip.src), f_beui16(p->tcp.src),
-      f_beui16(p->tcp.dest), f_beui32(p->tcp.ackno), f_beui32(p->tcp.seqno) + 1,
+  return send_control_raw(remote_mac, 
+      f_beui32(p->in_ip.src), f_beui32(p->out_ip.src),
+      f_beui16(p->tcp.src), f_beui16(p->tcp.dest), 
+      f_beui32(p->tcp.ackno), f_beui32(p->tcp.seqno) + 1,
       TCP_RST | TCP_ACK, ts_opt, ts_val, 0);
 }
 
-static inline int parse_options(const struct pkt_tcp *p, uint16_t len,
+static inline int parse_options(const struct pkt_gre *p, uint16_t len,
     struct tcp_opts *opts)
 {
   uint8_t *opt = (uint8_t *) (p + 1);

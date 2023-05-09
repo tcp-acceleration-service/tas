@@ -145,11 +145,11 @@ void fast_kernel_packet(struct dataplane_context *ctx,
 static inline void inject_tcp_ts(void *buf, uint16_t len, uint32_t ts,
     struct network_buf_handle *nbh)
 {
-  struct pkt_tcp *p = buf;
+  struct pkt_gre *p = buf;
   struct tcp_opts opts;
 
   if (len < sizeof(*p) || f_beui16(p->eth.type) != ETH_TYPE_IP ||
-      p->ip.proto != IP_PROTO_TCP)
+      p->in_ip.proto != IP_PROTO_TCP)
   {
     return;
   }

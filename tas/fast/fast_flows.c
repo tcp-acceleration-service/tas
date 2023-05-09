@@ -1120,10 +1120,9 @@ static inline void gre_checksums(struct network_buf_handle *nbh,
 }
 
 void fast_flows_kernelxsums(struct network_buf_handle *nbh,
-    struct pkt_tcp *p)
+    struct pkt_gre *p)
 {
-  tcp_checksums(nbh, p, p->ip.src, p->ip.dest,
-      f_beui16(p->ip.len) - sizeof(p->ip));
+  gre_checksums(nbh, p, f_beui16(p->in_ip.len) - sizeof(p->in_ip));
 }
 
 static inline uint32_t flow_hash(struct flow_key *k)

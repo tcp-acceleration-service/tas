@@ -240,7 +240,7 @@ struct tcp_opts {
  *
  * @return 0 if parsed successful, -1 otherwise.
  */
-static inline int tcp_parse_options(const struct pkt_tcp *p, uint16_t len,
+static inline int tcp_parse_options(const struct pkt_gre *p, uint16_t len,
     struct tcp_opts *opts)
 {
   uint8_t *opt = (uint8_t *) (p + 1);
