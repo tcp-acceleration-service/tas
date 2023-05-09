@@ -81,7 +81,7 @@ static inline struct connection *conn_alloc(int vmid);
 static inline void conn_free(struct connection *conn);
 static void conn_register(struct connection *conn);
 static void conn_unregister(struct connection *conn);
-static struct connection *conn_lookup(const struct pkt_tcp *p);
+static struct connection *conn_lookup(const struct pkt_gre *p);
 static int conn_syn_sent_packet(struct connection *c, const struct pkt_gre *p,
     const struct tcp_opts *opts);
 static int conn_reg_synack(struct connection *c);
@@ -90,7 +90,7 @@ static void conn_timeout_arm(struct connection *c, int type);
 static void conn_timeout_disarm(struct connection *c);
 static void conn_close_timeout(struct connection *c);
 
-static struct listener *listener_lookup(const struct pkt_tcp *p);
+static struct listener *listener_lookup(const struct pkt_gre *p);
 static void listener_packet(struct listener *l, const struct pkt_gre *p,
     const struct tcp_opts *opts, uint32_t fn_core, uint16_t flow_group);
 static void listener_accept(struct listener *l);
@@ -681,19 +681,20 @@ static inline void conn_free(struct connection *conn)
   free(conn);
 }
 
-static inline uint32_t conn_hash(uint32_t l_ip, uint32_t r_ip, uint16_t l_po,
-    uint16_t r_po)
+static inline uint32_t conn_hash(uint32_t l_ip, uint32_t r_ip, uint32_t t_id,
+    uint16_t l_po, uint16_t r_po)
 {
-  return crc32c_sse42_u32(l_po | (((uint32_t) r_po) << 16),
-      crc32c_sse42_u64(l_ip | (((uint64_t) r_ip) << 32), 0));
+  return crc32c_sse42_u32(t_id,
+      crc32c_sse42_u32(l_po | (((uint32_t) r_po) << 16),
+      crc32c_sse42_u64(l_ip | (((uint64_t) r_ip) << 32), 0)));
 }
 
 static void conn_register(struct connection *conn)
 {
   uint32_t h;
 
-  h = conn_hash(conn->local_ip, conn->remote_ip, conn->local_port,
-      conn->remote_port) % TCP_HTSIZE;
+  h = conn_hash(conn->local_ip, conn->remote_ip, conn->tunnel_id,
+      conn->local_port, conn->remote_port) % TCP_HTSIZE;
 
   conn->ht_next = tcp_hashtable[h];
   tcp_hashtable[h] = conn;
@@ -704,8 +705,8 @@ static void conn_unregister(struct connection *conn)
   struct connection *cp = NULL;
   uint32_t h;
 
-  h = conn_hash(conn->local_ip, conn->remote_ip, conn->local_port,
-      conn->remote_port) % TCP_HTSIZE;
+  h = conn_hash(conn->local_ip, conn->remote_ip, conn->tunnel_id,
+      conn->local_port, conn->remote_port) % TCP_HTSIZE;
   if (tcp_hashtable[h] == conn) {
     tcp_hashtable[h] = conn->ht_next;
   } else {
@@ -720,16 +721,17 @@ static void conn_unregister(struct connection *conn)
   }
 }
 
-static struct connection *conn_lookup(const struct pkt_tcp *p)
+static struct connection *conn_lookup(const struct pkt_gre *p)
 {
   uint32_t h;
   struct connection *c;
 
-  h = conn_hash(f_beui32(p->ip.dest), f_beui32(p->ip.src),
+  h = conn_hash(f_beui32(p->in_ip.dest), f_beui32(p->in_ip.src), p->gre.key,
       f_beui16(p->tcp.dest), f_beui16(p->tcp.src)) % TCP_HTSIZE;
 
   for (c = tcp_hashtable[h]; c != NULL; c = c->ht_next) {
-    if (f_beui32(p->ip.src) == c->remote_ip &&
+    if (f_beui32(p->in_ip.src) == c->remote_ip &&
+        p->gre.key == c->tunnel_id,
         f_beui16(p->tcp.dest) == c->local_port &&
         f_beui16(p->tcp.src) == c->remote_port)
     {
@@ -811,10 +813,10 @@ static inline uint32_t hash_64_to_32(uint64_t key)
   return (uint32_t) key;
 }
 
-static struct listener *listener_lookup(const struct pkt_tcp *p)
+static struct listener *listener_lookup(const struct pkt_gre *p)
 {
   uint16_t local_port = f_beui16(p->tcp.dest);
-  uint32_t hash;
+  uint32_t hash, init_hash;
   uint8_t type;
   struct listen_multi *lm;
 
@@ -825,7 +827,10 @@ static struct listener *listener_lookup(const struct pkt_tcp *p)
   } else if (type == PORT_TYPE_LMULTI) {
     /* multiple listener sockets, calculate hash */
     lm = (struct listen_multi *) (ports[local_port] & ~PORT_TYPE_MASK);
-    hash = hash_64_to_32(((uint64_t) f_beui32(p->ip.src) << 32) |
+
+    init_hash = hash_64_to_32(((uint64_t) f_beui32(p->in_ip.src) << 32) | 
+        p->gre.key);
+    hash = hash_64_to_32((init_hash << 32) |
         ((uint32_t) f_beui16(p->tcp.src) << 16) | local_port);
     return lm->ls[hash % lm->num];
   } else {
@@ -1080,8 +1085,9 @@ static inline int send_control_raw(uint64_t remote_mac,
   }
 
   /* calculate header checksums */
-  p->ip.chksum = rte_ipv4_cksum((void *) &p->ip);
-  p->tcp.chksum = rte_ipv4_udptcp_cksum((void *) &p->ip, (void *) &p->tcp);
+  p->in_ip.chksum = rte_ipv4_cksum((void *) &p->in_ip);
+  p->out_ip.chksum = rte_ipv4_cksum((void *) &p->out_ip);
+  p->tcp.chksum = rte_ipv4_udptcp_cksum((void *) &p->out_ip, (void *) &p->tcp);
   
   /* send packet */
   nicif_tx_send(new_tail, 0);
