@@ -149,8 +149,10 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t vm_id, uint32_t queu
   avail = tcp_txavail(fs, NULL);
 
 #ifdef PL_DEBUG_ATX
-  fprintf(stderr, "ATX try_sendseg local=%08x:%05u remote=%08x:%05u "
+  fprintf(stderr, "ATX try_sendseg tunnel=%x "
+      "local=%08x:%05u remote=%08x:%05u "
       "tx_avail=%x tx_next_pos=%x avail=%u core_id=%d\n",
+      fs->tunnel_id,
       f_beui32(fs->local_ip), f_beui16(fs->local_port),
       f_beui32(fs->remote_ip), f_beui16(fs->remote_port),
       fs->tx_avail, fs->tx_next_pos, avail, ctx->id);
@@ -1003,7 +1005,9 @@ static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
   p = network_buf_bufoff(nbh);
 
 #ifdef PL_DEBUG_TCPACK
-  fprintf(stderr, "FLOW local=%08x:%05u remote=%08x:%05u ACK: seq=%u ack=%u\n",
+  fprintf(stderr, "FLOW tunnel=%d "
+      "local=%08x:%05u remote=%08x:%05u ACK: seq=%u ack=%u\n",
+      p->gre.key,
       f_beui32(p->in_ip.dest), f_beui16(p->tcp.dest),
       f_beui32(p->in_ip.src), f_beui16(p->tcp.src), seq, ack);
 #endif
