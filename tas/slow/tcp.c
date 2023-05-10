@@ -1103,7 +1103,7 @@ static inline int send_reset(const struct pkt_gre *p,
     const struct tcp_opts *opts)
 {
   int ts_opt = 0;
-  uint32_t ts_val;
+  uint32_t ts_val = 0;
   uint64_t remote_mac = 0;
 
   if (opts->ts != NULL) {
