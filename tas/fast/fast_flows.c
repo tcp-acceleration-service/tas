@@ -36,9 +36,9 @@
 
 #define TCP_MAX_RTT 100000
 
-// #define PL_DEBUG_ARX
-// #define PL_DEBUG_ATX
-// #define PL_DEBUG_TCPPACK
+#define PL_DEBUG_ARX
+#define PL_DEBUG_ATX
+#define PL_DEBUG_TCPPACK
 
 // #define SKIP_ACK 1
 
@@ -1057,7 +1057,7 @@ static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
 
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_txack te_txack = {
-      .tunnel_id = p->gre.p->gre.key,
+      .tunnel_id = p->gre.key,
       .local_ip = f_beui32(p->in_ip.src),
       .remote_ip = f_beui32(p->in_ip.dest),
       .local_port = f_beui16(p->tcp.src),
