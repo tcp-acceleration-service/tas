@@ -149,7 +149,7 @@ static inline void inject_tcp_ts(void *buf, uint16_t len, uint32_t ts,
   struct tcp_opts opts;
 
   if (len < sizeof(*p) || f_beui16(p->eth.type) != ETH_TYPE_IP ||
-      p->in_ip.proto != IP_PROTO_TCP)
+      p->out_ip.proto != IP_PROTO_GRE || p->in_ip.proto != IP_PROTO_TCP)
   {
     return;
   }

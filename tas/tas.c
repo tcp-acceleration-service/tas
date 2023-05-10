@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
   uint32_t l_ip;
   uint32_t r_ip;
   util_parse_ipv4("192.168.10.20", &l_ip);
-  util_parse_ipv4("192.168.10.30", &r_ip);
+  util_parse_ipv4("192.168.10.40", &r_ip);
   struct flextcp_pl_tun tun = {
     .tun_id = 0,
     .local_ip = l_ip,

@@ -873,6 +873,7 @@ static void listener_packet(struct listener *l, const struct pkt_gre *p,
         f_beui32(p->in_ip.src) == f_beui32(bl_p->in_ip.src) &&
         f_beui32(p->out_ip.dest) == f_beui32(bl_p->out_ip.dest) &&
         f_beui32(p->in_ip.dest) == f_beui32(bl_p->in_ip.dest) &&
+        p->gre.key == bl_p->gre.key &&
         f_beui16(p->tcp.src) == f_beui16(bl_p->tcp.src) &&
         f_beui16(p->tcp.dest) == f_beui16(bl_p->tcp.dest))
     {
@@ -1030,7 +1031,7 @@ static inline int send_control_raw(uint64_t remote_mac,
   p->out_ip.id = t_beui16(3); /* TODO: not sure why we have 3 here */
   p->out_ip.offset = t_beui16(0);
   p->out_ip.ttl = 0xff;
-  p->out_ip.proto = IP_PROTO_TCP;
+  p->out_ip.proto = IP_PROTO_GRE;
   p->out_ip.chksum = 0;
   p->out_ip.src = t_beui32(config.ip);
   p->out_ip.dest = t_beui32(out_remote_ip);

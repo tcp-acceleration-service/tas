@@ -262,13 +262,13 @@ static void event_dump(void *buf, size_t len, uint16_t type)
       if (sizeof(*atx) == len) {
         printf("rx_bump=%u tx_bump=%u bump_seq_ent=%u bump_seq_flow=%u "
             "flags=%x "
-            "local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
+            "tunnel_id=%x local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
             "flow=%u db=%u tx_next_pos=%u tx_next_seq=%u tx_avail_prev=%u "
             "rx_next_pos=%u rx_avail=%u tx_len=%u rx_len=%u "
             "rx_remote_avail=%u tx_sent=%u",
             atx->rx_bump, atx->tx_bump, atx->bump_seq_ent, atx->bump_seq_flow,
             atx->flags,
-            atx->local_ip, atx->remote_ip, atx->local_port, atx->remote_port,
+            atx->tunnel_id, atx->local_ip, atx->remote_ip, atx->local_port, atx->remote_port,
             atx->flow_id, atx->db_id, atx->tx_next_pos, atx->tx_next_seq,
             atx->tx_avail_prev, atx->rx_next_pos, atx->rx_avail, atx->tx_len,
             atx->rx_len, atx->rx_remote_avail, atx->tx_sent);
@@ -281,9 +281,9 @@ static void event_dump(void *buf, size_t len, uint16_t type)
       printf("FLEXTCP_EV_ARX ");
       if (sizeof(*arx) == len) {
         printf("opaque=%lx rx_bump=%u rx_pos=%u tx_bump=%u flags=%x flow=%u "
-            "db=%u local_ip=%x remote_ip=%x local_port=%u remote_port=%u",
+            "db=%u tunnel_id=%x local_ip=%x remote_ip=%x local_port=%u remote_port=%u",
             arx->opaque, arx->rx_bump, arx->rx_pos, arx->tx_bump, arx->flags,
-            arx->flow_id, arx->db_id, arx->local_ip, arx->remote_ip,
+            arx->flow_id, arx->db_id, arx->tunnel_id, arx->local_ip, arx->remote_ip,
             arx->local_port, arx->remote_port);
       } else {
         printf("unexpected event length");
@@ -293,11 +293,11 @@ static void event_dump(void *buf, size_t len, uint16_t type)
     case FLEXNIC_PL_TREV_RXFS:
       printf("FLEXTCP_EV_RXFS ");
       if (sizeof(*rxfs) == len) {
-        printf("local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
+        printf("tunnel_id=%x local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
             "flow_id=%u flow={seq=%u ack=%u flags=%x len=%u} fs={rx_nextpos=%u "
             " rx_nextseq=%u rx_avail=%u  tx_nextpos=%u tx_nextseq=%u "
             "tx_sent=%u tx_avail=%u payload={",
-            rxfs->local_ip, rxfs->remote_ip, rxfs->local_port,
+            rxfs->tunnel_id, rxfs->local_ip, rxfs->remote_ip, rxfs->local_port,
             rxfs->remote_port, rxfs->flow_id, rxfs->flow_seq, rxfs->flow_ack,
             rxfs->flow_flags, rxfs->flow_len, rxfs->fs_rx_nextpos,
             rxfs->fs_rx_nextseq,
@@ -351,9 +351,9 @@ static void event_dump(void *buf, size_t len, uint16_t type)
     case FLEXNIC_PL_TREV_TXACK:
       printf("FLEXTCP_EV_TXACK ");
       if (sizeof(*txack) == len) {
-        printf("local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
+        printf("tunnel_id=%x local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
             "flow_seq=%u flow_ack=%u flow_flags=%x",
-            txack->local_ip, txack->remote_ip, txack->local_port,
+            txack->tunnel_id, txack->local_ip, txack->remote_ip, txack->local_port,
             txack->remote_port, txack->flow_seq, txack->flow_ack,
             txack->flow_flags);
       } else {
@@ -364,9 +364,9 @@ static void event_dump(void *buf, size_t len, uint16_t type)
     case FLEXNIC_PL_TREV_TXSEG:
       printf("FLEXTCP_EV_TXSEG ");
       if (sizeof(*txseg) == len) {
-        printf("local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
+        printf("tunnel_id=%x local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
             "flow_seq=%u flow_ack=%u flow_flags=%x flow_len=%u",
-            txseg->local_ip, txseg->remote_ip, txseg->local_port,
+            txseg->tunnel_id, txseg->local_ip, txseg->remote_ip, txseg->local_port,
             txseg->remote_port, txseg->flow_seq, txseg->flow_ack,
             txseg->flow_flags, txseg->flow_len);
       } else {
@@ -385,12 +385,14 @@ static void packet_dump(void *buf, size_t len)
 {
   struct eth_hdr *eth = buf;
   struct arp_hdr *arp = (struct arp_hdr *) (eth + 1);
-  struct ip_hdr *ip = (struct ip_hdr *) (eth + 1);
-  struct tcp_hdr *tcp = (struct tcp_hdr *) (ip + 1);
+  struct ip_hdr *in_ip = (struct ip_hdr *) (eth + 1);
+  struct gre_hdr *gre = (struct gre_hdr *) (in_ip + 1);
+  struct ip_hdr *out_ip = (struct ip_hdr *) (gre + 1);
+  struct tcp_hdr *tcp = (struct tcp_hdr *) (out_ip + 1);
   uint8_t *payload = (uint8_t *)(tcp + 1);
 
   uint64_t sm, dm;
-  uint16_t et, iplen, tcplen;
+  uint16_t et, out_iplen, tcplen;
 
   if (len < sizeof(*eth)) {
     printf("ill formated (short) Ethernet packet");
@@ -404,37 +406,61 @@ static void packet_dump(void *buf, size_t len)
   printf("eth={src=%"PRIx64" dst=%"PRIx64" type=%x}", sm, dm, et);
 
   if (et == ETH_TYPE_IP) {
-    if (len < sizeof(*eth) + sizeof(*ip)) {
-      printf(" ill formated (short) IPv4 packet");
+    if (len < sizeof(*eth) + sizeof(*out_ip)) {
+      printf(" ill formated (short) outer IPv4 packet");
       return;
     }
 
-    printf(" ip={src=%x dst=%x proto=%x}", f_beui32(ip->src),
-        f_beui32(ip->dest), ip->proto);
-    iplen = f_beui16(ip->len) - sizeof(*ip);
+    printf(" ip={out_src=%x out_dst=%x proto=%x}", f_beui32(out_ip->src),
+        f_beui32(out_ip->dest), out_ip->proto);
+    out_iplen = f_beui16(out_ip->len) - sizeof(*out_ip);
 
-    if (ip->proto == IP_PROTO_TCP) {
-      if (len < sizeof(*eth) + sizeof(*ip) + sizeof(*tcp)) {
-        printf(" ill formated (short) TCP packet");
+    if (out_ip->proto == IP_PROTO_GRE) {
+      if (len < sizeof(*eth) + sizeof(*out_ip) + sizeof(*gre)) {
+        printf(" ill formated (short) GRE packet");
         return;
       }
-      tcplen = iplen - sizeof(*tcp) - (TCPH_HDRLEN(tcp) - 5) * 4;
-      printf(" tcp={src=%u dst=%u flags=%x seq=%u ack=%u wnd=%u len=%u}",
-          f_beui16(tcp->src), f_beui16(tcp->dest), TCPH_FLAGS(tcp),
-          f_beui32(tcp->seqno), f_beui32(tcp->ackno), f_beui16(tcp->wnd),
-          tcplen);
 
-      printf(" payload={");
-      for(int i = 0; i < tcplen; i++) {
-	if(i % 16 == 0) {
-	  printf("\n%08X  ", i);
-	}
-	if(i % 4 == 0) {
-	  printf(" ");
-	}
-	printf("%02X ", payload[i]);
+      printf(" gre={key=%x proto=%x}", gre->key, gre->proto);
+
+      if (gre->proto == GRE_PROTO_IP) {
+        if (len < sizeof(*eth) + sizeof(*out_ip) + 
+            sizeof(*gre) + sizeof(*in_ip))
+        {
+          printf(" ill formated (short) inner IPv4 packet");
+          return;
+        }
+
+        printf(" ip={in_src=%x in_dst=%x proto=%x}", f_beui32(in_ip->src),
+        f_beui32(in_ip->dest), in_ip->proto);
+        
+        if (out_ip->proto == IP_PROTO_TCP) {
+          if (len < sizeof(*eth) + sizeof(*out_ip) + 
+              sizeof(*gre) + sizeof(*in_ip) + sizeof(*tcp)) {
+            printf(" ill formated (short) TCP packet");
+            return;
+          }
+          tcplen = out_iplen - sizeof(*tcp) - (TCPH_HDRLEN(tcp) - 5) * 4;
+          printf(" tcp={src=%u dst=%u flags=%x seq=%u ack=%u wnd=%u len=%u}",
+              f_beui16(tcp->src), f_beui16(tcp->dest), TCPH_FLAGS(tcp),
+              f_beui32(tcp->seqno), f_beui32(tcp->ackno), f_beui16(tcp->wnd),
+              tcplen);
+
+          printf(" payload={");
+          for(int i = 0; i < tcplen; i++) {
+            if(i % 16 == 0) {
+              printf("\n%08X  ", i);
+            }
+            if(i % 4 == 0) {
+              printf(" ");
+            }
+            printf("%02X ", payload[i]);
+          }
+          printf("}");
       }
-      printf("}");
+      
+      }
+
     }
   } else if (et == ETH_TYPE_ARP) {
     memcpy(&sm, &arp->sha, ETH_ADDR_LEN);

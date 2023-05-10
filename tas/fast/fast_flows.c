@@ -249,7 +249,7 @@ void fast_flows_packet_parse(struct dataplane_context *ctx,
     int cond =
         (len < sizeof(*p)) |
         (f_beui16(p->eth.type) != ETH_TYPE_IP) |
-        (p->out_ip.proto != IP_PROTO_TCP) |
+        (p->out_ip.proto != IP_PROTO_GRE) |
         (p->in_ip.proto != IP_PROTO_TCP) |
         (p->gre.proto != GRE_PROTO_IP) |
         (IPH_V(&p->out_ip) != 4) |
@@ -308,9 +308,10 @@ int fast_flows_packet(struct dataplane_context *ctx,
   orig_payload = payload_bytes;
 
 #ifdef PL_DEBUG_ARX
-  fprintf(stderr, "FLOW local=%08x:%05u remote=%08x:%05u  RX: seq=%u ack=%u "
+  fprintf(stderr, "FLOW tunnel=%x "
+      "local=%08x:%05u remote=%08x:%05u  RX: seq=%u ack=%u "
       "flags=%x payload=%u\n",
-      f_beui32(p->in_ip.dest), f_beui16(p->tcp.dest),
+      p->gre.key, f_beui32(p->in_ip.dest), f_beui16(p->tcp.dest),
       f_beui32(p->in_ip.src), f_beui16(p->tcp.src), f_beui32(p->tcp.seqno),
       f_beui32(p->tcp.ackno), TCPH_FLAGS(&p->tcp), payload_bytes);
 #endif
@@ -319,6 +320,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
 
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_rxfs te_rxfs = {
+      .tunnel_id = p->gre.key,
       .local_ip = f_beui32(p->in_ip.dest),
       .remote_ip = f_beui32(p->in_ip.src),
       .local_port = f_beui16(p->tcp.dest),
@@ -342,10 +344,11 @@ int fast_flows_packet(struct dataplane_context *ctx,
 #endif
 
 #ifdef PL_DEBUG_ARX
-  fprintf(stderr, "FLOW local=%08x:%05u remote=%08x:%05u  ST: op=%"PRIx64
+  fprintf(stderr, "FLOW tunnel=%x" 
+      " local=%08x:%05u remote=%08x:%05u  ST: op=%"PRIx64
       " rx_pos=%x rx_next_seq=%u rx_avail=%x  tx_pos=%x tx_next_seq=%u"
       " tx_sent=%u\n",
-      f_beui32(p->in_ip.dest), f_beui16(p->tcp.dest),
+      p->gre.key, f_beui32(p->in_ip.dest), f_beui16(p->tcp.dest),
       f_beui32(p->in_ip.src), f_beui16(p->tcp.src), fs->opaque, fs->rx_next_pos,
       fs->rx_next_seq, fs->rx_avail, fs->tx_next_pos, fs->tx_next_seq,
       fs->tx_sent);
@@ -615,6 +618,7 @@ unlock:
         .flow_id = flow_id,
         .db_id = fs->db_id,
 
+        .tunnel_id = p->gre.key,
         .local_ip = f_beui32(p->in_ip.dest),
         .remote_ip = f_beui32(p->in_ip.src),
         .local_port = f_beui16(p->tcp.dest),
@@ -676,6 +680,7 @@ int fast_flows_bump(struct dataplane_context *ctx, uint32_t flow_id,
       .bump_seq_flow = fs->bump_seq,
       .flags = flags,
 
+      .tunnel_id = fs->tunnel_id,
       .local_ip = f_beui32(fs->local_ip),
       .remote_ip = f_beui32(fs->remote_ip),
       .local_port = f_beui16(fs->local_port),
@@ -910,7 +915,7 @@ static void flow_tx_segment(struct dataplane_context *ctx,
   p->out_ip.id = t_beui16(3); /* TODO: not sure why we have 3 here */
   p->out_ip.offset = t_beui16(0);
   p->out_ip.ttl = 0xff;
-  p->out_ip.proto = IP_PROTO_TCP;
+  p->out_ip.proto = IP_PROTO_GRE;
   p->out_ip.chksum = 0;
   p->out_ip.src = fs->local_ip;
   p->out_ip.dest = fs->remote_ip;
@@ -967,6 +972,7 @@ static void flow_tx_segment(struct dataplane_context *ctx,
 
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_txseg te_txseg = {
+      .tunnel_id = p->gre.key,
       .local_ip = f_beui32(p->in_ip.src),
       .remote_ip = f_beui32(p->in_ip.dest),
       .local_port = f_beui16(p->tcp.src),
@@ -1047,6 +1053,7 @@ static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
 
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_txack te_txack = {
+      .tunnel_id = p->gre.p->gre.key,
       .local_ip = f_beui32(p->in_ip.src),
       .remote_ip = f_beui32(p->in_ip.dest),
       .local_port = f_beui16(p->tcp.src),

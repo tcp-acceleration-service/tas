@@ -68,7 +68,8 @@ struct eth_hdr {
 #define IP_PROTO_UDP     17
 #define IP_PROTO_UDPLITE 136
 #define IP_PROTO_TCP     6
-#define IP_PROTO_DCCP	 33
+#define IP_PROTO_DCCP	   33
+#define IP_PROTO_GRE     47
 
 #define IP_ECN_NONE      0x0
 #define IP_ECN_ECT0      0x2

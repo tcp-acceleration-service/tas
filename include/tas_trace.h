@@ -93,6 +93,7 @@ struct flextcp_pl_trev_atx {
   uint32_t bump_seq_ent;
   uint32_t flags;
 
+  uint32_t tunnel_id;
   uint32_t local_ip;
   uint32_t remote_ip;
   uint16_t local_port;
@@ -124,6 +125,7 @@ struct flextcp_pl_trev_arx {
   uint32_t flow_id;
   uint32_t db_id;
 
+  uint32_t tunnel_id;
   uint32_t local_ip;
   uint32_t remote_ip;
   uint16_t local_port;
@@ -132,6 +134,7 @@ struct flextcp_pl_trev_arx {
 
 /** tcp flow state on receive */
 struct flextcp_pl_trev_rxfs {
+  uint32_t tunnel_id;
   uint32_t local_ip;
   uint32_t remote_ip;
   uint16_t local_port;
@@ -154,6 +157,7 @@ struct flextcp_pl_trev_rxfs {
 
 /** tcp ack sent out */
 struct flextcp_pl_trev_txack {
+  uint32_t tunnel_id;
   uint32_t local_ip;
   uint32_t remote_ip;
   uint16_t local_port;
@@ -166,6 +170,7 @@ struct flextcp_pl_trev_txack {
 
 /* tcp segment sent out */
 struct flextcp_pl_trev_txseg {
+  uint32_t tunnel_id;
   uint32_t local_ip;
   uint32_t remote_ip;
   uint16_t local_port;

@@ -531,6 +531,8 @@ static inline int rxq_poll(void)
   return ret;
 }
 
+/* TODO: Will probably need to modify this to get gre packets to work
+   with kni */
 static inline void process_packet(const void *buf, uint16_t len,
     uint32_t fn_core, uint16_t flow_group)
 {
