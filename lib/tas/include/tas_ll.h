@@ -119,6 +119,7 @@ struct flextcp_connection {
   /** pending tx bump to fast path */
   uint32_t txb_bump;
 
+  uint32_t tunnel_id;
   uint32_t local_ip;
   uint32_t remote_ip;
   uint16_t local_port;
@@ -177,6 +178,7 @@ struct flextcp_event {
     } listen_open;
     /** For #FLEXTCP_EV_LISTEN_NEWCONN */
     struct {
+      uint32_t tunnel_id;
       uint16_t remote_port;
       uint32_t remote_ip;
       struct flextcp_listener *listener;

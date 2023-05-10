@@ -182,6 +182,7 @@ STATIC_ASSERT(sizeof(struct flextcp_pl_atx) == 16, atx_size);
 /******************************************************************************/
 /* Internal flexnic memory */
 
+#define FLEXNIC_PL_TUN_NUM         10
 #define FLEXNIC_PL_VMST_NUM         2
 #define FLEXNIC_PL_APPST_NUM        8
 #define FLEXNIC_PL_APPST_CTX_NUM   31
@@ -231,6 +232,14 @@ struct flextcp_pl_appctx {
 #define FLEXNIC_PL_FLOWST_TXFIN 16
 #define FLEXNIC_PL_FLOWST_RXFIN 32
 #define FLEXNIC_PL_FLOWST_RX_MASK (~63ULL)
+
+/** Tunnel entry */
+struct flextcp_pl_tun {
+  uint32_t tun_id;
+  uint32_t local_ip;
+  uint32_t remote_ip;
+} __attribute__((packed));
+
 
 /** Flow state registers */
 struct flextcp_pl_flowst {
@@ -353,6 +362,9 @@ struct flextcp_pl_mem {
 
   /* flow lookup table */
   struct flextcp_pl_flowhte flowht[FLEXNIC_PL_FLOWHT_ENTRIES];
+
+  /* tunnel entry lookup table */
+  struct flextcp_pl_tun tunt[FLEXNIC_PL_TUN_NUM];
 
   /* registers for kernel queues */
   struct flextcp_pl_appctx kctx[FLEXNIC_PL_APPST_CTX_MCS];

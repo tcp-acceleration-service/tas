@@ -563,6 +563,7 @@ static inline int event_kappin_conn_opened(
   conn->seq_rx = inev->seq_rx;
   conn->seq_tx = inev->seq_tx;
   conn->flow_id = inev->flow_id;
+  conn->tunnel_id = inev->tunnel_id;
   conn->fn_core = inev->fn_core;
 
   conn->rxb_base = (uint8_t *) flexnic_mem + inev->rx_off;
@@ -600,6 +601,7 @@ static inline void event_kappin_listen_newconn(
   listener = OPAQUE_PTR(inev->opaque);
 
   outev->event_type = FLEXTCP_EV_LISTEN_NEWCONN;
+  outev->ev.listen_newconn.tunnel_id = inev->tunnel_id;
   outev->ev.listen_newconn.remote_ip = inev->remote_ip;
   outev->ev.listen_newconn.remote_port = inev->remote_port;
   outev->ev.listen_open.listener = listener;
@@ -636,6 +638,7 @@ static inline int event_kappin_accept_conn(
   conn->seq_rx = inev->seq_rx;
   conn->seq_tx = inev->seq_tx;
   conn->flow_id = inev->flow_id;
+  conn->tunnel_id = inev->tunnel_id;
   conn->fn_core = inev->fn_core;
 
   conn->rxb_base = (uint8_t *) flexnic_mem + inev->rx_off;

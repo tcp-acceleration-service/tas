@@ -92,6 +92,18 @@ int main(int argc, char *argv[])
     goto error_exit;
   }
 
+  // TODO: Keep this hardcoded for now, but move it to control path
+  uint32_t l_ip;
+  uint32_t r_ip;
+  util_parse_ipv4("192.168.10.20", &l_ip);
+  util_parse_ipv4("192.168.10.30", &r_ip);
+  struct flextcp_pl_tun tun = {
+    .tun_id = 0,
+    .local_ip = l_ip,
+    .remote_ip = r_ip 
+  };
+  fp_state->tunt[0] = tun;
+
   /* initialize dpdk */
   rte_log_set_global_level(RTE_LOG_ERR);
   if (rte_eal_init(config.dpdk_argc, config.dpdk_argv) < 0) {

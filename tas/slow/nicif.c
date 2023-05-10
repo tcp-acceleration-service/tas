@@ -174,7 +174,7 @@ int nicif_appctx_add(uint16_t vmid, uint16_t appid, uint32_t db,
 
 /** Register flow */
 int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
-    uint64_t mac_remote, uint32_t ip_local, uint16_t port_local,
+    uint32_t tunnel_id, uint64_t mac_remote, uint32_t ip_local, uint16_t port_local,
     uint32_t ip_remote, uint16_t port_remote, uint64_t rx_base, uint32_t rx_len, 
     uint64_t tx_base, uint32_t tx_len, uint32_t remote_seq, uint32_t local_seq, 
     uint64_t app_opaque, uint32_t flags, uint32_t rate, uint32_t fn_core, 
@@ -216,6 +216,7 @@ int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
   fs->db_id = db;
   fs->app_id = app_id;
   fs->vm_id = vm_id;
+  fs->tunnel_id = tunnel_id;
 
   fs->local_ip = lip;
   fs->remote_ip = rip;

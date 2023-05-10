@@ -85,6 +85,7 @@ struct kernel_appout_conn_close {
   uint64_t opaque;
   uint32_t remote_ip;
   uint32_t local_ip;
+  uint32_t tunnel_id;
   uint16_t remote_port;
   uint16_t local_port;
   uint32_t flags;
@@ -95,6 +96,7 @@ struct kernel_appout_conn_move {
   uint64_t opaque;
   uint32_t remote_ip;
   uint32_t local_ip;
+  uint32_t tunnel_id;
   uint16_t remote_port;
   uint16_t local_port;
   uint16_t db_id;
@@ -180,6 +182,7 @@ struct kernel_appin_conn_opened {
   uint32_t seq_rx;
   uint32_t seq_tx;
   uint32_t flow_id;
+  uint32_t tunnel_id;
   uint32_t local_ip;
   uint16_t local_port;
   uint16_t fn_core;
@@ -188,6 +191,7 @@ struct kernel_appin_conn_opened {
 /** New connection on listener received */
 struct kernel_appin_listen_newconn {
   uint64_t opaque;
+  uint32_t tunnel_id;
   uint32_t remote_ip;
   uint16_t remote_port;
 } __attribute__((packed));
@@ -203,6 +207,7 @@ struct kernel_appin_accept_conn {
   uint32_t seq_rx;
   uint32_t seq_tx;
   uint32_t flow_id;
+  uint32_t tunnel_id;
   uint32_t local_ip;
   uint32_t remote_ip;
   uint16_t remote_port;
@@ -216,11 +221,11 @@ struct kernel_appin {
     struct kernel_appin_conn_opened     conn_opened;
     struct kernel_appin_listen_newconn  listen_newconn;
     struct kernel_appin_accept_conn     accept_connection;
-    uint8_t raw[63];
+    uint8_t raw[64];
   } __attribute__((packed)) data;
   uint8_t type;
 } __attribute__((packed));
 
-STATIC_ASSERT(sizeof(struct kernel_appin) == 64, kernel_appin_size);
+STATIC_ASSERT(sizeof(struct kernel_appin) == 65, kernel_appin_size);
 
 #endif /* ndef KERNEL_APPIF_H_ */

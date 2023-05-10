@@ -579,7 +579,7 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_gre *p,
   c->comp.status = 0;
 
   if (nicif_connection_add(c->db_id, c->ctx->app->vm_id, c->ctx->app->id,
-        c->remote_mac, c->local_ip, c->local_port,
+        c->tunnel_id, c->remote_mac, c->local_ip, c->local_port,
         c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) vm_shm[vmid],
         c->rx_len, c->tx_buf - (uint8_t *) vm_shm[vmid], c->tx_len,
         c->remote_seq, c->local_seq, c->opaque, c->flags, c->cc_rate,
@@ -731,7 +731,7 @@ static struct connection *conn_lookup(const struct pkt_gre *p)
 
   for (c = tcp_hashtable[h]; c != NULL; c = c->ht_next) {
     if (f_beui32(p->in_ip.src) == c->remote_ip &&
-        p->gre.key == c->tunnel_id,
+        p->gre.key == c->tunnel_id &&
         f_beui16(p->tcp.dest) == c->local_port &&
         f_beui16(p->tcp.src) == c->remote_port)
     {
@@ -830,7 +830,7 @@ static struct listener *listener_lookup(const struct pkt_gre *p)
 
     init_hash = hash_64_to_32(((uint64_t) f_beui32(p->in_ip.src) << 32) | 
         p->gre.key);
-    hash = hash_64_to_32((init_hash << 32) |
+    hash = hash_64_to_32(((uint64_t) init_hash << 32) |
         ((uint32_t) f_beui16(p->tcp.src) << 16) | local_port);
     return lm->ls[hash % lm->num];
   } else {
@@ -937,10 +937,9 @@ static void listener_accept(struct listener *l)
   c->flow_group = flow_group;
   c->remote_mac = 0;
   memcpy(&c->remote_mac, &p->eth.src, ETH_ADDR_LEN);
-  c->out_remote_ip = f_beui32(p->out_ip.src);
-  c->in_remote_ip = f_beui32(p->in_ip.src);
-  c->in_local_ip = config.ip; // TODO: get this from control plane
-  c->out_local_ip = config.ip;
+  c->tunnel_id = p->gre.key;
+  c->remote_ip = f_beui32(p->out_ip.src);
+  c->local_ip = config.ip;
   c->remote_port = f_beui16(p->tcp.src);
   c->local_port = l->port;
 
@@ -965,7 +964,7 @@ static void listener_accept(struct listener *l)
   vmid = c->ctx->app->vm_id;
 
   if (nicif_connection_add(c->db_id, c->ctx->app->vm_id, c->ctx->app->id,
-        c->remote_mac, c->local_ip, c->local_port,
+        c->tunnel_id, c->remote_mac, c->local_ip, c->local_port,
         c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) vm_shm[vmid],
         c->rx_len, c->tx_buf - (uint8_t *) vm_shm[vmid], c->tx_len,
         c->remote_seq, c->local_seq + 1, c->opaque, c->flags, c->cc_rate,
@@ -992,12 +991,12 @@ out:
 }
 
 static inline int send_control_raw(uint64_t remote_mac, 
-    uint32_t in_remote_ip, uint32_t out_remote_ip,
+    uint32_t tunnel_id, uint32_t out_remote_ip,
     uint16_t remote_port, uint16_t local_port, uint32_t local_seq,
     uint32_t remote_seq, uint16_t flags, int ts_opt, uint32_t ts_echo,
     uint16_t mss_opt)
 {
-  uint32_t new_tail, hdcoded_ip;
+  uint32_t new_tail;
   struct pkt_gre *p;
   struct tcp_mss_opt *opt_mss;
   struct tcp_timestamp_opt *opt_ts;
@@ -1038,9 +1037,7 @@ static inline int send_control_raw(uint64_t remote_mac,
 
   GREH_CKSV_SET(&p->gre, 0, 1, 0, 0);
   p->gre.proto = GRE_PROTO_IP;
-  // TODO: Hardcode tunnel as 0 for now but should set 
-  // it up in the control plane.
-  p->gre.key = 0;
+  p->gre.key = tunnel_id;
 
   /* fill inner ipv4 header */
   IPH_VHL_SET(&p->in_ip, 4, 5);
@@ -1051,10 +1048,8 @@ static inline int send_control_raw(uint64_t remote_mac,
   p->in_ip.ttl = 0xff;
   p->in_ip.proto = IP_PROTO_TCP;
   p->in_ip.chksum = 0;
-  // TODO: Have this IP hardcoded for now but set it up in the control plane
-  util_parse_ipv4("192.168.10.20", &hdcoded_ip);
-  p->in_ip.src = t_beui32(hdcoded_ip);
-  p->in_ip.dest = t_beui32(out_remote_ip);
+  p->in_ip.src = t_beui32(fp_state->tunt[p->gre.key].local_ip);
+  p->in_ip.dest = t_beui32(fp_state->tunt[p->gre.key].remote_ip);
 
   /* fill tcp header */
   p->tcp.src = t_beui16(local_port);
@@ -1098,7 +1093,7 @@ static inline int send_control(const struct connection *conn, uint16_t flags,
     int ts_opt, uint32_t ts_echo, uint16_t mss_opt)
 {
   return send_control_raw(conn->remote_mac, 
-      conn->in_remote_ip, conn->out_remote_ip, conn->remote_port,
+      conn->tunnel_id, conn->remote_ip, conn->remote_port,
       conn->local_port, conn->local_seq, conn->remote_seq, flags, ts_opt,
       ts_echo, mss_opt);
 }
@@ -1117,7 +1112,7 @@ static inline int send_reset(const struct pkt_gre *p,
 
   memcpy(&remote_mac, &p->eth.src, ETH_ADDR_LEN);
   return send_control_raw(remote_mac, 
-      f_beui32(p->in_ip.src), f_beui32(p->out_ip.src),
+      p->gre.key, f_beui32(p->out_ip.src),
       f_beui16(p->tcp.src), f_beui16(p->tcp.dest), 
       f_beui32(p->tcp.ackno), f_beui32(p->tcp.seqno) + 1,
       TCP_RST | TCP_ACK, ts_opt, ts_val, 0);

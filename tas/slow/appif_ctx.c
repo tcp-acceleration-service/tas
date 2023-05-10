@@ -195,6 +195,7 @@ void appif_accept_conn(struct connection *c, int status)
 
     kout->data.accept_connection.seq_rx = c->remote_seq;
     kout->data.accept_connection.seq_tx = c->local_seq;
+    kout->data.accept_connection.tunnel_id = c->tunnel_id;
     kout->data.accept_connection.local_ip = config.ip;
     kout->data.accept_connection.remote_ip = c->remote_ip;
     kout->data.accept_connection.remote_port = c->remote_port;
@@ -337,6 +338,7 @@ static int kin_conn_move(struct application *app, struct app_context *ctx,
   for (conn = app->conns; conn != NULL; conn = conn->app_next) {
     if (conn->local_ip == kin->data.conn_move.local_ip &&
         conn->remote_ip == kin->data.conn_move.remote_ip &&
+        conn->tunnel_id == kin->data.conn_move.tunnel_id &&
         conn->local_port == kin->data.conn_move.local_port &&
         conn->remote_port == kin->data.conn_move.remote_port &&
         conn->opaque == kin->data.conn_move.opaque)
@@ -392,6 +394,7 @@ static int kin_conn_close(struct application *app, struct app_context *ctx,
 
   for (conn = app->conns; conn != NULL; conn = conn->app_next) {
     if (conn->local_ip == kin->data.conn_close.local_ip &&
+        conn->tunnel_id == kin->data.conn_close.tunnel_id &&
         conn->remote_ip == kin->data.conn_close.remote_ip &&
         conn->local_port == kin->data.conn_close.local_port &&
         conn->remote_port == kin->data.conn_close.remote_port &&

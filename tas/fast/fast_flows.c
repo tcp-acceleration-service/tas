@@ -890,7 +890,6 @@ static void flow_tx_segment(struct dataplane_context *ctx,
     uint32_t seq, uint32_t ack, uint32_t rxwnd, uint16_t payload,
     uint32_t payload_pos, uint32_t ts_echo, uint32_t ts_my, uint8_t fin)
 {
-  uint32_t hdcoded_ip;
   uint16_t hdrs_len, optlen, fin_fl;
   struct pkt_gre *p = network_buf_buf(nbh);
   struct tcp_timestamp_opt *opt_ts;
@@ -914,7 +913,6 @@ static void flow_tx_segment(struct dataplane_context *ctx,
   p->out_ip.proto = IP_PROTO_TCP;
   p->out_ip.chksum = 0;
   p->out_ip.src = fs->local_ip;
-  p->out_ip.src = fs->local_ip;
   p->out_ip.dest = fs->remote_ip;
 
   /* mark as ECN capable if flow marked so */
@@ -937,10 +935,8 @@ static void flow_tx_segment(struct dataplane_context *ctx,
   p->in_ip.ttl = 0xff;
   p->in_ip.proto = IP_PROTO_TCP;
   p->in_ip.chksum = 0;
-  // TODO: Have this IP hardcoded for now but set it up in the control plane
-  util_parse_ipv4("192.168.10.20", &hdcoded_ip);
-  p->in_ip.src = t_beui32(hdcoded_ip);
-  p->in_ip.dest = fs->remote_ip;
+  p->in_ip.src = t_beui32(fp_state->tunt[p->gre.key].local_ip);
+  p->in_ip.dest = t_beui32(fp_state->tunt[p->gre.key].remote_ip);
 
   fin_fl = (fin ? TCP_FIN : 0);
 
