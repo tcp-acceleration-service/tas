@@ -106,6 +106,7 @@ static struct trace *trace_connect(unsigned id)
 
   if ((fd = shm_open(name, O_RDONLY, 0)) == -1) {
     free(t);
+    perror("trace_connect: shm_open failed");
     return NULL;
   }
 

@@ -235,9 +235,16 @@ struct flextcp_pl_appctx {
 
 /** Tunnel entry */
 struct flextcp_pl_tun {
+  /** Tunnel ID */
   uint32_t tun_id;
+  /** IP of local VM */
   uint32_t local_ip;
+  /** IP of remote VM */
   uint32_t remote_ip;
+  /** IP in local end of the tunnel */
+  uint32_t local_tunip;
+  /** IP in remote enf of the tunnel */
+  uint32_t remote_tunip;
 } __attribute__((packed));
 
 

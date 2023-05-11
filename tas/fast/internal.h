@@ -33,7 +33,7 @@
 
 #define BUFFER_SIZE 2048
 
-// #define FLEXNIC_TRACING
+#define FLEXNIC_TRACING
 #ifdef FLEXNIC_TRACING
 #   include <tas_trace.h>
 #   define FLEXNIC_TRACE_RX

@@ -171,6 +171,7 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
   conn->ctx = ctx;
   conn->opaque = opaque;
   conn->status = CONN_ARP_PENDING;
+  //
   conn->remote_ip = remote_ip;
   conn->local_ip = config.ip;
   conn->remote_port = remote_port;
