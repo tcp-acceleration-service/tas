@@ -138,7 +138,7 @@ void fast_kernel_packet(struct dataplane_context *ctx,
 
   /* krx queue header */
   krx->type = FLEXTCP_PL_KRX_PACKET;
-  /* vmid is 0 because mem group 0 is used by the kernel */
+  
   notify_slowpath_core();
 }
 

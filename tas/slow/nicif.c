@@ -40,12 +40,14 @@
 
 #define PKTBUF_SIZE 1536
 
-struct nic_buffer {
+struct nic_buffer
+{
   uint64_t addr;
   void *buf;
 };
 
-struct flow_id_item {
+struct flow_id_item
+{
   uint32_t flow_id;
   struct flow_id_item *next;
 };
@@ -58,10 +60,10 @@ static inline void process_packet(const void *buf, uint16_t len,
 static inline volatile struct flextcp_pl_ktx *ktx_try_alloc(uint32_t core,
     struct nic_buffer **buf, uint32_t *new_tail);
 static inline uint32_t flow_hash(ip_addr_t lip, beui16_t lp,
-    ip_addr_t rip, beui16_t rp);
+    ip_addr_t rip, beui16_t rp, uint32_t tid);
 static inline int flow_slot_alloc(uint32_t h, uint32_t *i, uint32_t *d);
 static inline int flow_slot_clear(uint32_t f_id, ip_addr_t lip, beui16_t lp,
-    ip_addr_t rip, beui16_t rp);
+    ip_addr_t rip, beui16_t rp, uint32_t tunnel_id);
 static void flow_id_alloc_init(void);
 static int flow_id_alloc(uint32_t *fid);
 static void flow_id_free(uint32_t flow_id);
@@ -87,12 +89,14 @@ int nicif_init(void)
   rte_hash_crc_init_alg();
 
   /* wait for fastpath to be ready */
-  while (!(tas_info->flags & FLEXNIC_FLAG_READY));
+  while (!(tas_info->flags & FLEXNIC_FLAG_READY))
+    ;
 
   fn_cores = tas_info->cores_num;
 
   /* prepare packet memory manager */
-  if (packetmem_init()) {
+  if (packetmem_init())
+  {
     fprintf(stderr, "nicif_init: pktmem_init failed\n");
     return -1;
   }
@@ -100,7 +104,8 @@ int nicif_init(void)
   /* prepare flow_id allocator */
   flow_id_alloc_init();
 
-  if (adminq_init()) {
+  if (adminq_init())
+  {
     fprintf(stderr, "nicif_init: initializing admin queue failed\n");
     return -1;
   }
@@ -110,10 +115,11 @@ int nicif_init(void)
 
 unsigned nicif_poll(void)
 {
-  unsigned i, ret = 0/*, nonsuc = 0*/;
+  unsigned i, ret = 0 /*, nonsuc = 0*/;
   int x;
 
-  for (i = 0; i < 512; i++) {
+  for (i = 0; i < 512; i++)
+  {
     x = rxq_poll();
     /*if (x == -1 && ++nonsuc > 2 * fn_cores)
       break;
@@ -128,26 +134,28 @@ unsigned nicif_poll(void)
 
 /** Register application context */
 int nicif_appctx_add(uint16_t vmid, uint16_t appid, uint32_t db,
-    uint64_t *rxq_base,  uint32_t rxq_len, 
-    uint64_t *txq_base, uint32_t txq_len, int evfd)
+                     uint64_t *rxq_base, uint32_t rxq_len,
+                     uint64_t *txq_base, uint32_t txq_len, int evfd)
 {
   struct flextcp_pl_appctx *actx;
   struct flextcp_pl_appst *ast = &fp_state->appst[appid];
   uint16_t i;
 
-  if (appid >= FLEXNIC_PL_APPST_NUM) {
+  if (appid >= FLEXNIC_PL_APPST_NUM)
+  {
     fprintf(stderr, "nicif_appctx_add: app id too high (%u, max=%u)\n", appid,
-        FLEXNIC_PL_APPST_NUM);
+            FLEXNIC_PL_APPST_NUM);
     return -1;
   }
 
-  if (ast->ctx_num + 1 >= FLEXNIC_PL_APPST_CTX_NUM) {
+  if (ast->ctx_num + 1 >= FLEXNIC_PL_APPST_CTX_NUM)
+  {
     fprintf(stderr, "nicif_appctx_add: too many contexts in app\n");
     return -1;
-
   }
 
-  for (i = 0; i < tas_info->cores_num; i++) {
+  for (i = 0; i < tas_info->cores_num; i++)
+  {
     actx = &fp_state->appctx[i][vmid][db];
     actx->vm_id = vmid;
     actx->rx_base = rxq_base[i];
@@ -158,7 +166,8 @@ int nicif_appctx_add(uint16_t vmid, uint16_t appid, uint32_t db,
 
   MEM_BARRIER();
 
-  for (i = 0; i < tas_info->cores_num; i++) {
+  for (i = 0; i < tas_info->cores_num; i++)
+  {
     actx = &fp_state->appctx[i][vmid][db];
     actx->tx_len = txq_len;
     actx->rx_len = rxq_len;
@@ -174,11 +183,11 @@ int nicif_appctx_add(uint16_t vmid, uint16_t appid, uint32_t db,
 
 /** Register flow */
 int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
-    uint32_t tunnel_id, uint64_t mac_remote, uint32_t ip_local, uint16_t port_local,
-    uint32_t ip_remote, uint16_t port_remote, uint64_t rx_base, uint32_t rx_len, 
-    uint64_t tx_base, uint32_t tx_len, uint32_t remote_seq, uint32_t local_seq, 
-    uint64_t app_opaque, uint32_t flags, uint32_t rate, uint32_t fn_core, 
-    uint16_t flow_group, uint32_t *pf_id)
+                         uint32_t tunnel_id, uint64_t mac_remote, uint32_t ip_local, uint16_t port_local,
+                         uint32_t ip_remote, uint16_t port_remote, uint64_t rx_base, uint32_t rx_len,
+                         uint64_t tx_base, uint32_t tx_len, uint32_t remote_seq, uint32_t local_seq,
+                         uint64_t app_opaque, uint32_t flags, uint32_t rate, uint32_t fn_core,
+                         uint16_t flow_group, uint32_t *pf_id)
 {
   struct flextcp_pl_flowst *fs;
   beui32_t lip = t_beui32(ip_local), rip = t_beui32(ip_remote);
@@ -187,14 +196,18 @@ int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
   struct flextcp_pl_flowhte *hte = fp_state->flowht;
 
   /* allocate flow id */
-  if (flow_id_alloc(&f_id) != 0) {
+  if (flow_id_alloc(&f_id) != 0)
+  {
     fprintf(stderr, "nicif_connection_add: allocating flow state\n");
     return -1;
   }
 
   /* calculate hash and find empty slot */
-  hash = flow_hash(lip, lp, rip, rp);
-  if (flow_slot_alloc(hash, &i, &d) != 0) {
+  // TODO: Remove hardcoded tunnel key
+  hash = flow_hash(t_beui32(fp_state->tunt[0].local_ip), lp,
+                   t_beui32(fp_state->tunt[0].remote_ip), rp, tunnel_id);
+  if (flow_slot_alloc(hash, &i, &d) != 0)
+  {
     flow_id_free(f_id);
     fprintf(stderr, "nicif_connection_add: allocating slot failed\n");
     return -1;
@@ -202,7 +215,8 @@ int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
   assert(i < FLEXNIC_PL_FLOWHT_ENTRIES);
   assert(d < FLEXNIC_PL_FLOWHT_NBSZ);
 
-  if ((flags & NICIF_CONN_ECN) == NICIF_CONN_ECN) {
+  if ((flags & NICIF_CONN_ECN) == NICIF_CONN_ECN)
+  {
     rx_base |= FLEXNIC_PL_FLOWST_ECN;
   }
 
@@ -245,14 +259,14 @@ int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
   hte[i].flow_hash = hash;
   MEM_BARRIER();
   hte[i].flow_id = FLEXNIC_PL_FLOWHTE_VALID |
-      (d << FLEXNIC_PL_FLOWHTE_POSSHIFT) | f_id;
+                   (d << FLEXNIC_PL_FLOWHTE_POSSHIFT) | f_id;
 
   *pf_id = f_id;
   return 0;
 }
 
 int nicif_connection_disable(uint32_t f_id, uint32_t *tx_seq, uint32_t *rx_seq,
-    int *tx_closed, int *rx_closed)
+                             int *tx_closed, int *rx_closed)
 {
   struct flextcp_pl_flowst *fs = &fp_state->flowst[f_id];
 
@@ -264,12 +278,12 @@ int nicif_connection_disable(uint32_t f_id, uint32_t *tx_seq, uint32_t *rx_seq,
 
   *rx_closed = !!(fs->rx_base_sp & FLEXNIC_PL_FLOWST_RXFIN);
   *tx_closed = !!(fs->rx_base_sp & FLEXNIC_PL_FLOWST_TXFIN) &&
-      fs->tx_sent == 0;
+               fs->tx_sent == 0;
 
   util_spin_unlock(&fs->lock);
 
   flow_slot_clear(f_id, fs->local_ip, fs->local_port, fs->remote_ip,
-      fs->remote_port);
+                  fs->remote_port, fs->tunnel_id);
   return 0;
 }
 
@@ -287,11 +301,12 @@ int nicif_connection_move(uint32_t dst_db, uint32_t f_id)
 
 /** Read connection stats from NIC. */
 int nicif_connection_stats(uint32_t f_id,
-    struct nicif_connection_stats *p_stats)
+                           struct nicif_connection_stats *p_stats)
 {
   struct flextcp_pl_flowst *fs;
 
-  if (f_id >= FLEXNIC_PL_FLOWST_NUM) {
+  if (f_id >= FLEXNIC_PL_FLOWST_NUM)
+  {
     fprintf(stderr, "nicif_connection_stats: bad flow id\n");
     return -1;
   }
@@ -319,7 +334,8 @@ int nicif_connection_setrate(uint32_t f_id, uint32_t rate)
 {
   struct flextcp_pl_flowst *fs;
 
-  if (f_id >= FLEXNIC_PL_FLOWST_NUM) {
+  if (f_id >= FLEXNIC_PL_FLOWST_NUM)
+  {
     fprintf(stderr, "nicif_connection_stats: bad flow id\n");
     return -1;
   }
@@ -338,7 +354,8 @@ int nicif_connection_retransmit(uint32_t f_id, uint16_t flow_group)
   uint32_t tail;
   uint16_t core = fp_state->flow_group_steering[flow_group];
 
-  if ((ktx = ktx_try_alloc(core, &buf, &tail)) == NULL) {
+  if ((ktx = ktx_try_alloc(core, &buf, &tail)) == NULL)
+  {
     return -1;
   }
   txq_tail[core] = tail;
@@ -358,7 +375,8 @@ int nicif_tx_alloc(uint16_t len, void **pbuf, uint32_t *opaque)
   volatile struct flextcp_pl_ktx *ktx;
   struct nic_buffer *buf;
 
-  if ((ktx = ktx_try_alloc(0, &buf, opaque)) == NULL) {
+  if ((ktx = ktx_try_alloc(0, &buf, opaque)) == NULL)
+  {
     return -1;
   }
 
@@ -377,7 +395,7 @@ void nicif_tx_send(uint32_t opaque, int no_ts)
   MEM_BARRIER();
   ktx->type = (!no_ts ? FLEXTCP_PL_KTX_PACKET : FLEXTCP_PL_KTX_PACKET_NOTS);
   txq_tail[0] = opaque;
-  
+
   notify_fastpath_core(0);
 }
 
@@ -403,7 +421,8 @@ static int adminq_init()
 
   rxq_next = 0;
 
-  for (i = 0; i < fn_cores; i++) {
+  for (i = 0; i < fn_cores; i++)
+  {
     if (adminq_init_core(i) != 0)
       return -1;
   }
@@ -417,23 +436,21 @@ static int adminq_init_core(uint16_t core)
   uintptr_t off_bufs, off_rx, off_tx;
   size_t i, sz_bufs, sz_rx, sz_tx;
 
-  if ((rxq_bufs[core] = calloc(config.nic_rx_len, sizeof(**rxq_bufs)))
-      == NULL)
+  if ((rxq_bufs[core] = calloc(config.nic_rx_len, sizeof(**rxq_bufs))) == NULL)
   {
     fprintf(stderr, "adminq_init: calloc rx bufs failed\n");
     return -1;
   }
-  if ((txq_bufs[core] = calloc(config.nic_tx_len, sizeof(**txq_bufs)))
-      == NULL)
+  if ((txq_bufs[core] = calloc(config.nic_tx_len, sizeof(**txq_bufs))) == NULL)
   {
     fprintf(stderr, "adminq_init: calloc tx bufs failed\n");
     free(rxq_bufs[core]);
     return -1;
   }
 
-  sz_bufs = ((config.nic_rx_len + config.nic_tx_len) * PKTBUF_SIZE + 0xfff)
-    & ~0xfffULL;
-  if (packetmem_alloc(sz_bufs, &off_bufs, &pm_bufs) != 0) {
+  sz_bufs = ((config.nic_rx_len + config.nic_tx_len) * PKTBUF_SIZE + 0xfff) & ~0xfffULL;
+  if (packetmem_alloc(sz_bufs, &off_bufs, &pm_bufs) != 0)
+  {
     fprintf(stderr, "adminq_init: packetmem_alloc bufs failed\n");
     free(txq_bufs[core]);
     free(rxq_bufs[core]);
@@ -441,7 +458,8 @@ static int adminq_init_core(uint16_t core)
   }
 
   sz_rx = config.nic_rx_len * sizeof(struct flextcp_pl_krx);
-  if (packetmem_alloc(sz_rx, &off_rx, &pm_rx) != 0) {
+  if (packetmem_alloc(sz_rx, &off_rx, &pm_rx) != 0)
+  {
     fprintf(stderr, "adminq_init: packetmem_alloc tx failed\n");
     packetmem_free(pm_bufs);
     free(txq_bufs[core]);
@@ -449,7 +467,8 @@ static int adminq_init_core(uint16_t core)
     return -1;
   }
   sz_tx = config.nic_tx_len * sizeof(struct flextcp_pl_ktx);
-  if (packetmem_alloc(sz_tx, &off_tx, &pm_tx) != 0) {
+  if (packetmem_alloc(sz_tx, &off_tx, &pm_tx) != 0)
+  {
     fprintf(stderr, "adminq_init: packetmem_alloc tx failed\n");
     packetmem_free(pm_rx);
     packetmem_free(pm_bufs);
@@ -458,23 +477,23 @@ static int adminq_init_core(uint16_t core)
     return -1;
   }
 
-  rxq_base[core] = (volatile struct flextcp_pl_krx *)
-      ((uint8_t *) vm_shm[SP_MEM_ID] + off_rx);
-  txq_base[core] = (volatile struct flextcp_pl_ktx *)
-      ((uint8_t *) vm_shm[SP_MEM_ID] + off_tx);
+  rxq_base[core] = (volatile struct flextcp_pl_krx *)((uint8_t *)vm_shm[SP_MEM_ID] + off_rx);
+  txq_base[core] = (volatile struct flextcp_pl_ktx *)((uint8_t *)vm_shm[SP_MEM_ID] + off_tx);
 
-  memset((void *) rxq_base[core], 0, sz_rx);
-  memset((void *) txq_base[core], 0, sz_tx);
+  memset((void *)rxq_base[core], 0, sz_rx);
+  memset((void *)txq_base[core], 0, sz_tx);
 
-  for (i = 0; i < rxq_len; i++) {
+  for (i = 0; i < rxq_len; i++)
+  {
     rxq_bufs[core][i].addr = off_bufs;
-    rxq_bufs[core][i].buf = (uint8_t *) vm_shm[SP_MEM_ID] + off_bufs;
+    rxq_bufs[core][i].buf = (uint8_t *)vm_shm[SP_MEM_ID] + off_bufs;
     rxq_base[core][i].addr = off_bufs;
     off_bufs += PKTBUF_SIZE;
   }
-  for (i = 0; i < txq_len; i++) {
+  for (i = 0; i < txq_len; i++)
+  {
     txq_bufs[core][i].addr = off_bufs;
-    txq_bufs[core][i].buf = (uint8_t *) vm_shm[SP_MEM_ID] + off_bufs;
+    txq_bufs[core][i].buf = (uint8_t *)vm_shm[SP_MEM_ID] + off_bufs;
     off_bufs += PKTBUF_SIZE;
   }
 
@@ -502,27 +521,30 @@ static inline int rxq_poll(void)
 
   /* no queue entry here */
   type = krx->type;
-  if (type == FLEXTCP_PL_KRX_INVALID) {
+  if (type == FLEXTCP_PL_KRX_INVALID)
+  {
     return -1;
   }
 
   /* update tail */
   tail = tail + 1;
-  if (tail == rxq_len) {
+  if (tail == rxq_len)
+  {
     tail -= rxq_len;
   }
 
   /* handle based on queue entry type */
   type = krx->type;
-  switch (type) {
-    case FLEXTCP_PL_KRX_PACKET:
-      process_packet(buf->buf, krx->msg.packet.len, krx->msg.packet.fn_core,
-          krx->msg.packet.flow_group);
-      break;
+  switch (type)
+  {
+  case FLEXTCP_PL_KRX_PACKET:
+    process_packet(buf->buf, krx->msg.packet.len, krx->msg.packet.fn_core,
+                   krx->msg.packet.flow_group);
+    break;
 
-    default:
-      fprintf(stderr, "rxq_poll: unknown rx type 0x%x old %x len %x\n", type,
-          old_tail, rxq_len);
+  default:
+    fprintf(stderr, "rxq_poll: unknown rx type 0x%x old %x len %x\n", type,
+            old_tail, rxq_len);
   }
 
   krx->type = 0;
@@ -534,28 +556,45 @@ static inline int rxq_poll(void)
 /* TODO: Will probably need to modify this to get gre packets to work
    with kni */
 static inline void process_packet(const void *buf, uint16_t len,
-    uint32_t fn_core, uint16_t flow_group)
+                                  uint32_t fn_core, uint16_t flow_group)
 {
   const struct eth_hdr *eth = buf;
-  const struct ip_hdr *ip = (struct ip_hdr *) (eth + 1);
-  const struct tcp_hdr *tcp = (struct tcp_hdr *) (ip + 1);
+  const struct ip_hdr *ip = (struct ip_hdr *)(eth + 1);
+  const struct tcp_hdr *tcp = (struct tcp_hdr *)(ip + 1);
   int to_kni = 1;
 
-  if (f_beui16(eth->type) == ETH_TYPE_ARP) {
-    if (len < sizeof(struct pkt_arp)) {
+  if (f_beui16(eth->type) == ETH_TYPE_ARP)
+  {
+    if (len < sizeof(struct pkt_arp))
+    {
       fprintf(stderr, "process_packet: short arp packet\n");
       return;
     }
 
     arp_packet(buf, len);
-  } else if (f_beui16(eth->type) == ETH_TYPE_IP) {
-    if (len < sizeof(*eth) + sizeof(*ip)) {
+  }
+  else if (f_beui16(eth->type) == ETH_TYPE_IP)
+  {
+    if (len < sizeof(*eth) + sizeof(*ip))
+    {
       fprintf(stderr, "process_packet: short ip packet\n");
       return;
     }
 
-    if (ip->proto == IP_PROTO_TCP) {
-      if (len < sizeof(*eth) + sizeof(*ip) + sizeof(*tcp)) {
+    if (ip->proto == IP_PROTO_TCP)
+    {
+      if (len < sizeof(*eth) + sizeof(*ip) + sizeof(*tcp))
+      {
+        fprintf(stderr, "process_packet: short tcp packet\n");
+        return;
+      }
+
+      to_kni = !!tcp_packet(buf, len, fn_core, flow_group);
+    }
+    else if (ip->proto == IP_PROTO_GRE)
+    {
+      if (len < sizeof(*eth) + sizeof(*ip) + sizeof(*tcp))
+      {
         fprintf(stderr, "process_packet: short tcp packet\n");
         return;
       }
@@ -566,24 +605,25 @@ static inline void process_packet(const void *buf, uint16_t len,
 
   if (to_kni)
     kni_packet(buf, len);
-
 }
 
 static inline volatile struct flextcp_pl_ktx *ktx_try_alloc(uint32_t core,
-    struct nic_buffer **pbuf, uint32_t *new_tail)
+                                                            struct nic_buffer **pbuf, uint32_t *new_tail)
 {
   uint32_t tail = txq_tail[core];
   volatile struct flextcp_pl_ktx *ktx = &txq_base[core][tail];
   struct nic_buffer *buf = &txq_bufs[core][tail];
 
   /* queue is full */
-  if (ktx->type != 0) {
+  if (ktx->type != 0)
+  {
     return NULL;
   }
 
   /* update tail */
   tail = tail + 1;
-  if (tail == rxq_len) {
+  if (tail == rxq_len)
+  {
     tail -= rxq_len;
   }
 
@@ -594,15 +634,17 @@ static inline volatile struct flextcp_pl_ktx *ktx_try_alloc(uint32_t core,
 }
 
 static inline uint32_t flow_hash(ip_addr_t lip, beui16_t lp,
-    ip_addr_t rip, beui16_t rp)
+                                 ip_addr_t rip, beui16_t rp, uint32_t tid)
 {
-  struct {
+  struct
+  {
     ip_addr_t lip;
     ip_addr_t rip;
+    uint32_t tid;
     beui16_t lp;
     beui16_t rp;
   } __attribute__((packed)) hk =
-      { .lip = lip, .rip = rip, .lp = lp, .rp = rp };
+      {.lip = lip, .rip = rip, .lp = lp, .rp = rp};
   MEM_BARRIER();
   return rte_hash_crc(&hk, sizeof(hk), 0);
 }
@@ -618,8 +660,10 @@ static inline int flow_slot_alloc(uint32_t h, uint32_t *pi, uint32_t *pd)
 
   /* look for empty slot */
   d = 0;
-  for (i = j; i != l; i = (i + 1) % FLEXNIC_PL_FLOWHT_ENTRIES) {
-    if ((hte[i].flow_id & FLEXNIC_PL_FLOWHTE_VALID) == 0) {
+  for (i = j; i != l; i = (i + 1) % FLEXNIC_PL_FLOWHT_ENTRIES)
+  {
+    if ((hte[i].flow_id & FLEXNIC_PL_FLOWHTE_VALID) == 0)
+    {
       *pi = i;
       *pd = d;
       return 0;
@@ -630,14 +674,17 @@ static inline int flow_slot_alloc(uint32_t h, uint32_t *pi, uint32_t *pd)
   /* no free slot, try to clear up on */
   k = (l + 4 * FLEXNIC_PL_FLOWHT_NBSZ) % FLEXNIC_PL_FLOWHT_ENTRIES;
   /* looking for candidate empty slot to move back */
-  for (; i != k; i = (i + 1) % FLEXNIC_PL_FLOWHT_ENTRIES) {
-    if ((hte[i].flow_id & FLEXNIC_PL_FLOWHTE_VALID) == 0) {
+  for (; i != k; i = (i + 1) % FLEXNIC_PL_FLOWHT_ENTRIES)
+  {
+    if ((hte[i].flow_id & FLEXNIC_PL_FLOWHTE_VALID) == 0)
+    {
       break;
     }
   }
 
   /* abort if no candidate slot found */
-  if (i == k) {
+  if (i == k)
+  {
     fprintf(stderr, "flow_slot_alloc: no empty slot found\n");
     return -1;
   }
@@ -645,12 +692,14 @@ static inline int flow_slot_alloc(uint32_t h, uint32_t *pi, uint32_t *pd)
   /* move candidate backwards until in range for this insertion */
   /* j < l -> (i < j || i >= l) */
   /* j > l -> (i >= l && i < j) */
-  while ((j > l || (i < j || i >= l)) && (j < l || (i >= l && i < j))) {
+  while ((j > l || (i < j || i >= l)) && (j < l || (i >= l && i < j)))
+  {
     k = i;
 
     /* look for element to swap */
     i = (k - FLEXNIC_PL_FLOWHT_NBSZ) % FLEXNIC_PL_FLOWHT_ENTRIES;
-    for (; i != k; i = (i + 1) % FLEXNIC_PL_FLOWHT_ENTRIES) {
+    for (; i != k; i = (i + 1) % FLEXNIC_PL_FLOWHT_ENTRIES)
+    {
       assert((hte[i].flow_id & FLEXNIC_PL_FLOWHTE_VALID) != 0);
 
       /* calculate how much further this element can be moved */
@@ -659,13 +708,15 @@ static inline int flow_slot_alloc(uint32_t h, uint32_t *pi, uint32_t *pd)
       d = FLEXNIC_PL_FLOWHT_NBSZ - 1 - d;
 
       /* check whether element can be moved */
-      if ((k - i) % FLEXNIC_PL_FLOWHT_ENTRIES <= d) {
+      if ((k - i) % FLEXNIC_PL_FLOWHT_ENTRIES <= d)
+      {
         break;
       }
     }
 
     /* abort if none of the elements can be moved */
-    if (i == k) {
+    if (i == k)
+    {
       fprintf(stderr, "flow_slot_alloc: no element could be moved\n");
       return -1;
     }
@@ -679,8 +730,8 @@ static inline int flow_slot_alloc(uint32_t h, uint32_t *pi, uint32_t *pd)
     hte[k].flow_hash = hte[i].flow_hash;
     MEM_BARRIER();
     hte[k].flow_id = FLEXNIC_PL_FLOWHTE_VALID |
-        (d << FLEXNIC_PL_FLOWHTE_POSSHIFT) |
-        (((1 << FLEXNIC_PL_FLOWHTE_POSSHIFT) - 1) & hte[i].flow_id);
+                     (d << FLEXNIC_PL_FLOWHTE_POSSHIFT) |
+                     (((1 << FLEXNIC_PL_FLOWHTE_POSSHIFT) - 1) & hte[i].flow_id);
     MEM_BARRIER();
 
     /* empty original position */
@@ -694,14 +745,16 @@ static inline int flow_slot_alloc(uint32_t h, uint32_t *pi, uint32_t *pd)
 }
 
 static inline int flow_slot_clear(uint32_t f_id, ip_addr_t lip, beui16_t lp,
-    ip_addr_t rip, beui16_t rp)
+    ip_addr_t rip, beui16_t rp, uint32_t tunnel_id)
 {
   uint32_t h, k, j, ffid, eh;
   struct flextcp_pl_flowhte *e;
 
-  h = flow_hash(lip, lp, rip, rp);
+  h = flow_hash(t_beui32(fp_state->tunt[tunnel_id].local_ip), lp,
+                   t_beui32(fp_state->tunt[tunnel_id].remote_ip), rp, tunnel_id);
 
-  for (j = 0; j < FLEXNIC_PL_FLOWHT_NBSZ; j++) {
+  for (j = 0; j < FLEXNIC_PL_FLOWHT_NBSZ; j++)
+  {
     k = (h + j) % FLEXNIC_PL_FLOWHT_ENTRIES;
     e = &fp_state->flowht[k];
 
@@ -709,11 +762,13 @@ static inline int flow_slot_clear(uint32_t f_id, ip_addr_t lip, beui16_t lp,
     MEM_BARRIER();
     eh = e->flow_hash;
 
-    if ((ffid & FLEXNIC_PL_FLOWHTE_VALID) == 0 || eh != h) {
+    if ((ffid & FLEXNIC_PL_FLOWHTE_VALID) == 0 || eh != h)
+    {
       continue;
     }
 
-    if ((ffid & ((1 << FLEXNIC_PL_FLOWHTE_POSSHIFT) - 1)) == f_id) {
+    if ((ffid & ((1 << FLEXNIC_PL_FLOWHTE_POSSHIFT) - 1)) == f_id)
+    {
       e->flow_id &= ~FLEXNIC_PL_FLOWHTE_VALID;
       return 0;
     }
@@ -727,14 +782,18 @@ static void flow_id_alloc_init(void)
 {
   size_t i;
   struct flow_id_item *it, *prev = NULL;
-  for (i = 0; i < FLEXNIC_PL_FLOWST_NUM; i++) {
+  for (i = 0; i < FLEXNIC_PL_FLOWST_NUM; i++)
+  {
     it = &flow_id_items[i];
     it->flow_id = i;
     it->next = NULL;
 
-    if (prev == NULL) {
+    if (prev == NULL)
+    {
       flow_id_freelist = it;
-    } else {
+    }
+    else
+    {
       prev->next = it;
     }
     prev = it;

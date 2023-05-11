@@ -54,10 +54,10 @@
 /* maximum number of listening sockets per port */
 #define LISTEN_MULTI_MAX 32
 
-#define CONN_DEBUG(c, f, x...) do { } while (0)
-#define CONN_DEBUG0(c, f) do { } while (0)
-// #define CONN_DEBUG(c, f, x...) fprintf(stderr, "conn(%p): " f, c, x)
-// #define CONN_DEBUG0(c, f, x...) fprintf(stderr, "conn(%p): " f, c)
+// #define CONN_DEBUG(c, f, x...) do { } while (0)
+// #define CONN_DEBUG0(c, f) do { } while (0)
+#define CONN_DEBUG(c, f, x...) fprintf(stderr, "conn(%p): " f, c, x)
+#define CONN_DEBUG0(c, f, x...) fprintf(stderr, "conn(%p): " f, c)
 
 struct listen_multi {
   size_t num;
@@ -371,7 +371,6 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
     return -1;
   }
 
-  // TODO: Also add check for inner ip address?
   if (f_beui32(p->out_ip.dest) != config.ip) {
     fprintf(stderr, "tcp_packet: unexpected destination IP (%x received, "
         "%x expected)\n", f_beui32(p->out_ip.dest), config.ip);
