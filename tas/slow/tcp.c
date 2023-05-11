@@ -726,7 +726,7 @@ static struct connection *conn_lookup(const struct pkt_gre *p)
   uint32_t h;
   struct connection *c;
 
-  h = conn_hash(f_beui32(p->in_ip.dest), f_beui32(p->in_ip.src), p->gre.key,
+  h = conn_hash(f_beui32(p->out_ip.dest), f_beui32(p->out_ip.src), p->gre.key,
       f_beui16(p->tcp.dest), f_beui16(p->tcp.src)) % TCP_HTSIZE;
 
   for (c = tcp_hashtable[h]; c != NULL; c = c->ht_next) {
@@ -901,7 +901,7 @@ static void listener_packet(struct listener *l, const struct pkt_gre *p,
 
   l->backlog_used++;
 
-  appif_listen_newconn(l, f_beui32(p->out_ip.src), f_beui16(p->tcp.src));
+  appif_listen_newconn(l, f_beui32(p->out_ip.src), f_beui16(p->tcp.src), p->gre.key);
 
   /* check if there are pending accepts */
   if (l->wait_conns != NULL) {

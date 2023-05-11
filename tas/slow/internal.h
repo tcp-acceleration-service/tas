@@ -341,7 +341,7 @@ void appif_conn_closed(struct connection *c, int status);
  * @param remote_port Remote port
  */
 void appif_listen_newconn(struct listener *l, uint32_t remote_ip,
-    uint16_t remote_port);
+    uint16_t remote_port, uint32_t tunnel_id);
 
 /**
  * Callback from tcp_accept(): Connection accepted.

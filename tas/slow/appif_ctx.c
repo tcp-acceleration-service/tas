@@ -141,7 +141,7 @@ void appif_conn_closed(struct connection *c, int status)
 }
 
 void appif_listen_newconn(struct listener *l, uint32_t remote_ip,
-    uint16_t remote_port)
+    uint16_t remote_port, uint32_t tunnel_id)
 {
   struct app_context *ctx = l->ctx;
   volatile struct kernel_appin *kout = ctx->kout_base;
@@ -158,6 +158,7 @@ void appif_listen_newconn(struct listener *l, uint32_t remote_ip,
   kout->data.listen_newconn.opaque = l->opaque;
   kout->data.listen_newconn.remote_ip = remote_ip;
   kout->data.listen_newconn.remote_port = remote_port;
+  kout->data.listen_newconn.tunnel_id = tunnel_id;
   MEM_BARRIER();
   kout->type = KERNEL_APPIN_LISTEN_NEWCONN;
   appif_ctx_kick(ctx);
@@ -167,7 +168,6 @@ void appif_listen_newconn(struct listener *l, uint32_t remote_ip,
     kout_pos = 0;
   }
   ctx->kout_pos = kout_pos;
-
 }
 
 void appif_accept_conn(struct connection *c, int status)
