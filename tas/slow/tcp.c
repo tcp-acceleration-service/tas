@@ -171,8 +171,8 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
   conn->ctx = ctx;
   conn->opaque = opaque;
   conn->status = CONN_ARP_PENDING;
-  //
-  conn->remote_ip = remote_ip;
+  // TODO: Have tunnel id hardcoded to 0 for now
+  conn->remote_ip = fp_state->tunt[0].remote_tunip;
   conn->local_ip = config.ip;
   conn->remote_port = remote_port;
   conn->local_port = local_port;
@@ -188,7 +188,7 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
 
 
   /* resolve IP to mac */
-  ret = routing_resolve(&conn->comp, remote_ip, &conn->remote_mac);
+  ret = routing_resolve(&conn->comp, conn->remote_ip, &conn->remote_mac);
   if (ret < 0) {
     fprintf(stderr, "tcp_open: nicif_arp failed\n");
     conn_free(conn);
