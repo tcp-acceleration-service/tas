@@ -559,8 +559,10 @@ static inline void process_packet(const void *buf, uint16_t len,
                                   uint32_t fn_core, uint16_t flow_group)
 {
   const struct eth_hdr *eth = buf;
-  const struct ip_hdr *ip = (struct ip_hdr *)(eth + 1);
-  const struct tcp_hdr *tcp = (struct tcp_hdr *)(ip + 1);
+  const struct ip_hdr *out_ip = (struct ip_hdr *)(eth + 1);
+  const struct gre_hdr *gre = (struct gre_hdr *)(out_ip + 1);
+  const struct ip_hdr *in_ip = (struct ip_hdr *)(gre + 1);
+  const struct tcp_hdr *tcp = (struct tcp_hdr *)(in_ip + 1);
   int to_kni = 1;
 
   if (f_beui16(eth->type) == ETH_TYPE_ARP)
@@ -575,15 +577,15 @@ static inline void process_packet(const void *buf, uint16_t len,
   }
   else if (f_beui16(eth->type) == ETH_TYPE_IP)
   {
-    if (len < sizeof(*eth) + sizeof(*ip))
+    if (len < sizeof(*eth) + sizeof(*out_ip))
     {
       fprintf(stderr, "process_packet: short ip packet\n");
       return;
     }
 
-    if (ip->proto == IP_PROTO_TCP)
+    if (out_ip->proto == IP_PROTO_TCP)
     {
-      if (len < sizeof(*eth) + sizeof(*ip) + sizeof(*tcp))
+      if (len < sizeof(*eth) + sizeof(*out_ip) + sizeof(*tcp))
       {
         fprintf(stderr, "process_packet: short tcp packet\n");
         return;
@@ -591,9 +593,10 @@ static inline void process_packet(const void *buf, uint16_t len,
 
       to_kni = !!tcp_packet(buf, len, fn_core, flow_group);
     }
-    else if (ip->proto == IP_PROTO_GRE)
+    else if (out_ip->proto == IP_PROTO_GRE)
     {
-      if (len < sizeof(*eth) + sizeof(*ip) + sizeof(*tcp))
+      if (len < sizeof(*eth) + sizeof(*out_ip) + 
+          sizeof(*gre) + sizeof(*in_ip) + sizeof(*tcp))
       {
         fprintf(stderr, "process_packet: short tcp packet\n");
         return;
