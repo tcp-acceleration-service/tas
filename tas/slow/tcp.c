@@ -730,7 +730,8 @@ static struct connection *conn_lookup(const struct pkt_gre *p)
       f_beui16(p->tcp.dest), f_beui16(p->tcp.src)) % TCP_HTSIZE;
 
   for (c = tcp_hashtable[h]; c != NULL; c = c->ht_next) {
-    if (f_beui32(p->in_ip.src) == c->remote_ip &&
+    if (f_beui32(p->out_ip.src) == c->remote_ip &&
+        f_beui32(p->out_ip.dest) == c->local_ip &&
         p->gre.key == c->tunnel_id &&
         f_beui16(p->tcp.dest) == c->local_port &&
         f_beui16(p->tcp.src) == c->remote_port)
