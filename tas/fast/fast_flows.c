@@ -36,8 +36,8 @@
 
 #define TCP_MAX_RTT 100000
 
-#define PL_DEBUG_ARX
-#define PL_DEBUG_ATX
+// #define PL_DEBUG_ARX
+// #define PL_DEBUG_ATX
 #define PL_DEBUG_TCPPACK
 
 // #define SKIP_ACK 1
@@ -45,8 +45,6 @@
 struct flow_key {
   ip_addr_t out_local_ip;
   ip_addr_t out_remote_ip;
-  ip_addr_t in_local_ip;
-  ip_addr_t in_remote_ip;
   uint32_t tunnel_id;
   beui16_t local_port;
   beui16_t remote_port;
@@ -1151,9 +1149,11 @@ void fast_flows_kernelxsums(struct network_buf_handle *nbh,
 
 static inline uint32_t flow_hash(struct flow_key *k)
 {
-  return crc32c_sse42_u32(k->tunnel_id,
-      crc32c_sse42_u32(k->local_port.x | (((uint32_t) k->remote_port.x) << 16),
-      crc32c_sse42_u64(k->out_local_ip.x | (((uint64_t) k->out_remote_ip.x) << 32), 0)));
+  // return crc32c_sse42_u32(k->tunnel_id,
+  //     crc32c_sse42_u32(k->local_port.x | (((uint32_t) k->remote_port.x) << 16),
+  //     crc32c_sse42_u64(k->out_local_ip.x | (((uint64_t) k->out_remote_ip.x) << 32), 0)));
+  // TODO: Is this less performant?
+  return rte_hash_crc(k, sizeof(*k), 0);
 }
 
 void fast_flows_packet_fss(struct dataplane_context *ctx,
@@ -1173,12 +1173,12 @@ void fast_flows_packet_fss(struct dataplane_context *ctx,
 
     key.out_local_ip = p->out_ip.dest;
     key.out_remote_ip = p->out_ip.src;
-    key.in_local_ip = p->in_ip.dest;
-    key.in_remote_ip = p->in_ip.src;
     key.tunnel_id = p->gre.key;
     key.local_port = p->tcp.dest;
     key.remote_port = p->tcp.src;
     h = flow_hash(&key);
+    // printf("receive: hash=%d\n remote_ip=%x local_ip=%x tunnel=%d remote_port=%u local_port=%u\n", h, f_beui32(key.out_remote_ip), f_beui32(key.out_local_ip), key.tunnel_id, f_beui16(key.remote_port), f_beui16(key.local_port));
+
 
     rte_prefetch0(&fp_state->flowht[h % FLEXNIC_PL_FLOWHT_ENTRIES]);
     rte_prefetch0(&fp_state->flowht[(h + 3) % FLEXNIC_PL_FLOWHT_ENTRIES]);
@@ -1189,6 +1189,7 @@ void fast_flows_packet_fss(struct dataplane_context *ctx,
    * (usually 1 per packet, except in case of collisions) */
   for (i = 0; i < n; i++) {
     h = hashes[i];
+    
     for (j = 0; j < FLEXNIC_PL_FLOWHT_NBSZ; j++) {
       k = (h + j) % FLEXNIC_PL_FLOWHT_ENTRIES;
       e = &fp_state->flowht[k];

@@ -648,7 +648,7 @@ static inline uint32_t flow_hash(ip_addr_t lip, beui16_t lp,
     beui16_t lp;
     beui16_t rp;
   } __attribute__((packed)) hk =
-      {.lip = lip, .rip = rip, .lp = lp, .rp = rp};
+      {.lip = lip, .rip = rip, .tid = tid, .lp = lp, .rp = rp};
   MEM_BARRIER();
   return rte_hash_crc(&hk, sizeof(hk), 0);
 }
