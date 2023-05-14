@@ -193,7 +193,7 @@ int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
 {
   struct flextcp_pl_flowst *fs;
   beui32_t i_lip = t_beui32(in_ip_local), i_rip = t_beui32(in_ip_remote);
-  beui32_t o_lip = t_beui32(in_ip_local), o_rip = t_beui32(in_ip_remote);
+  beui32_t o_lip = t_beui32(out_ip_local), o_rip = t_beui32(out_ip_remote);
   beui16_t lp = t_beui16(port_local), rp = t_beui16(port_remote);
   uint32_t i, d, f_id, hash;
   struct flextcp_pl_flowhte *hte = fp_state->flowht;
