@@ -145,7 +145,9 @@ void tcp_poll(void)
   }
 }
 
-int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
+int tcp_open(struct app_context *ctx, 
+    uint64_t opaque, uint32_t tunnel_id,
+    uint32_t out_remote_ip, uint32_t in_remote_ip,
     uint16_t remote_port, uint32_t db_id, struct connection **pconn)
 {
   int ret;
@@ -158,8 +160,9 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
     return -1;
   }
 
-  CONN_DEBUG(conn, "opening connection (ctx=%p, op=%"PRIx64", rip=%x, rp=%u, "
-      "db=%u)\n", ctx, opaque, remote_ip, remote_port, db_id);
+  CONN_DEBUG(conn, "opening connection (ctx=%p, op=%"PRIx64", o_rip=%x, i_rip=%x, "
+      "rp=%u, db=%u)\n",
+      ctx, opaque, out_remote_ip, in_remote_ip, remote_port, db_id);
 
   /* allocate local port */
   if ((local_port = port_alloc()) == 0) {
@@ -172,8 +175,11 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
   conn->opaque = opaque;
   conn->status = CONN_ARP_PENDING;
   // TODO: Have tunnel id hardcoded to 0 for now
-  conn->remote_ip = fp_state->tunt[0].remote_tunip;
-  conn->local_ip = config.ip;
+  conn->tunnel_id = tunnel_id;
+  conn->out_remote_ip = fp_state->tunt[tunnel_id].out_remote_ip;
+  conn->out_local_ip = config.ip;
+  conn->in_remote_ip = fp_state->tunt[tunnel_id].in_remote_ip;
+  conn->in_local_ip = fp_state->tunt[tunnel_id].in_local_ip;
   conn->remote_port = remote_port;
   conn->local_port = local_port;
   conn->local_seq = 0; /* TODO: assign random */
@@ -188,7 +194,7 @@ int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
 
 
   /* resolve IP to mac */
-  ret = routing_resolve(&conn->comp, conn->remote_ip, &conn->remote_mac);
+  ret = routing_resolve(&conn->comp, conn->out_remote_ip, &conn->remote_mac);
   if (ret < 0) {
     fprintf(stderr, "tcp_open: nicif_arp failed\n");
     conn_free(conn);
@@ -579,8 +585,10 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_gre *p,
   c->comp.status = 0;
 
   if (nicif_connection_add(c->db_id, c->ctx->app->vm_id, c->ctx->app->id,
-        c->tunnel_id, c->remote_mac, c->local_ip, c->local_port,
-        c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) vm_shm[vmid],
+        c->tunnel_id, c->remote_mac, 
+        c->out_local_ip, c->out_remote_ip,
+        c->in_local_ip, c->local_port,
+        c->in_remote_ip, c->remote_port, c->rx_buf - (uint8_t *) vm_shm[vmid],
         c->rx_len, c->tx_buf - (uint8_t *) vm_shm[vmid], c->tx_len,
         c->remote_seq, c->local_seq, c->opaque, c->flags, c->cc_rate,
         c->fn_core, c->flow_group, &c->flow_id)
@@ -693,7 +701,7 @@ static void conn_register(struct connection *conn)
 {
   uint32_t h;
 
-  h = conn_hash(conn->local_ip, conn->remote_ip, conn->tunnel_id,
+  h = conn_hash(conn->out_local_ip, conn->out_remote_ip, conn->tunnel_id,
       conn->local_port, conn->remote_port) % TCP_HTSIZE;
 
   conn->ht_next = tcp_hashtable[h];
@@ -705,7 +713,7 @@ static void conn_unregister(struct connection *conn)
   struct connection *cp = NULL;
   uint32_t h;
 
-  h = conn_hash(conn->local_ip, conn->remote_ip, conn->tunnel_id,
+  h = conn_hash(conn->out_local_ip, conn->out_remote_ip, conn->tunnel_id,
       conn->local_port, conn->remote_port) % TCP_HTSIZE;
   if (tcp_hashtable[h] == conn) {
     tcp_hashtable[h] = conn->ht_next;
@@ -730,8 +738,8 @@ static struct connection *conn_lookup(const struct pkt_gre *p)
       f_beui16(p->tcp.dest), f_beui16(p->tcp.src)) % TCP_HTSIZE;
 
   for (c = tcp_hashtable[h]; c != NULL; c = c->ht_next) {
-    if (f_beui32(p->out_ip.src) == c->remote_ip &&
-        f_beui32(p->out_ip.dest) == c->local_ip &&
+    if (f_beui32(p->out_ip.src) == c->out_remote_ip &&
+        f_beui32(p->out_ip.dest) == c->out_local_ip &&
         p->gre.key == c->tunnel_id &&
         f_beui16(p->tcp.dest) == c->local_port &&
         f_beui16(p->tcp.src) == c->remote_port)
@@ -902,7 +910,8 @@ static void listener_packet(struct listener *l, const struct pkt_gre *p,
 
   l->backlog_used++;
 
-  appif_listen_newconn(l, f_beui32(p->out_ip.src), f_beui16(p->tcp.src), p->gre.key);
+  appif_listen_newconn(l, f_beui32(p->out_ip.src), f_beui32(p->in_ip.src),
+      f_beui16(p->tcp.src), p->gre.key);
 
   /* check if there are pending accepts */
   if (l->wait_conns != NULL) {
@@ -940,8 +949,10 @@ static void listener_accept(struct listener *l)
   c->remote_mac = 0;
   memcpy(&c->remote_mac, &p->eth.src, ETH_ADDR_LEN);
   c->tunnel_id = p->gre.key;
-  c->remote_ip = f_beui32(p->out_ip.src);
-  c->local_ip = config.ip;
+  c->out_remote_ip = f_beui32(p->out_ip.src);
+  c->out_local_ip = config.ip;
+  c->in_remote_ip = f_beui32(p->in_ip.src);
+  c->in_local_ip = f_beui32(p->in_ip.dest);
   c->remote_port = f_beui16(p->tcp.src);
   c->local_port = l->port;
 
@@ -966,8 +977,10 @@ static void listener_accept(struct listener *l)
   vmid = c->ctx->app->vm_id;
 
   if (nicif_connection_add(c->db_id, c->ctx->app->vm_id, c->ctx->app->id,
-        c->tunnel_id, c->remote_mac, c->local_ip, c->local_port,
-        c->remote_ip, c->remote_port, c->rx_buf - (uint8_t *) vm_shm[vmid],
+        c->tunnel_id, c->remote_mac, 
+        c->out_local_ip, c->out_remote_ip,
+        c->in_local_ip, c->local_port,
+        c->in_remote_ip, c->remote_port, c->rx_buf - (uint8_t *) vm_shm[vmid],
         c->rx_len, c->tx_buf - (uint8_t *) vm_shm[vmid], c->tx_len,
         c->remote_seq, c->local_seq + 1, c->opaque, c->flags, c->cc_rate,
         c->fn_core, c->flow_group, &c->flow_id)
@@ -994,6 +1007,7 @@ out:
 
 static inline int send_control_raw(uint64_t remote_mac, 
     uint32_t tunnel_id, uint32_t out_remote_ip,
+    uint32_t in_local_ip, uint32_t in_remote_ip,
     uint16_t remote_port, uint16_t local_port, uint32_t local_seq,
     uint32_t remote_seq, uint16_t flags, int ts_opt, uint32_t ts_echo,
     uint16_t mss_opt)
@@ -1050,8 +1064,8 @@ static inline int send_control_raw(uint64_t remote_mac,
   p->in_ip.ttl = 0xff;
   p->in_ip.proto = IP_PROTO_TCP;
   p->in_ip.chksum = 0;
-  p->in_ip.src = t_beui32(fp_state->tunt[p->gre.key].local_ip);
-  p->in_ip.dest = t_beui32(fp_state->tunt[p->gre.key].remote_ip);
+  p->in_ip.src = t_beui32(in_local_ip);
+  p->in_ip.dest = t_beui32(in_remote_ip);
 
   /* fill tcp header */
   p->tcp.src = t_beui16(local_port);
@@ -1095,7 +1109,9 @@ static inline int send_control(const struct connection *conn, uint16_t flags,
     int ts_opt, uint32_t ts_echo, uint16_t mss_opt)
 {
   return send_control_raw(conn->remote_mac, 
-      conn->tunnel_id, conn->remote_ip, conn->remote_port,
+      conn->tunnel_id, conn->out_remote_ip,
+      conn->in_local_ip, conn->in_remote_ip,
+      conn->remote_port,
       conn->local_port, conn->local_seq, conn->remote_seq, flags, ts_opt,
       ts_echo, mss_opt);
 }
@@ -1115,6 +1131,7 @@ static inline int send_reset(const struct pkt_gre *p,
   memcpy(&remote_mac, &p->eth.src, ETH_ADDR_LEN);
   return send_control_raw(remote_mac, 
       p->gre.key, f_beui32(p->out_ip.src),
+      f_beui32(p->in_ip.dest), f_beui32(p->out_ip.dest),
       f_beui16(p->tcp.src), f_beui16(p->tcp.dest), 
       f_beui32(p->tcp.ackno), f_beui32(p->tcp.seqno) + 1,
       TCP_RST | TCP_ACK, ts_opt, ts_val, 0);

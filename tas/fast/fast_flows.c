@@ -43,8 +43,10 @@
 // #define SKIP_ACK 1
 
 struct flow_key {
-  ip_addr_t local_ip;
-  ip_addr_t remote_ip;
+  ip_addr_t out_local_ip;
+  ip_addr_t out_remote_ip;
+  ip_addr_t in_local_ip;
+  ip_addr_t in_remote_ip;
   uint32_t tunnel_id;
   beui16_t local_port;
   beui16_t remote_port;
@@ -150,11 +152,13 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t vm_id, uint32_t queu
 
 #ifdef PL_DEBUG_ATX
   fprintf(stderr, "ATX try_sendseg tunnel=%x "
-      "local=%08x:%05u remote=%08x:%05u "
+      "out_local=%08x out_remote=%08x "
+      "in_local=%08x:%05u in_remote=%08x:%05u "
       "tx_avail=%x tx_next_pos=%x avail=%u core_id=%d\n",
       fs->tunnel_id,
-      f_beui32(fs->local_ip), f_beui16(fs->local_port),
-      f_beui32(fs->remote_ip), f_beui16(fs->remote_port),
+      f_beui32(fs->out_local_ip), f_beui32(fs->out_remote_ip),
+      f_beui32(fs->in_local_ip), f_beui16(fs->local_port),
+      f_beui32(fs->in_remote_ip), f_beui16(fs->remote_port),
       fs->tx_avail, fs->tx_next_pos, avail, ctx->id);
 #endif
 #ifdef FLEXNIC_TRACING
@@ -323,8 +327,10 @@ int fast_flows_packet(struct dataplane_context *ctx,
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_rxfs te_rxfs = {
       .tunnel_id = p->gre.key,
-      .local_ip = f_beui32(p->in_ip.dest),
-      .remote_ip = f_beui32(p->in_ip.src),
+      .out_local_ip = f_beui32(p->out_ip.dest),
+      .out_remote_ip = f_beui32(p->out_ip.src),
+      .in_local_ip = f_beui32(p->in_ip.dest),
+      .in_remote_ip = f_beui32(p->in_ip.src),
       .local_port = f_beui16(p->tcp.dest),
       .remote_port = f_beui16(p->tcp.src),
 
@@ -621,8 +627,10 @@ unlock:
         .db_id = fs->db_id,
 
         .tunnel_id = p->gre.key,
-        .local_ip = f_beui32(p->in_ip.dest),
-        .remote_ip = f_beui32(p->in_ip.src),
+        .out_local_ip = f_beui32(p->out_ip.dest),
+        .out_remote_ip = f_beui32(p->out_ip.src),
+        .in_local_ip = f_beui32(p->in_ip.dest),
+        .in_remote_ip = f_beui32(p->in_ip.src),
         .local_port = f_beui16(p->tcp.dest),
         .remote_port = f_beui16(p->tcp.src),
       };
@@ -683,8 +691,10 @@ int fast_flows_bump(struct dataplane_context *ctx, uint32_t flow_id,
       .flags = flags,
 
       .tunnel_id = fs->tunnel_id,
-      .local_ip = f_beui32(fs->local_ip),
-      .remote_ip = f_beui32(fs->remote_ip),
+      .out_local_ip = f_beui32(fs->out_local_ip),
+      .out_remote_ip = f_beui32(fs->out_remote_ip),
+      .in_local_ip = f_beui32(fs->in_local_ip),
+      .in_remote_ip = f_beui32(fs->in_remote_ip),
       .local_port = f_beui16(fs->local_port),
       .remote_port = f_beui16(fs->remote_port),
 
@@ -919,8 +929,8 @@ static void flow_tx_segment(struct dataplane_context *ctx,
   p->out_ip.ttl = 0xff;
   p->out_ip.proto = IP_PROTO_GRE;
   p->out_ip.chksum = 0;
-  p->out_ip.src = fs->local_ip;
-  p->out_ip.dest = fs->remote_ip;
+  p->out_ip.src = fs->out_local_ip;
+  p->out_ip.dest = fs->out_remote_ip;
 
   /* mark as ECN capable if flow marked so */
   if ((fs->rx_base_sp & FLEXNIC_PL_FLOWST_ECN) == FLEXNIC_PL_FLOWST_ECN) {
@@ -929,9 +939,7 @@ static void flow_tx_segment(struct dataplane_context *ctx,
 
   GREH_CKSV_SET(&p->gre, 0, 1, 0, 0);
   p->gre.proto = GRE_PROTO_IP;
-  // TODO: Hardcode tunnel as 0 for now but should set 
-  // it up in the control plane.
-  p->gre.key = 0;
+  p->gre.key = fs->tunnel_id;
 
   IPH_VHL_SET(&p->in_ip, 4, 5);
   p->in_ip._tos = 0;
@@ -942,8 +950,8 @@ static void flow_tx_segment(struct dataplane_context *ctx,
   p->in_ip.ttl = 0xff;
   p->in_ip.proto = IP_PROTO_TCP;
   p->in_ip.chksum = 0;
-  p->in_ip.src = t_beui32(fp_state->tunt[p->gre.key].local_ip);
-  p->in_ip.dest = t_beui32(fp_state->tunt[p->gre.key].remote_ip);
+  p->in_ip.src = fs->in_local_ip;
+  p->in_ip.dest = fs->in_remote_ip;
 
   fin_fl = (fin ? TCP_FIN : 0);
 
@@ -975,8 +983,10 @@ static void flow_tx_segment(struct dataplane_context *ctx,
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_txseg te_txseg = {
       .tunnel_id = p->gre.key,
-      .local_ip = f_beui32(p->in_ip.src),
-      .remote_ip = f_beui32(p->in_ip.dest),
+      .out_local_ip = f_beui32(p->out_ip.src),
+      .out_remote_ip = f_beui32(p->out_ip.dest),
+      .in_local_ip = f_beui32(p->in_ip.src),
+      .in_remote_ip = f_beui32(p->in_ip.dest),
       .local_port = f_beui16(p->tcp.src),
       .remote_port = f_beui16(p->tcp.dest),
 
@@ -1058,8 +1068,10 @@ static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_txack te_txack = {
       .tunnel_id = p->gre.key,
-      .local_ip = f_beui32(p->in_ip.src),
-      .remote_ip = f_beui32(p->in_ip.dest),
+      .out_local_ip = f_beui32(p->out_ip.src),
+      .out_remote_ip = f_beui32(p->out_ip.dest),
+      .in_local_ip = f_beui32(p->in_ip.src),
+      .in_remote_ip = f_beui32(p->in_ip.dest),
       .local_port = f_beui16(p->tcp.src),
       .remote_port = f_beui16(p->tcp.dest),
 
@@ -1139,8 +1151,9 @@ void fast_flows_kernelxsums(struct network_buf_handle *nbh,
 
 static inline uint32_t flow_hash(struct flow_key *k)
 {
-  return crc32c_sse42_u32(k->local_port.x | (((uint32_t) k->remote_port.x) << 16),
-      crc32c_sse42_u64(k->local_ip.x | (((uint64_t) k->remote_ip.x) << 32), 0));
+  return crc32c_sse42_u32(k->tunnel_id,
+      crc32c_sse42_u32(k->local_port.x | (((uint32_t) k->remote_port.x) << 16),
+      crc32c_sse42_u64(k->out_local_ip.x | (((uint64_t) k->out_remote_ip.x) << 32), 0)));
 }
 
 void fast_flows_packet_fss(struct dataplane_context *ctx,
@@ -1158,8 +1171,10 @@ void fast_flows_packet_fss(struct dataplane_context *ctx,
   for (i = 0; i < n; i++) {
     p = network_buf_bufoff(nbhs[i]);
 
-    key.local_ip = p->in_ip.dest;
-    key.remote_ip = p->in_ip.src;
+    key.out_local_ip = p->out_ip.dest;
+    key.out_remote_ip = p->out_ip.src;
+    key.in_local_ip = p->in_ip.dest;
+    key.in_remote_ip = p->in_ip.src;
     key.tunnel_id = p->gre.key;
     key.local_port = p->tcp.dest;
     key.remote_port = p->tcp.src;
@@ -1212,8 +1227,10 @@ void fast_flows_packet_fss(struct dataplane_context *ctx,
 
       MEM_BARRIER();
       fs = &fp_state->flowst[fid];
-      if ((fs->local_ip.x == p->in_ip.dest.x) &
-          (fs->remote_ip.x == p->in_ip.src.x) &
+      if ((fs->out_local_ip.x == p->out_ip.dest.x) &
+          (fs->out_remote_ip.x == p->out_ip.src.x) &
+          (fs->in_local_ip.x == p->in_ip.dest.x) &
+          (fs->in_remote_ip.x == p->in_ip.src.x) &
           (fs->tunnel_id == p->gre.key) &
           (fs->local_port.x == p->tcp.dest.x) &
           (fs->remote_port.x == p->tcp.src.x))

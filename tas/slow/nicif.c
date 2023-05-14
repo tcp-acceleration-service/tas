@@ -183,14 +183,17 @@ int nicif_appctx_add(uint16_t vmid, uint16_t appid, uint32_t db,
 
 /** Register flow */
 int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
-                         uint32_t tunnel_id, uint64_t mac_remote, uint32_t ip_local, uint16_t port_local,
-                         uint32_t ip_remote, uint16_t port_remote, uint64_t rx_base, uint32_t rx_len,
+                         uint32_t tunnel_id, uint64_t mac_remote, 
+                         uint32_t out_ip_local, uint32_t out_ip_remote,
+                         uint32_t in_ip_local, uint16_t port_local,
+                         uint32_t in_ip_remote, uint16_t port_remote, uint64_t rx_base, uint32_t rx_len,
                          uint64_t tx_base, uint32_t tx_len, uint32_t remote_seq, uint32_t local_seq,
                          uint64_t app_opaque, uint32_t flags, uint32_t rate, uint32_t fn_core,
                          uint16_t flow_group, uint32_t *pf_id)
 {
   struct flextcp_pl_flowst *fs;
-  beui32_t lip = t_beui32(ip_local), rip = t_beui32(ip_remote);
+  beui32_t i_lip = t_beui32(in_ip_local), i_rip = t_beui32(in_ip_remote);
+  beui32_t o_lip = t_beui32(in_ip_local), o_rip = t_beui32(in_ip_remote);
   beui16_t lp = t_beui16(port_local), rp = t_beui16(port_remote);
   uint32_t i, d, f_id, hash;
   struct flextcp_pl_flowhte *hte = fp_state->flowht;
@@ -203,9 +206,7 @@ int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
   }
 
   /* calculate hash and find empty slot */
-  // TODO: Remove hardcoded tunnel key
-  hash = flow_hash(t_beui32(fp_state->tunt[0].local_ip), lp,
-                   t_beui32(fp_state->tunt[0].remote_ip), rp, tunnel_id);
+  hash = flow_hash(o_lip, lp, o_rip, rp, tunnel_id);
   if (flow_slot_alloc(hash, &i, &d) != 0)
   {
     flow_id_free(f_id);
@@ -232,8 +233,10 @@ int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
   fs->vm_id = vm_id;
   fs->tunnel_id = tunnel_id;
 
-  fs->local_ip = lip;
-  fs->remote_ip = rip;
+  fs->out_local_ip = o_lip;
+  fs->out_remote_ip = o_rip;
+  fs->in_local_ip = i_lip;
+  fs->in_remote_ip = i_rip;
   fs->local_port = lp;
   fs->remote_port = rp;
 
@@ -282,7 +285,7 @@ int nicif_connection_disable(uint32_t f_id, uint32_t *tx_seq, uint32_t *rx_seq,
 
   util_spin_unlock(&fs->lock);
 
-  flow_slot_clear(f_id, fs->local_ip, fs->local_port, fs->remote_ip,
+  flow_slot_clear(f_id, fs->out_local_ip, fs->local_port, fs->out_remote_ip,
                   fs->remote_port, fs->tunnel_id);
   return 0;
 }
@@ -553,8 +556,6 @@ static inline int rxq_poll(void)
   return ret;
 }
 
-/* TODO: Will probably need to modify this to get gre packets to work
-   with kni */
 static inline void process_packet(const void *buf, uint16_t len,
                                   uint32_t fn_core, uint16_t flow_group)
 {
@@ -753,8 +754,8 @@ static inline int flow_slot_clear(uint32_t f_id, ip_addr_t lip, beui16_t lp,
   uint32_t h, k, j, ffid, eh;
   struct flextcp_pl_flowhte *e;
 
-  h = flow_hash(t_beui32(fp_state->tunt[tunnel_id].local_ip), lp,
-                   t_beui32(fp_state->tunt[tunnel_id].remote_ip), rp, tunnel_id);
+  h = flow_hash(t_beui32(fp_state->tunt[tunnel_id].out_local_ip), lp,
+                   t_beui32(fp_state->tunt[tunnel_id].out_remote_ip), rp, tunnel_id);
 
   for (j = 0; j < FLEXNIC_PL_FLOWHT_NBSZ; j++)
   {

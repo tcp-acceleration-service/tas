@@ -78,7 +78,8 @@ void appif_conn_opened(struct connection *c, int status)
 
     kout->data.conn_opened.seq_rx = c->remote_seq;
     kout->data.conn_opened.seq_tx = c->local_seq;
-    kout->data.conn_opened.local_ip = config.ip;
+    kout->data.conn_opened.out_local_ip = config.ip;
+    kout->data.conn_opened.in_local_ip = c->in_local_ip;
     kout->data.conn_opened.local_port = c->local_port;
     kout->data.conn_opened.flow_id = c->flow_id;
     kout->data.conn_opened.fn_core = c->fn_core;
@@ -140,7 +141,8 @@ void appif_conn_closed(struct connection *c, int status)
   }
 }
 
-void appif_listen_newconn(struct listener *l, uint32_t remote_ip,
+void appif_listen_newconn(struct listener *l, 
+    uint32_t out_remote_ip, uint32_t in_remote_ip,
     uint16_t remote_port, uint32_t tunnel_id)
 {
   struct app_context *ctx = l->ctx;
@@ -156,9 +158,10 @@ void appif_listen_newconn(struct listener *l, uint32_t remote_ip,
   }
 
   kout->data.listen_newconn.opaque = l->opaque;
-  kout->data.listen_newconn.remote_ip = remote_ip;
-  kout->data.listen_newconn.remote_port = remote_port;
   kout->data.listen_newconn.tunnel_id = tunnel_id;
+  kout->data.listen_newconn.out_remote_ip = out_remote_ip;
+  kout->data.listen_newconn.in_remote_ip = in_remote_ip;
+  kout->data.listen_newconn.remote_port = remote_port;
   MEM_BARRIER();
   kout->type = KERNEL_APPIN_LISTEN_NEWCONN;
   appif_ctx_kick(ctx);
@@ -196,8 +199,10 @@ void appif_accept_conn(struct connection *c, int status)
     kout->data.accept_connection.seq_rx = c->remote_seq;
     kout->data.accept_connection.seq_tx = c->local_seq;
     kout->data.accept_connection.tunnel_id = c->tunnel_id;
-    kout->data.accept_connection.local_ip = config.ip;
-    kout->data.accept_connection.remote_ip = c->remote_ip;
+    kout->data.accept_connection.out_local_ip = config.ip;
+    kout->data.accept_connection.out_remote_ip = c->out_remote_ip;
+    kout->data.accept_connection.in_local_ip = c->in_local_ip;
+    kout->data.accept_connection.in_remote_ip = c->in_remote_ip;
     kout->data.accept_connection.remote_port = c->remote_port;
     kout->data.accept_connection.flow_id = c->flow_id;
     kout->data.accept_connection.fn_core = c->fn_core;
@@ -308,7 +313,11 @@ static int kin_conn_open(struct application *app, struct app_context *ctx,
 {
   struct connection *conn;
 
-  if (tcp_open(ctx, kin->data.conn_open.opaque, kin->data.conn_open.remote_ip,
+  // TODO: Lookup tunnel to find the rest of the information needed to open this.
+  //       Keep tunnel id 0 hardcoded for now.
+  if (tcp_open(ctx, kin->data.conn_open.opaque, 0, 
+      fp_state->tunt[0].out_remote_ip, 
+      kin->data.conn_open.remote_ip,
       kin->data.conn_open.remote_port, ctx->doorbell->id, &conn) != 0)
   {
     fprintf(stderr, "kin_conn_open: tcp_open failed\n");
@@ -336,8 +345,10 @@ static int kin_conn_move(struct application *app, struct app_context *ctx,
   struct app_context *new_ctx;
 
   for (conn = app->conns; conn != NULL; conn = conn->app_next) {
-    if (conn->local_ip == kin->data.conn_move.local_ip &&
-        conn->remote_ip == kin->data.conn_move.remote_ip &&
+    if (conn->out_local_ip == kin->data.conn_move.out_local_ip &&
+        conn->out_remote_ip == kin->data.conn_move.out_remote_ip &&
+        conn->in_local_ip == kin->data.conn_move.in_local_ip &&
+        conn->in_remote_ip == kin->data.conn_move.in_remote_ip &&
         conn->tunnel_id == kin->data.conn_move.tunnel_id &&
         conn->local_port == kin->data.conn_move.local_port &&
         conn->remote_port == kin->data.conn_move.remote_port &&
@@ -393,9 +404,11 @@ static int kin_conn_close(struct application *app, struct app_context *ctx,
   struct connection *conn;
 
   for (conn = app->conns; conn != NULL; conn = conn->app_next) {
-    if (conn->local_ip == kin->data.conn_close.local_ip &&
+    if (conn->out_local_ip == kin->data.conn_close.out_local_ip &&
+        conn->out_remote_ip == kin->data.conn_close.out_remote_ip &&
+        conn->in_local_ip == kin->data.conn_close.in_local_ip &&
+        conn->in_remote_ip == kin->data.conn_close.in_remote_ip &&
         conn->tunnel_id == kin->data.conn_close.tunnel_id &&
-        conn->remote_ip == kin->data.conn_close.remote_ip &&
         conn->local_port == kin->data.conn_close.local_port &&
         conn->remote_port == kin->data.conn_close.remote_port &&
         conn->opaque == kin->data.conn_close.opaque)

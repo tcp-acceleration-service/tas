@@ -94,8 +94,10 @@ struct flextcp_pl_trev_atx {
   uint32_t flags;
 
   uint32_t tunnel_id;
-  uint32_t local_ip;
-  uint32_t remote_ip;
+  uint32_t out_local_ip;
+  uint32_t out_remote_ip;
+  uint32_t in_local_ip;
+  uint32_t in_remote_ip;
   uint16_t local_port;
   uint16_t remote_port;
 
@@ -126,8 +128,10 @@ struct flextcp_pl_trev_arx {
   uint32_t db_id;
 
   uint32_t tunnel_id;
-  uint32_t local_ip;
-  uint32_t remote_ip;
+  uint32_t out_local_ip;
+  uint32_t out_remote_ip;
+  uint32_t in_local_ip;
+  uint32_t in_remote_ip;
   uint16_t local_port;
   uint16_t remote_port;
 } __attribute__((packed));
@@ -135,8 +139,10 @@ struct flextcp_pl_trev_arx {
 /** tcp flow state on receive */
 struct flextcp_pl_trev_rxfs {
   uint32_t tunnel_id;
-  uint32_t local_ip;
-  uint32_t remote_ip;
+  uint32_t out_local_ip;
+  uint32_t out_remote_ip;
+  uint32_t in_local_ip;
+  uint32_t in_remote_ip;
   uint16_t local_port;
   uint16_t remote_port;
 
@@ -158,8 +164,10 @@ struct flextcp_pl_trev_rxfs {
 /** tcp ack sent out */
 struct flextcp_pl_trev_txack {
   uint32_t tunnel_id;
-  uint32_t local_ip;
-  uint32_t remote_ip;
+  uint32_t out_local_ip;
+  uint32_t out_remote_ip;
+  uint32_t in_local_ip;
+  uint32_t in_remote_ip;
   uint16_t local_port;
   uint16_t remote_port;
 
@@ -171,8 +179,10 @@ struct flextcp_pl_trev_txack {
 /* tcp segment sent out */
 struct flextcp_pl_trev_txseg {
   uint32_t tunnel_id;
-  uint32_t local_ip;
-  uint32_t remote_ip;
+  uint32_t out_local_ip;
+  uint32_t out_remote_ip;
+  uint32_t in_local_ip;
+  uint32_t in_remote_ip;
   uint16_t local_port;
   uint16_t remote_port;
 

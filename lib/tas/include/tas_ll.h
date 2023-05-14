@@ -120,8 +120,10 @@ struct flextcp_connection {
   uint32_t txb_bump;
 
   uint32_t tunnel_id;
-  uint32_t local_ip;
-  uint32_t remote_ip;
+  uint32_t out_local_ip;
+  uint32_t out_remote_ip;
+  uint32_t in_local_ip;
+  uint32_t in_remote_ip;
   uint16_t local_port;
   uint16_t remote_port;
 
@@ -180,7 +182,8 @@ struct flextcp_event {
     struct {
       uint32_t tunnel_id;
       uint16_t remote_port;
-      uint32_t remote_ip;
+      uint32_t out_remote_ip;
+      uint32_t in_remote_ip;
       struct flextcp_listener *listener;
     } listen_newconn;
     /** For #FLEXTCP_EV_LISTEN_ACCEPT */

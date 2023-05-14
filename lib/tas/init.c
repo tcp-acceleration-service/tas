@@ -558,7 +558,8 @@ static inline int event_kappin_conn_opened(
   }
 
   conn->status = CONN_OPEN;
-  conn->local_ip = inev->local_ip;
+  conn->out_local_ip = inev->out_local_ip;
+  conn->in_local_ip = inev->in_local_ip;
   conn->local_port = inev->local_port;
   conn->seq_rx = inev->seq_rx;
   conn->seq_tx = inev->seq_tx;
@@ -600,9 +601,11 @@ static inline void event_kappin_listen_newconn(
 
   listener = OPAQUE_PTR(inev->opaque);
 
+
   outev->event_type = FLEXTCP_EV_LISTEN_NEWCONN;
   outev->ev.listen_newconn.tunnel_id = inev->tunnel_id;
-  outev->ev.listen_newconn.remote_ip = inev->remote_ip;
+  outev->ev.listen_newconn.out_remote_ip = inev->out_remote_ip;
+  outev->ev.listen_newconn.in_remote_ip = inev->in_remote_ip;
   outev->ev.listen_newconn.remote_port = inev->remote_port;
   outev->ev.listen_open.listener = listener;
 }
@@ -632,8 +635,10 @@ static inline int event_kappin_accept_conn(
   }
 
   conn->status = CONN_OPEN;
-  conn->local_ip = inev->local_ip;
-  conn->remote_ip = inev->remote_ip;
+  conn->out_local_ip = inev->out_local_ip;
+  conn->out_remote_ip = inev->out_remote_ip;
+  conn->in_local_ip = inev->in_local_ip;
+  conn->in_remote_ip = inev->in_remote_ip;
   conn->remote_port = inev->remote_port;
   conn->seq_rx = inev->seq_rx;
   conn->seq_tx = inev->seq_tx;

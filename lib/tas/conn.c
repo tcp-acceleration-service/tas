@@ -136,7 +136,7 @@ int flextcp_connection_open(struct flextcp_context *ctx,
   }
 
   conn->status = CONN_OPEN_REQUESTED;
-  conn->remote_ip = dst_ip;
+  conn->in_remote_ip = dst_ip;
   conn->remote_port = dst_port;
 
   kin->data.conn_open.opaque = OPAQUE(conn);
@@ -202,9 +202,11 @@ int flextcp_connection_close(struct flextcp_context *ctx,
   conn->status = CONN_CLOSE_REQUESTED;
 
   kin->data.conn_close.opaque = (uintptr_t) conn;
-  kin->data.conn_close.remote_ip = conn->remote_ip;
+  kin->data.conn_close.out_remote_ip = conn->out_remote_ip;
+  kin->data.conn_close.in_remote_ip = conn->in_remote_ip;
   kin->data.conn_close.remote_port = conn->remote_port;
-  kin->data.conn_close.local_ip = conn->local_ip;
+  kin->data.conn_close.out_local_ip = conn->out_local_ip;
+  kin->data.conn_close.in_local_ip = conn->in_local_ip;
   kin->data.conn_close.local_port = conn->local_port;
   kin->data.conn_close.flags = f;
   MEM_BARRIER();
@@ -407,8 +409,10 @@ int flextcp_connection_move(struct flextcp_context *ctx,
     return -1;
   }
 
-  kin->data.conn_move.local_ip = conn->local_ip;
-  kin->data.conn_move.remote_ip = conn->remote_ip;
+  kin->data.conn_move.out_local_ip = conn->out_local_ip;
+  kin->data.conn_move.out_remote_ip = conn->out_remote_ip;
+  kin->data.conn_move.in_local_ip = conn->in_local_ip;
+  kin->data.conn_move.in_remote_ip = conn->in_remote_ip;
   kin->data.conn_move.local_port = conn->local_port;
   kin->data.conn_move.remote_port = conn->remote_port;
   kin->data.conn_move.db_id = ctx->db_id;

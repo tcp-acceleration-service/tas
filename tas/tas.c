@@ -93,18 +93,18 @@ int main(int argc, char *argv[])
   }
 
   // TODO: Keep this hardcoded for now, but move it to control path
-  uint32_t l_ip;
-  uint32_t r_ip;
-  uint32_t r_tip;
-  util_parse_ipv4("192.168.10.20", &l_ip);
-  util_parse_ipv4("192.168.10.40", &r_ip);
-  util_parse_ipv4("192.168.10.14", &r_tip);
+  uint32_t in_lip;
+  uint32_t in_rip;
+  uint32_t out_rip;
+  util_parse_ipv4("192.168.10.20", &in_lip);
+  util_parse_ipv4("192.168.10.40", &in_rip);
+  util_parse_ipv4("192.168.10.14", &out_rip);
   struct flextcp_pl_tun tun = {
     .tun_id = 0,
-    .local_ip = l_ip,
-    .remote_ip = r_ip,
-    .local_tunip = config.ip,
-    .remote_tunip = r_tip
+    .out_local_ip = config.ip,
+    .out_remote_ip = out_rip,
+    .in_local_ip = in_lip,
+    .in_remote_ip = in_rip,
   };
   fp_state->tunt[0] = tun;
 

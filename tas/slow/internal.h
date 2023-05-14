@@ -126,31 +126,35 @@ enum nicif_connection_flags {
 /**
  * Register flow (must be called from poll thread).
  *
- * @param db          Doorbell ID
- * @param app_id      Application ID
- * @param mac_remote  MAC address of the remote host
- * @param ip_local    Local IP address
- * @param port_local  Local port number
- * @param ip_remote   Remote IP address
- * @param port_remote Remote port number
- * @param rx_base     Base address of circular receive buffer
- * @param rx_len      Length of circular receive buffer
- * @param tx_base     Base address of circular transmit buffer
- * @param tx_len      Length of circular transmit buffer
- * @param remote_seq  Next sequence number expected from remote host
- * @param local_seq   Next sequence number for transmission
- * @param app_opaque  Opaque value to pass in notificaitions
- * @param flags       See #nicif_connection_flags.
- * @param rate        Congestion rate to set [Kbps]
- * @param fn_core     FlexNIC emulator core for the connection
- * @param flow_group  Flow group
- * @param pf_id       Pointer to location where flow id should be stored
+ * @param db            Doorbell ID
+ * @param app_id        Application ID
+ * @param mac_remote    MAC address of the remote host
+ * @param out_ip_local  Local IP header of tunnel endpoint
+ * @param out_ip_remote Remote IP header of tunnel endpoint
+ * @param in_ip_local   Local IP address of VM
+ * @param port_local    Local port number
+ * @param in_ip_remote  Remote IP address of VM
+ * @param port_remote   Remote port number
+ * @param rx_base       Base address of circular receive buffer
+ * @param rx_len        Length of circular receive buffer
+ * @param tx_base       Base address of circular transmit buffer
+ * @param tx_len        Length of circular transmit buffer
+ * @param remote_seq    Next sequence number expected from remote host
+ * @param local_seq     Next sequence number for transmission
+ * @param app_opaque    Opaque value to pass in notificaitions
+ * @param flags         See #nicif_connection_flags.
+ * @param rate          Congestion rate to set [Kbps]
+ * @param fn_core       FlexNIC emulator core for the connection
+ * @param flow_group    Flow group
+ * @param pf_id         Pointer to location where flow id should be stored
  *
  * @return 0 on success, <0 else
  */
 int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
-    uint32_t tunnel_id, uint64_t mac_remote, uint32_t ip_local, uint16_t port_local,
-    uint32_t ip_remote, uint16_t port_remote, uint64_t rx_base, uint32_t rx_len, 
+    uint32_t tunnel_id, uint64_t mac_remote, 
+    uint32_t out_ip_local, uint32_t out_ip_remote,
+    uint32_t in_ip_local, uint16_t port_local,
+    uint32_t in_ip_remote, uint16_t port_remote, uint64_t rx_base, uint32_t rx_len, 
     uint64_t tx_base, uint32_t tx_len, uint32_t remote_seq, uint32_t local_seq, 
     uint64_t app_opaque, uint32_t flags, uint32_t rate, uint32_t fn_core, 
     uint16_t flow_group, uint32_t *pf_id);
@@ -336,11 +340,13 @@ void appif_conn_closed(struct connection *c, int status);
 /**
  * Callback from TCP module: New connection request received on listener.
  *
- * @param l           Listener that received new connection
- * @param remote_ip   Remote IP address
- * @param remote_port Remote port
+ * @param l              Listener that received new connection
+ * @param out_remote_ip  Remote IP address of tunnel endpoint
+ * @param in_remote_ip   Remote IP address of VM
+ * @param remote_port    Remote port
  */
-void appif_listen_newconn(struct listener *l, uint32_t remote_ip,
+void appif_listen_newconn(struct listener *l, 
+    uint32_t out_remote_ip, uint32_t in_remote_ip,
     uint16_t remote_port, uint32_t tunnel_id);
 
 /**
@@ -468,9 +474,13 @@ struct connection {
     /** GRE tunnel ID */
     uint32_t tunnel_id;
     /** Peer IP address of outer header. */
-    uint32_t remote_ip;
+    uint32_t out_remote_ip;
     /** Local IP to be used in outer header. */
-    uint32_t local_ip;
+    uint32_t out_local_ip;
+    /** Peer IP address of inner header. */
+    uint32_t in_remote_ip;
+    /** Local IP to be used in inner header. */
+    uint32_t in_local_ip;
     /** Peer port number. */
     uint16_t remote_port;
     /** Local port number. */
@@ -617,17 +627,21 @@ void tcp_poll(void);
  * This function returns asynchronously if it does not fail immediately. The TCP
  * module will call appif_conn_opened().
  *
- * @param ctx         Application context
- * @param opaque      Opaque value passed from application
- * @param remote_ip   Remote IP address
- * @param remote_port Remote port number
- * @param db_id       Doorbell ID to use for connection
- * @param conn        Pointer to location for storing pointer of created conn
- *                    struct.
+ * @param ctx             Application context
+ * @param opaque          Opaque value passed from application
+ * @param tunnel_id       ID of the tunnel
+ * @param out_remote_ip   Remote IP address of tunnel endpoint
+ * @param in_remote_ip    Remote IP address of VM
+ * @param remote_port     Remote port number
+ * @param db_id           Doorbell ID to use for connection
+ * @param conn            Pointer to location for storing pointer of created conn
+ *                        struct.
  *
  * @return 0 on success, <0 else
  */
-int tcp_open(struct app_context *ctx, uint64_t opaque, uint32_t remote_ip,
+int tcp_open(struct app_context *ctx, 
+    uint64_t opaque, uint32_t tunnel_id, 
+    uint32_t out_remote_ip, uint32_t in_remote_ip,
     uint16_t remote_port, uint32_t db_id, struct connection **conn);
 
 /**

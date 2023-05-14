@@ -238,13 +238,13 @@ struct flextcp_pl_tun {
   /** Tunnel ID */
   uint32_t tun_id;
   /** IP of local VM */
-  uint32_t local_ip;
+  uint32_t in_local_ip;
   /** IP of remote VM */
-  uint32_t remote_ip;
+  uint32_t in_remote_ip;
   /** IP in local end of the tunnel */
-  uint32_t local_tunip;
+  uint32_t out_local_ip;
   /** IP in remote enf of the tunnel */
-  uint32_t remote_tunip;
+  uint32_t out_remote_ip;
 } __attribute__((packed));
 
 
@@ -268,9 +268,10 @@ struct flextcp_pl_flowst {
 
   /* GRE ID used to identify tunnel */
   uint32_t tunnel_id;
-
-  beui32_t local_ip;
-  beui32_t remote_ip;
+  beui32_t out_local_ip;
+  beui32_t out_remote_ip;
+  beui32_t in_local_ip;
+  beui32_t in_remote_ip;
 
   beui16_t local_port;
   beui16_t remote_port;

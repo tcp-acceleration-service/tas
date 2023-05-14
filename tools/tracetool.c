@@ -263,13 +263,16 @@ static void event_dump(void *buf, size_t len, uint16_t type)
       if (sizeof(*atx) == len) {
         printf("rx_bump=%u tx_bump=%u bump_seq_ent=%u bump_seq_flow=%u "
             "flags=%x "
-            "tunnel_id=%x local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
+            "tunnel_id=%x out_local_ip=%x out_remote_ip=%x "
+            "in_local_ip=%x in_remote_ip=%x local_port=%u remote_port=%u "
             "flow=%u db=%u tx_next_pos=%u tx_next_seq=%u tx_avail_prev=%u "
             "rx_next_pos=%u rx_avail=%u tx_len=%u rx_len=%u "
             "rx_remote_avail=%u tx_sent=%u",
             atx->rx_bump, atx->tx_bump, atx->bump_seq_ent, atx->bump_seq_flow,
             atx->flags,
-            atx->tunnel_id, atx->local_ip, atx->remote_ip, atx->local_port, atx->remote_port,
+            atx->tunnel_id, atx->out_local_ip, atx->out_remote_ip, 
+            atx->in_local_ip, atx->in_remote_ip, 
+            atx->local_port, atx->remote_port,
             atx->flow_id, atx->db_id, atx->tx_next_pos, atx->tx_next_seq,
             atx->tx_avail_prev, atx->rx_next_pos, atx->rx_avail, atx->tx_len,
             atx->rx_len, atx->rx_remote_avail, atx->tx_sent);
@@ -282,9 +285,12 @@ static void event_dump(void *buf, size_t len, uint16_t type)
       printf("FLEXTCP_EV_ARX ");
       if (sizeof(*arx) == len) {
         printf("opaque=%lx rx_bump=%u rx_pos=%u tx_bump=%u flags=%x flow=%u "
-            "db=%u tunnel_id=%x local_ip=%x remote_ip=%x local_port=%u remote_port=%u",
+            "db=%u tunnel_id=%x out_local_ip=%x out_remote_ip=%x "
+            "in_local_ip=%x in_remote_ip=%x local_port=%u remote_port=%u",
             arx->opaque, arx->rx_bump, arx->rx_pos, arx->tx_bump, arx->flags,
-            arx->flow_id, arx->db_id, arx->tunnel_id, arx->local_ip, arx->remote_ip,
+            arx->flow_id, arx->db_id, arx->tunnel_id, 
+            arx->out_local_ip, arx->out_remote_ip,
+            arx->in_local_ip, arx->in_remote_ip,
             arx->local_port, arx->remote_port);
       } else {
         printf("unexpected event length");
@@ -294,11 +300,13 @@ static void event_dump(void *buf, size_t len, uint16_t type)
     case FLEXNIC_PL_TREV_RXFS:
       printf("FLEXTCP_EV_RXFS ");
       if (sizeof(*rxfs) == len) {
-        printf("tunnel_id=%x local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
+        printf("tunnel_id=%x out_local_ip=%x out_remote_ip=%x"
+            "in_local_ip=%x in_remote_ip=%x local_port=%u remote_port=%u "
             "flow_id=%u flow={seq=%u ack=%u flags=%x len=%u} fs={rx_nextpos=%u "
             " rx_nextseq=%u rx_avail=%u  tx_nextpos=%u tx_nextseq=%u "
             "tx_sent=%u tx_avail=%u payload={",
-            rxfs->tunnel_id, rxfs->local_ip, rxfs->remote_ip, rxfs->local_port,
+            rxfs->tunnel_id, rxfs->out_local_ip, rxfs->out_remote_ip,
+            rxfs->in_local_ip, rxfs->in_remote_ip, rxfs->local_port,
             rxfs->remote_port, rxfs->flow_id, rxfs->flow_seq, rxfs->flow_ack,
             rxfs->flow_flags, rxfs->flow_len, rxfs->fs_rx_nextpos,
             rxfs->fs_rx_nextseq,
@@ -352,9 +360,11 @@ static void event_dump(void *buf, size_t len, uint16_t type)
     case FLEXNIC_PL_TREV_TXACK:
       printf("FLEXTCP_EV_TXACK ");
       if (sizeof(*txack) == len) {
-        printf("tunnel_id=%x local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
+        printf("tunnel_id=%x out_local_ip=%x out_remote_ip=%x"
+            "in_local_ip=%x in_remote_ip=%x local_port=%u remote_port=%u "
             "flow_seq=%u flow_ack=%u flow_flags=%x",
-            txack->tunnel_id, txack->local_ip, txack->remote_ip, txack->local_port,
+            txack->tunnel_id, txack->out_local_ip, txack->out_remote_ip,
+            txack->in_local_ip, txack->in_remote_ip, txack->local_port,
             txack->remote_port, txack->flow_seq, txack->flow_ack,
             txack->flow_flags);
       } else {
@@ -365,9 +375,11 @@ static void event_dump(void *buf, size_t len, uint16_t type)
     case FLEXNIC_PL_TREV_TXSEG:
       printf("FLEXTCP_EV_TXSEG ");
       if (sizeof(*txseg) == len) {
-        printf("tunnel_id=%x local_ip=%x remote_ip=%x local_port=%u remote_port=%u "
+        printf("tunnel_id=%x out_local_ip=%x out_remote_ip=%x "
+            "in_local_ip=%x in_remote_ip=%x local_port=%u remote_port=%u "
             "flow_seq=%u flow_ack=%u flow_flags=%x flow_len=%u",
-            txseg->tunnel_id, txseg->local_ip, txseg->remote_ip, txseg->local_port,
+            txseg->tunnel_id, txseg->out_local_ip, txseg->out_remote_ip,
+            txseg->in_local_ip, txseg->in_remote_ip, txseg->local_port,
             txseg->remote_port, txseg->flow_seq, txseg->flow_ack,
             txseg->flow_flags, txseg->flow_len);
       } else {

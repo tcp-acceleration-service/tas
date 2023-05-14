@@ -901,7 +901,7 @@ int tas_getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
     /* FIXME: without breaking abstraction */
-    sin.sin_addr.s_addr = htonl(s->data.connection.c.local_ip);
+    sin.sin_addr.s_addr = htonl(s->data.connection.c.in_local_ip);
     sin.sin_port = htons(s->data.connection.c.local_port);
   } else {
     errno = ENOTCONN;
@@ -944,7 +944,7 @@ int tas_getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
   memset(&sin, 0, sizeof(sin));
   sin.sin_family = AF_INET;
   /* FIXME: without breaking abstraction */
-  sin.sin_addr.s_addr = htonl(s->data.connection.c.remote_ip);
+  sin.sin_addr.s_addr = htonl(s->data.connection.c.in_remote_ip);
   sin.sin_port = htons(s->data.connection.c.remote_port);
 
   len = MIN(*addrlen, sizeof(sin));
