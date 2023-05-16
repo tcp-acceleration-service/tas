@@ -54,10 +54,10 @@
 /* maximum number of listening sockets per port */
 #define LISTEN_MULTI_MAX 32
 
-// #define CONN_DEBUG(c, f, x...) do { } while (0)
-// #define CONN_DEBUG0(c, f) do { } while (0)
-#define CONN_DEBUG(c, f, x...) fprintf(stderr, "conn(%p): " f, c, x)
-#define CONN_DEBUG0(c, f, x...) fprintf(stderr, "conn(%p): " f, c)
+#define CONN_DEBUG(c, f, x...) do { } while (0)
+#define CONN_DEBUG0(c, f) do { } while (0)
+// #define CONN_DEBUG(c, f, x...) fprintf(stderr, "conn(%p): " f, c, x)
+// #define CONN_DEBUG0(c, f, x...) fprintf(stderr, "conn(%p): " f, c)
 
 struct listen_multi {
   size_t num;
