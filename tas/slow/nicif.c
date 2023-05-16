@@ -642,13 +642,11 @@ static inline uint32_t flow_hash(ip_addr_t lip, beui16_t lp,
 {
   struct
   {
-    ip_addr_t lip;
-    ip_addr_t rip;
     uint32_t tid;
     beui16_t lp;
     beui16_t rp;
   } __attribute__((packed)) hk =
-      {.lip = lip, .rip = rip, .tid = tid, .lp = lp, .rp = rp};
+      {.tid = tid, .lp = lp, .rp = rp};
   MEM_BARRIER();
   return rte_hash_crc(&hk, sizeof(hk), 0);
 }

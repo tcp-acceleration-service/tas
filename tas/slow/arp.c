@@ -33,8 +33,8 @@
 #include <utils.h>
 #include "internal.h"
 
-// #define ARP_DEBUG(x...) do { } while (0)
-#define ARP_DEBUG(x...) fprintf(stderr, "arp: " x)
+#define ARP_DEBUG(x...) do { } while (0)
+// #define ARP_DEBUG(x...) fprintf(stderr, "arp: " x)
 
 struct arp_entry {
     int status;
