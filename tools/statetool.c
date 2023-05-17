@@ -130,7 +130,7 @@ static int dump_flow(uint32_t flow_id)
          "  flag_rxfin=%u\n"
          "  bump_seq=%010u\n"
          "  addr {\n"
-         "      tunnel_id=%04x\n"
+         "      tunnel_id=%08x\n"
          "       out_local_ip=%08x\n"
          "       out_remote_ip=%08x\n"
          "       in_local_ip=%08x\n"
@@ -175,7 +175,7 @@ static int dump_flow(uint32_t flow_id)
       !!(fs->rx_base_sp & FLEXNIC_PL_FLOWST_TXFIN),
       !!(fs->rx_base_sp & FLEXNIC_PL_FLOWST_RXFIN),
       fs->bump_seq,
-      fs->tunnel_id,
+      f_beui32(fs->tunnel_id),
       f_beui32(fs->out_local_ip), f_beui32(fs->out_remote_ip),
       f_beui32(fs->in_local_ip), f_beui16(fs->local_port), f_beui32(fs->in_remote_ip),
       f_beui16(fs->remote_port), mac,
