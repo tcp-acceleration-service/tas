@@ -96,11 +96,11 @@ int main(int argc, char *argv[])
   uint32_t in_lip;
   uint32_t in_rip;
   uint32_t out_rip;
-  util_parse_ipv4("192.168.10.20", &in_lip);
-  util_parse_ipv4("192.168.10.40", &in_rip);
+  util_parse_ipv4("10.0.0.1", &in_lip);
+  util_parse_ipv4("10.0.0.2", &in_rip);
   util_parse_ipv4("192.168.10.14", &out_rip);
   struct flextcp_pl_tun tun = {
-    .tun_id = 0,
+    .tun_id = 1,
     .out_local_ip = config.ip,
     .out_remote_ip = out_rip,
     .in_local_ip = in_lip,
@@ -314,8 +314,6 @@ void boost_budget(int vmid, int ctxid, int64_t incr)
   new_budget = old_budget + incr;
   max_budget = config.bu_max_budget;  
 
-  /* TODO: Leftovers that would go over budget (new_budget - max_budget)
-     give to other VMs that would not go over MAX */
   if (new_budget > max_budget)
   {
     incr = max_budget - old_budget;

@@ -434,9 +434,9 @@ static void packet_dump(void *buf, size_t len)
         return;
       }
 
-      printf(" gre={key=%x proto=%x}", gre->key, gre->proto);
+      printf(" gre={key=%x proto=%x}", f_beui32(gre->key), f_beui16(gre->proto));
 
-      if (gre->proto == GRE_PROTO_IP) {
+      if (f_beui16(gre->proto) == GRE_PROTO_IP) {
         if (len < sizeof(*eth) + sizeof(*out_ip) + 
             sizeof(*gre) + sizeof(*in_ip))
         {

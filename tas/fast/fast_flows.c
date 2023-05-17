@@ -43,7 +43,7 @@
 // #define SKIP_ACK 1
 
 struct flow_key {
-  uint32_t tunnel_id;
+  beui32_t tunnel_id;
   beui16_t local_port;
   beui16_t remote_port;
 } __attribute__((packed));
@@ -253,7 +253,7 @@ void fast_flows_packet_parse(struct dataplane_context *ctx,
         (f_beui16(p->eth.type) != ETH_TYPE_IP) |
         (p->out_ip.proto != IP_PROTO_GRE) |
         (p->in_ip.proto != IP_PROTO_TCP) |
-        (p->gre.proto != GRE_PROTO_IP) |
+        (f_beui16(p->gre.proto) != GRE_PROTO_IP) |
         (IPH_V(&p->out_ip) != 4) |
         (IPH_HL(&p->out_ip) != 5) |
         (IPH_V(&p->in_ip) != 4) |
@@ -934,7 +934,7 @@ static void flow_tx_segment(struct dataplane_context *ctx,
   }
 
   GREH_CKSV_SET(&p->gre, 0, 1, 0, 0);
-  p->gre.proto = GRE_PROTO_IP;
+  p->gre.proto = t_beui16(GRE_PROTO_IP);
   p->gre.key = fs->tunnel_id;
 
   IPH_VHL_SET(&p->in_ip, 4, 5);
@@ -1151,7 +1151,7 @@ static inline uint32_t flow_hash(struct flow_key *k)
   //     crc32c_sse42_u32(k->local_port.x | (((uint32_t) k->remote_port.x) << 16),
   //     crc32c_sse42_u64(k->out_local_ip.x | (((uint64_t) k->out_remote_ip.x) << 32), 0)));
   return crc32c_sse42_u32(k->local_port.x | (((uint32_t) k->remote_port.x) << 16),
-      crc32c_sse42_u64(k->tunnel_id, 0));
+      crc32c_sse42_u64(k->tunnel_id.x, 0));
 }
 
 void fast_flows_packet_fss(struct dataplane_context *ctx,
@@ -1226,7 +1226,7 @@ void fast_flows_packet_fss(struct dataplane_context *ctx,
           (fs->out_remote_ip.x == p->out_ip.src.x) &
           (fs->in_local_ip.x == p->in_ip.dest.x) &
           (fs->in_remote_ip.x == p->in_ip.src.x) &
-          (fs->tunnel_id == p->gre.key) &
+          (fs->tunnel_id.x == p->gre.key.x) &
           (fs->local_port.x == p->tcp.dest.x) &
           (fs->remote_port.x == p->tcp.src.x))
       {

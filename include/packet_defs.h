@@ -109,17 +109,17 @@ struct ip_hdr {
 #define GREH_V(hdr) ((hdr)->_c_k_s_ver & 0b0000000000000111)
 
 #define GREH_CKSV_SET(hdr, c, k, s, v) (hdr)->_c_k_s_ver = \
-    (((c) << 15) | ((k) << 13) | ((s) << 12) | (v))
+    t_beui16(((c) << 15) | ((k) << 13) | ((s) << 12) | (v))
 
 #define GRE_PROTO_IP 0x0800
 
 struct gre_hdr {
   /* checksum / key present / seq num / reserved / version */
-  uint16_t _c_k_s_ver;
+  beui16_t _c_k_s_ver;
   /* protocol */
-  uint16_t proto;
+  beui16_t proto;
   /* key number used to identify a flow */
-  uint32_t key;
+  beui32_t key;
 } __attribute__ ((packed));
 
 /******************************************************************************/

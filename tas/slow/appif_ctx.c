@@ -315,7 +315,7 @@ static int kin_conn_open(struct application *app, struct app_context *ctx,
 
   // TODO: Lookup tunnel to find the rest of the information needed to open this.
   //       Keep tunnel id 0 hardcoded for now.
-  if (tcp_open(ctx, kin->data.conn_open.opaque, 0, 
+  if (tcp_open(ctx, kin->data.conn_open.opaque, fp_state->tunt[0].tun_id, 
       fp_state->tunt[0].out_remote_ip, 
       kin->data.conn_open.remote_ip,
       kin->data.conn_open.remote_port, ctx->doorbell->id, &conn) != 0)
