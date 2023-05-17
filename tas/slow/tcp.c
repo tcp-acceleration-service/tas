@@ -388,7 +388,6 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
   }
 
   if ((c = conn_lookup(p)) != NULL) {
-    printf("conn lookup succeeded\n");
     conn_packet(c, p, &opts, fn_core, flow_group);
   } else if ((l = listener_lookup(p)) != NULL) {
     listener_packet(l, p, &opts, fn_core, flow_group);
@@ -739,12 +738,12 @@ static struct connection *conn_lookup(const struct pkt_gre *p)
       f_beui16(p->tcp.dest), f_beui16(p->tcp.src)) % TCP_HTSIZE;
 
   for (c = tcp_hashtable[h]; c != NULL; c = c->ht_next) {
-    if (f_beui32(p->out_ip.src) == c->out_remote_ip &&
-        f_beui32(p->out_ip.dest) == c->out_local_ip &&
-        f_beui32(p->gre.key) == c->tunnel_id &&
+    if (f_beui32(p->gre.key) == c->tunnel_id &&
         f_beui16(p->tcp.dest) == c->local_port &&
         f_beui16(p->tcp.src) == c->remote_port)
     {
+      printf("conn_lookup success: h=%d tun=%d src_port=%d dst_port=%d\n",
+        h, f_beui32(p->gre.key), f_beui16(p->tcp.src), f_beui16(p->tcp.dest));
       return c;
     }
   }
@@ -842,6 +841,8 @@ static struct listener *listener_lookup(const struct pkt_gre *p)
         f_beui32(p->gre.key));
     hash = hash_64_to_32(((uint64_t) init_hash << 32) |
         ((uint32_t) f_beui16(p->tcp.src) << 16) | local_port);
+    printf("listener_lookup success: h=%d tun=%d src_port=%d dst_port=%d\n",
+        hash, f_beui32(p->gre.key), f_beui16(p->tcp.src), f_beui16(p->tcp.dest));
     return lm->ls[hash % lm->num];
   } else {
     return NULL;
