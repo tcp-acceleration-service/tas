@@ -1170,8 +1170,6 @@ void fast_flows_packet_fss(struct dataplane_context *ctx,
     key.local_port = p->tcp.dest;
     key.remote_port = p->tcp.src;
     h = flow_hash(&key);
-    printf("fss_lookup: h=%d tun=%d local_port=%d remote_port=%d\n",
-        h, f_beui32(p->gre.key), f_beui16(p->tcp.dest), f_beui16(p->tcp.src));
 
     rte_prefetch0(&fp_state->flowht[h % FLEXNIC_PL_FLOWHT_ENTRIES]);
     rte_prefetch0(&fp_state->flowht[(h + 3) % FLEXNIC_PL_FLOWHT_ENTRIES]);

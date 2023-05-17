@@ -739,8 +739,6 @@ static struct connection *conn_lookup(const struct pkt_gre *p)
         f_beui16(p->tcp.dest) == c->local_port &&
         f_beui16(p->tcp.src) == c->remote_port)
     {
-      printf("conn_lookup success: h=%d tun=%d src_port=%d dst_port=%d\n",
-        h, f_beui32(p->gre.key), f_beui16(p->tcp.src), f_beui16(p->tcp.dest));
       return c;
     }
   }
@@ -838,8 +836,6 @@ static struct listener *listener_lookup(const struct pkt_gre *p)
         f_beui32(p->gre.key));
     hash = hash_64_to_32(((uint64_t) init_hash << 32) |
         ((uint32_t) f_beui16(p->tcp.src) << 16) | local_port);
-    printf("listener_lookup success: h=%d tun=%d src_port=%d dst_port=%d\n",
-        hash, f_beui32(p->gre.key), f_beui16(p->tcp.src), f_beui16(p->tcp.dest));
     return lm->ls[hash % lm->num];
   } else {
     return NULL;
