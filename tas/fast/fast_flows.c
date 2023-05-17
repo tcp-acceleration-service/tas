@@ -1147,11 +1147,8 @@ void fast_flows_kernelxsums(struct network_buf_handle *nbh,
 
 static inline uint32_t flow_hash(struct flow_key *k)
 {
-  // return crc32c_sse42_u32(k->tunnel_id,
-  //     crc32c_sse42_u32(k->local_port.x | (((uint32_t) k->remote_port.x) << 16),
-  //     crc32c_sse42_u64(k->out_local_ip.x | (((uint64_t) k->out_remote_ip.x) << 32), 0)));
   return crc32c_sse42_u32(k->local_port.x | (((uint32_t) k->remote_port.x) << 16),
-      crc32c_sse42_u64(k->tunnel_id.x, 0));
+      crc32c_sse42_u32(k->tunnel_id.x, 0));
 }
 
 void fast_flows_packet_fss(struct dataplane_context *ctx,
@@ -1173,8 +1170,8 @@ void fast_flows_packet_fss(struct dataplane_context *ctx,
     key.local_port = p->tcp.dest;
     key.remote_port = p->tcp.src;
     h = flow_hash(&key);
-    printf("fss_lookup: h=%d tun=%d src_port=%d dst_port=%d\n",
-        h, f_beui32(p->gre.key), f_beui16(p->tcp.src), f_beui16(p->tcp.dest));
+    printf("fss_lookup: h=%d tun=%d local_port=%d remote_port=%d\n",
+        h, f_beui32(p->gre.key), f_beui16(p->tcp.dest), f_beui16(p->tcp.src));
 
     rte_prefetch0(&fp_state->flowht[h % FLEXNIC_PL_FLOWHT_ENTRIES]);
     rte_prefetch0(&fp_state->flowht[(h + 3) % FLEXNIC_PL_FLOWHT_ENTRIES]);

@@ -688,20 +688,18 @@ static inline void conn_free(struct connection *conn)
   free(conn);
 }
 
-static inline uint32_t conn_hash(uint32_t l_ip, uint32_t r_ip, uint32_t t_id,
-    uint16_t l_po, uint16_t r_po)
+static inline uint32_t conn_hash(uint32_t t_id, uint16_t l_po, uint16_t r_po)
 {
-  return crc32c_sse42_u32(t_id,
-      crc32c_sse42_u32(l_po | (((uint32_t) r_po) << 16),
-      crc32c_sse42_u64(l_ip | (((uint64_t) r_ip) << 32), 0)));
+  return crc32c_sse42_u32(l_po | (((uint32_t) r_po) << 16),
+      crc32c_sse42_u64(t_id, 0));
 }
 
 static void conn_register(struct connection *conn)
 {
   uint32_t h;
 
-  h = conn_hash(conn->out_local_ip, conn->out_remote_ip, conn->tunnel_id,
-      conn->local_port, conn->remote_port) % TCP_HTSIZE;
+  h = conn_hash(conn->tunnel_id, conn->local_port, conn->remote_port)
+      % TCP_HTSIZE;
 
   conn->ht_next = tcp_hashtable[h];
   tcp_hashtable[h] = conn;
@@ -712,8 +710,8 @@ static void conn_unregister(struct connection *conn)
   struct connection *cp = NULL;
   uint32_t h;
 
-  h = conn_hash(conn->out_local_ip, conn->out_remote_ip, conn->tunnel_id,
-      conn->local_port, conn->remote_port) % TCP_HTSIZE;
+  h = conn_hash(conn->tunnel_id, conn->local_port, conn->remote_port)
+      % TCP_HTSIZE;
   if (tcp_hashtable[h] == conn) {
     tcp_hashtable[h] = conn->ht_next;
   } else {
@@ -733,9 +731,8 @@ static struct connection *conn_lookup(const struct pkt_gre *p)
   uint32_t h;
   struct connection *c;
 
-  h = conn_hash(f_beui32(p->out_ip.dest), f_beui32(p->out_ip.src), 
-      f_beui32(p->gre.key),
-      f_beui16(p->tcp.dest), f_beui16(p->tcp.src)) % TCP_HTSIZE;
+  h = conn_hash(f_beui32(p->gre.key), f_beui16(p->tcp.dest), f_beui16(p->tcp.src))
+      % TCP_HTSIZE;
 
   for (c = tcp_hashtable[h]; c != NULL; c = c->ht_next) {
     if (f_beui32(p->gre.key) == c->tunnel_id &&
