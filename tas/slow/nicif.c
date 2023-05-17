@@ -207,8 +207,6 @@ int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
 
   /* calculate hash and find empty slot */
   hash = flow_hash(lp, rp, tid);
-  printf("adding connections: h=%d tun=%d local_port=%d remote_port=%d\n",
-        hash, f_beui32(tid), f_beui16(lp), f_beui16(rp));
   if (flow_slot_alloc(hash, &i, &d) != 0)
   {
     flow_id_free(f_id);
