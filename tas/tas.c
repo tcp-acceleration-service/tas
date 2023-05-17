@@ -96,8 +96,8 @@ int main(int argc, char *argv[])
   uint32_t in_lip;
   uint32_t in_rip;
   uint32_t out_rip;
-  util_parse_ipv4("10.0.0.1", &in_lip);
-  util_parse_ipv4("10.0.0.2", &in_rip);
+  util_parse_ipv4("192.168.10.40", &in_lip);
+  util_parse_ipv4("192.168.10.20", &in_rip);
   util_parse_ipv4("192.168.10.14", &out_rip);
   struct flextcp_pl_tun tun = {
     .tun_id = 1,

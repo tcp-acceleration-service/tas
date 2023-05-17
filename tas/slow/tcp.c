@@ -388,6 +388,7 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
   }
 
   if ((c = conn_lookup(p)) != NULL) {
+    printf("conn lookup succeeded\n");
     conn_packet(c, p, &opts, fn_core, flow_group);
   } else if ((l = listener_lookup(p)) != NULL) {
     listener_packet(l, p, &opts, fn_core, flow_group);

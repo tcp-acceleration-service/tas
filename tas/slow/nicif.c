@@ -59,8 +59,7 @@ static inline void process_packet(const void *buf, uint16_t len,
     uint32_t fn_core, uint16_t flow_group);
 static inline volatile struct flextcp_pl_ktx *ktx_try_alloc(uint32_t core,
     struct nic_buffer **buf, uint32_t *new_tail);
-static inline uint32_t flow_hash(ip_addr_t lip, beui16_t lp,
-    ip_addr_t rip, beui16_t rp, beui32_t tid);
+static inline uint32_t flow_hash(beui16_t lp, beui16_t rp, beui32_t tid);
 static inline int flow_slot_alloc(uint32_t h, uint32_t *i, uint32_t *d);
 static inline int flow_slot_clear(uint32_t f_id, ip_addr_t lip, beui16_t lp,
     ip_addr_t rip, beui16_t rp, beui32_t tunnel_id);
@@ -207,7 +206,7 @@ int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
   }
 
   /* calculate hash and find empty slot */
-  hash = flow_hash(o_lip, lp, o_rip, rp, tid);
+  hash = flow_hash(lp, rp, tid);
   if (flow_slot_alloc(hash, &i, &d) != 0)
   {
     flow_id_free(f_id);
@@ -638,8 +637,7 @@ static inline volatile struct flextcp_pl_ktx *ktx_try_alloc(uint32_t core,
   return ktx;
 }
 
-static inline uint32_t flow_hash(ip_addr_t lip, beui16_t lp,
-                                 ip_addr_t rip, beui16_t rp, beui32_t tid)
+static inline uint32_t flow_hash(beui16_t lp, beui16_t rp, beui32_t tid)
 {
   struct
   {
@@ -753,8 +751,7 @@ static inline int flow_slot_clear(uint32_t f_id, ip_addr_t lip, beui16_t lp,
   uint32_t h, k, j, ffid, eh;
   struct flextcp_pl_flowhte *e;
 
-  h = flow_hash(t_beui32(fp_state->tunt[f_beui32(tid) - 1].out_local_ip), lp,
-                   t_beui32(fp_state->tunt[f_beui32(tid) - 1].out_remote_ip), rp, tid);
+  h = flow_hash(lp, rp, tid);
 
   for (j = 0; j < FLEXNIC_PL_FLOWHT_NBSZ; j++)
   {
