@@ -27,13 +27,6 @@
 
 #include <stdint.h>
 
-/** Supported packet_scheduling algorithms. */
-enum config_ps_algorithm {
-  /** Default scheduler from TAS paper */
-  CONFIG_PS_DEFAULT,
-  /** Hierarchical packet scheduler */
-  CONFIG_PS_HIERARCHICAL,
-};
 
 /** Supported congestion control algorithms. */
 enum config_cc_algorithm {
@@ -139,8 +132,6 @@ struct configuration {
   uint32_t fp_poll_interval_tas;
   /** FP: polling interval for app */
   uint32_t fp_poll_interval_app;
-  /** Packet scheduling algorithm */
-  enum config_ps_algorithm ps_algorithm;
   /** Max budget for a vm */
   uint64_t bu_max_budget;
   /** Budget update frequency in microseconds */
