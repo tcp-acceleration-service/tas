@@ -120,8 +120,8 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t vm_id, uint32_t queu
   /* if connection has been moved, add to forwarding queue and stop */
   new_core = fp_state->flow_group_steering[fs->flow_group];
   if (new_core != ctx->id) {
-    /*fprintf(stderr, "fast_flows_qman: arrived on wrong core, forwarding "
-        "%u -> %u (fs=%p, fg=%u)\n", ctx->id, new_core, fs, fs->flow_group);*/
+    fprintf(stderr, "fast_flows_qman: arrived on wrong core, forwarding "
+        "%u -> %u (fs=%p, fg=%u)\n", ctx->id, new_core, fs, fs->flow_group);
 
     /* enqueue flo state on forwarding queue */
     if (rte_ring_enqueue(ctxs[new_core]->qman_fwd_ring, fs) != 0) {
@@ -308,7 +308,6 @@ int fast_flows_packet(struct dataplane_context *ctx,
   payload_bytes =
       f_beui16(p->in_ip.len) - (sizeof(p->in_ip) + sizeof(p->tcp) + tcp_extra_hlen);
   orig_payload = payload_bytes;
-
 #ifdef PL_DEBUG_ARX
   fprintf(stderr, "FLOW tunnel=%x "
       "local=%08x:%05u remote=%08x:%05u  RX: seq=%u ack=%u "

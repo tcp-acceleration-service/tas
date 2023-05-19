@@ -41,7 +41,6 @@ extern uint16_t rss_reta_size;
 
 int network_thread_init(struct dataplane_context *ctx);
 int network_rx_interrupt_ctl(struct network_thread *t, int turnon);
-
 int network_scale_up(uint16_t old, uint16_t new);
 int network_scale_down(uint16_t old, uint16_t new);
 
@@ -90,7 +89,6 @@ static inline int network_poll(struct network_thread *t, unsigned num,
     struct network_buf_handle **bhs)
 {
   struct rte_mbuf **mbs = (struct rte_mbuf **) bhs;
-
   num = rte_eth_rx_burst(net_port_id, t->queue_id, mbs, num);
   if (num == 0) {
     return 0;

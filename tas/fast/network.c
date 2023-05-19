@@ -42,12 +42,15 @@
 #include <tas_memif.h>
 #include "internal.h"
 
+#define MAX_PATTERN_IN_FLOW 10
+#define MAX_ACTIONS_IN_FLOW 10
 #define PERTHREAD_MBUFS 2048
 #define MBUF_SIZE (BUFFER_SIZE + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
 #define RX_DESCRIPTORS 256
 #define TX_DESCRIPTORS 128
 
 uint8_t net_port_id = 0;
+
 static struct rte_eth_conf port_conf = {
     .rxmode = {
       .mq_mode = ETH_MQ_RX_RSS,
@@ -57,7 +60,7 @@ static struct rte_eth_conf port_conf = {
 #endif
     },
     .txmode = {
-      .mq_mode = ETH_MQ_TX_NONE,
+      .mq_mode = ETH_MQ_RX_RSS,
       .offloads = 0,
     },
     .rx_adv_conf = {
@@ -69,6 +72,7 @@ static struct rte_eth_conf port_conf = {
       .rxq = 1,
     },
   };
+
 
 static unsigned num_threads;
 static struct network_rx_thread **net_threads;
@@ -88,6 +92,10 @@ static struct rte_mempool *mempool_alloc(void);
 static int reta_setup(void);
 static int reta_mlx5_resize(void);
 static rte_spinlock_t initlock = RTE_SPINLOCK_INITIALIZER;
+
+static int add_rss_flow_rule(int n_threads);
+static struct rte_flow * add_rss_inbound_flow_rule();
+static void create_queue_idxs(int num_threads, uint16_t *idxs);
 
 int network_init(unsigned n_threads)
 {
@@ -195,6 +203,9 @@ error_exit:
 
 void network_cleanup(void)
 {
+  struct rte_flow_error error;
+
+  rte_flow_flush(net_port_id, &error);
   rte_eth_dev_stop(net_port_id);
   rte_free(net_threads);
 }
@@ -233,7 +244,6 @@ int network_thread_init(struct dataplane_context *ctx)
   ret = rte_eth_tx_queue_setup(net_port_id, t->queue_id, TX_DESCRIPTORS, 
           rte_socket_id(), &eth_devinfo.default_txconf);
   rte_spinlock_unlock(&initlock);
- 
   if (ret != 0) {
     fprintf(stderr, "network_thread_init: rte_eth_tx_queue_setup failed\n");
     goto error_tx_queue;
@@ -264,6 +274,13 @@ int network_thread_init(struct dataplane_context *ctx)
     if (rte_eth_dev_start(net_port_id) != 0) {
       fprintf(stderr, "rte_eth_dev_start failed\n");
       goto error_tx_queue;
+    }
+
+    /* Configure inner header RSS */
+    if (config.fp_rss) {
+      if (add_rss_flow_rule(num_threads) < 0) {
+        fprintf(stderr, "RSS disabled\n");
+      }
     }
 
     /* enable vlan stripping if configured */
@@ -513,4 +530,99 @@ static int reta_mlx5_resize(void)
   }
 
   return 0;
+}
+
+int add_rss_flow_rule(int n_threads)
+{
+  struct rte_flow *in_flow;
+
+  in_flow = add_rss_inbound_flow_rule(n_threads);
+  if (in_flow == NULL)
+  {
+    fprintf(stderr, "network_add_rss_flow_rule: "
+        "failed to create inbound flow rule.\n");
+    return -1;
+  }
+
+  return 0;
+
+}
+
+static struct rte_flow * add_rss_inbound_flow_rule(int n_threads)
+{
+  struct rte_flow_attr attr = { .ingress = 1 };
+  struct rte_flow_item pattern[MAX_PATTERN_IN_FLOW];
+  struct rte_flow_action actions[MAX_ACTIONS_IN_FLOW];
+
+  uint16_t queue_idxs[n_threads];
+  struct rte_flow *flow;
+  struct rte_flow_error error;
+
+
+  /* Setting spec, last, and mask to NULL matches all packets*/
+  /* Setting eth to pass all packets */
+  pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
+  pattern[0].spec = NULL;
+  pattern[0].last = NULL;
+  pattern[0].mask = NULL;
+
+  /* Setting ip to pass all packets */
+  pattern[1].type = RTE_FLOW_ITEM_TYPE_IPV4;
+  pattern[1].spec = NULL;
+  pattern[1].last = NULL;
+  pattern[1].mask = NULL;
+
+  /* Setting gre to pass all packets */
+  pattern[2].type = RTE_FLOW_ITEM_TYPE_GRE;
+  pattern[2].spec = NULL;
+  pattern[2].last = NULL;
+  pattern[2].mask = NULL;
+
+  pattern[3].type = RTE_FLOW_ITEM_TYPE_IPV4;
+  pattern[3].spec = NULL;
+  pattern[3].last = NULL;
+  pattern[3].mask = NULL;
+
+  /* Setting tcp to pass all packets */
+  pattern[4].type = RTE_FLOW_ITEM_TYPE_TCP;
+  pattern[4].spec = NULL;
+  pattern[4].last = NULL;
+  pattern[4].mask = NULL;
+
+  /* End pattern array */
+  pattern[5].type = RTE_FLOW_ITEM_TYPE_END;
+
+  /* Create queue action */
+  create_queue_idxs(num_threads, queue_idxs);
+  struct rte_flow_action_rss rss = { .level = 2,
+      .types = ETH_RSS_NONFRAG_IPV4_TCP,
+      .queue_num = n_threads,
+      .queue = queue_idxs,
+  };
+
+  actions[0].type = RTE_FLOW_ACTION_TYPE_RSS;
+  actions[0].conf = &rss;
+  actions[1].type = RTE_FLOW_ACTION_TYPE_END;
+
+  /* Validate flow rule */
+  if (rte_flow_validate(net_port_id, &attr, pattern, actions, &error) == 0)
+  {
+    flow = rte_flow_create(net_port_id, &attr, pattern, actions, &error);
+    return flow;
+  } else 
+  {
+    fprintf(stderr, "add_rss_inbound_flow_rule: %s\n", error.message);
+    return NULL;
+  }
+
+}
+
+static void create_queue_idxs(int num_threads, uint16_t *idxs)
+{
+  int i;
+
+  for (i = 0; i < num_threads; i++)
+  {
+    idxs[i] = i;
+  }
 }
