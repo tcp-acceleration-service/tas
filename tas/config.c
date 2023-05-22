@@ -76,6 +76,7 @@ enum cfg_params {
   CP_FP_NO_AUTOSCALE,
   CP_FP_NO_RSS,
   CP_FP_NO_HUGEPAGES,
+  CP_FP_NO_GRE,
   CP_FP_VLAN_STRIP,
   CP_FP_POLL_INTERVAL_TAS,
   CP_FP_POLL_INTERVAL_APP,
@@ -210,6 +211,9 @@ static struct option opts[] = {
     { .name = "fp-no-rss",
       .has_arg = no_argument,
       .val = CP_FP_NO_RSS },
+    { .name = "fp-gre",
+      .has_arg = no_argument,
+      .val = CP_FP_NO_GRE },
     { .name = "fp-no-hugepages",
       .has_arg = no_argument,
       .val = CP_FP_NO_HUGEPAGES },
@@ -515,6 +519,9 @@ int config_parse(struct configuration *c, int argc, char *argv[])
       case CP_FP_NO_RSS:
         c->fp_rss = 0;
         break;
+      case CP_FP_NO_GRE:
+        c->fp_gre = 0;
+        break;
       case CP_FP_NO_HUGEPAGES:
         c->fp_hugepages = 0;
         break;
@@ -648,6 +655,7 @@ static int config_defaults(struct configuration *c, char *progname)
   c->fp_xsumoffload = 1;
   c->fp_autoscale = 1;
   c->fp_rss = 1;
+  c->fp_gre = 1;
   c->fp_hugepages = 1;
   c->fp_vlan_strip = 0;
   c->fp_poll_interval_tas = 10000;
@@ -759,6 +767,8 @@ static void print_usage(struct configuration *c, char *progname)
       "  --fp-no-autoscale           Disable autoscaling "
           "[default: enabled]\n"
       "  --fp-no-rss                 Disable rss "
+          "[default: enabled]\n"
+      "  --fp-no-gre                 Disable GRE tunneling "
           "[default: enabled]\n"
       "  --fp-no-hugepages           Disable hugepages for SHM "
           "[default: enabled]\n"

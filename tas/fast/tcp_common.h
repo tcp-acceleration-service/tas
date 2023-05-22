@@ -231,6 +231,64 @@ struct tcp_opts {
 };
 
 /**
+ * Parse TCP option list. For each parsed option the corresponding pointer in
+ * opts will be set.
+ *
+ * @param p Pointer to packet
+ * @param len Packet length
+ * @param [out] opts Pointers to parsed options
+ *
+ * @return 0 if parsed successful, -1 otherwise.
+ */
+static inline int tcp_parse_options(const struct pkt_tcp *p, uint16_t len,
+    struct tcp_opts *opts)
+{
+  uint8_t *opt = (uint8_t *) (p + 1);
+  uint16_t opts_len = TCPH_HDRLEN(&p->tcp) * 4 - 20;
+  uint16_t off = 0;
+  uint8_t opt_kind, opt_len, opt_avail;
+
+  opts->ts = NULL;
+
+  /* whole header not in buf */
+  if (TCPH_HDRLEN(&p->tcp) < 5 || opts_len > (len - sizeof(*p))) {
+    fprintf(stderr, "hlen=%u opts_len=%u len=%u so=%zu\n", TCPH_HDRLEN(&p->tcp), opts_len, len, sizeof(*p));
+    return -1;
+  }
+
+  while (off < opts_len) {
+    opt_kind = opt[off];
+    opt_avail = opts_len - off;
+    if (opt_kind == TCP_OPT_END_OF_OPTIONS) {
+      /* end of options list option */
+      break;
+    } else if (opt_kind == TCP_OPT_NO_OP) {
+      /* no-op, ignore */
+      opt_len = 1;
+    } else {
+      /* variable length option */
+      if (opt_avail < 2) {
+        fprintf(stderr, "parse_options: opt_avail=%u kind=%u off=%u\n", opt_avail, opt_kind,  off);
+        return -1;
+      }
+
+      opt_len = opt[off + 1];
+      if (opt_kind == TCP_OPT_TIMESTAMP) {
+        if (opt_len != sizeof(struct tcp_timestamp_opt)) {
+          fprintf(stderr, "parse_options: opt_len=%u so=%zu\n", opt_len, sizeof(struct tcp_timestamp_opt));
+          return -1;
+        }
+
+        opts->ts = (struct tcp_timestamp_opt *) (opt + off);
+      }
+    }
+    off += opt_len;
+  }
+
+  return 0;
+}
+
+/**
  * Parse TCP option list for gre packet. For each parsed option 
  * the corresponding pointer in opts will be set.
  *

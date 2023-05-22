@@ -268,6 +268,8 @@ struct flextcp_pl_flowst {
 
   /* GRE ID used to identify tunnel */
   beui32_t tunnel_id;
+  /* If packet is not GRE encapsulated use only
+     out ips */
   beui32_t out_local_ip;
   beui32_t out_remote_ip;
   beui32_t in_local_ip;

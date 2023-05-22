@@ -33,6 +33,8 @@
 #include "tcp_common.h"
 
 
+static inline void inject_tcp_ts(void *buf, uint16_t len, uint32_t ts,
+    struct network_buf_handle *nbh);
 static inline void inject_tcp_ts_gre(void *buf, uint16_t len, uint32_t ts,
     struct network_buf_handle *nbh);
 
@@ -64,7 +66,14 @@ int fast_kernel_poll(struct dataplane_context *ctx,
     dma_read(ktx->msg.packet.addr, len, buf, SP_MEM_ID);
 
     ret = 0;
-    inject_tcp_ts_gre(buf, len, ts, nbh);
+    if (config.fp_gre)
+    {
+      inject_tcp_ts_gre(buf, len, ts, nbh);
+    } else
+    {
+      inject_tcp_ts(buf, len, ts, nbh);
+    }
+    
     tx_send(ctx, nbh, 0, len);
   } else if (ktx->type == FLEXTCP_PL_KTX_PACKET_NOTS) {
     /* send packet without filling in timestamp */
@@ -140,6 +149,32 @@ void fast_kernel_packet(struct dataplane_context *ctx,
   krx->type = FLEXTCP_PL_KRX_PACKET;
   
   notify_slowpath_core();
+}
+
+static inline void inject_tcp_ts(void *buf, uint16_t len, uint32_t ts,
+    struct network_buf_handle *nbh)
+{
+  struct pkt_tcp *p = buf;
+  struct tcp_opts opts;
+
+  if (len < sizeof(*p) || f_beui16(p->eth.type) != ETH_TYPE_IP ||
+      p->ip.proto != IP_PROTO_TCP)
+  {
+    return;
+  }
+
+  if (tcp_parse_options(buf, len, &opts) != 0) {
+    fprintf(stderr, "inject_tcp_ts: parsing options failed\n");
+    return;
+  }
+
+  if (opts.ts == NULL) {
+    return;
+  }
+
+  opts.ts->ts_val = t_beui32(ts);
+
+  fast_flows_kernelxsums(nbh, p);
 }
 
 static inline void inject_tcp_ts_gre(void *buf, uint16_t len, uint32_t ts,

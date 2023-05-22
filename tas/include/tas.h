@@ -46,8 +46,6 @@ extern struct flexnic_info *tas_info;
 #endif
 extern unsigned fp_cores_max;
 
-#define IS_GRE
-
 int slowpath_main(int threads_launched);
 
 int shm_preinit(void);

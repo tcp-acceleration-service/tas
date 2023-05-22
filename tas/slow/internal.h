@@ -126,6 +126,38 @@ enum nicif_connection_flags {
 /**
  * Register flow (must be called from poll thread).
  *
+ * @param db          Doorbell ID
+ * @param app_id      Application ID
+ * @param mac_remote  MAC address of the remote host
+ * @param ip_local    Local IP address
+ * @param port_local  Local port number
+ * @param ip_remote   Remote IP address
+ * @param port_remote Remote port number
+ * @param rx_base     Base address of circular receive buffer
+ * @param rx_len      Length of circular receive buffer
+ * @param tx_base     Base address of circular transmit buffer
+ * @param tx_len      Length of circular transmit buffer
+ * @param remote_seq  Next sequence number expected from remote host
+ * @param local_seq   Next sequence number for transmission
+ * @param app_opaque  Opaque value to pass in notificaitions
+ * @param flags       See #nicif_connection_flags.
+ * @param rate        Congestion rate to set [Kbps]
+ * @param fn_core     FlexNIC emulator core for the connection
+ * @param flow_group  Flow group
+ * @param pf_id       Pointer to location where flow id should be stored
+ *
+ * @return 0 on success, <0 else
+ */
+int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
+    uint64_t mac_remote, uint32_t ip_local, uint16_t port_local,
+    uint32_t ip_remote, uint16_t port_remote, uint64_t rx_base, uint32_t rx_len, 
+    uint64_t tx_base, uint32_t tx_len, uint32_t remote_seq, uint32_t local_seq, 
+    uint64_t app_opaque, uint32_t flags, uint32_t rate, uint32_t fn_core, 
+    uint16_t flow_group, uint32_t *pf_id);
+
+/**
+ * Register flow (must be called from poll thread).
+ *
  * @param db            Doorbell ID
  * @param app_id        Application ID
  * @param mac_remote    MAC address of the remote host
@@ -150,7 +182,7 @@ enum nicif_connection_flags {
  *
  * @return 0 on success, <0 else
  */
-int nicif_connection_add(uint32_t db, uint16_t vm_id, uint16_t app_id,
+int nicif_connection_add_gre(uint32_t db, uint16_t vm_id, uint16_t app_id,
     uint32_t tunnel_id, uint64_t mac_remote, 
     uint32_t out_ip_local, uint32_t out_ip_remote,
     uint32_t in_ip_local, uint16_t port_local,
@@ -340,12 +372,24 @@ void appif_conn_closed(struct connection *c, int status);
 /**
  * Callback from TCP module: New connection request received on listener.
  *
+ * @param l           Listener that received new connection
+ * @param remote_ip   Remote IP address
+ * @param remote_port Remote port
+ */
+void appif_listen_newconn(struct listener *l, uint32_t remote_ip,
+    uint16_t remote_port);
+
+/**
+ * Callback from TCP module: New connection request with GRE tunnel
+ * received on listener.
+ *
  * @param l              Listener that received new connection
  * @param out_remote_ip  Remote IP address of tunnel endpoint
  * @param in_remote_ip   Remote IP address of VM
  * @param remote_port    Remote port
+ * @param tunnel_id      ID of the tunnel
  */
-void appif_listen_newconn(struct listener *l, 
+void appif_listen_newconn_gre(struct listener *l, 
     uint32_t out_remote_ip, uint32_t in_remote_ip,
     uint16_t remote_port, uint32_t tunnel_id);
 
@@ -676,6 +720,19 @@ int tcp_accept(struct app_context *ctx, uint64_t opaque,
 
 /**
  * RX processing for a TCP packet.
+ *
+ * @param pkt Pointer to packet
+ * @param len Length of packet
+ * @param fn_core FlexNIC emulator core
+ * @param flow_group Flow group (rss bucket for steering)
+ *
+ * @return 0 if packet has been consumed, <0 otherwise.
+ */
+int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
+    uint16_t flow_group);
+
+/**
+ * RX processing for an encapsulated TCP packet.
  *
  * @param pkt Pointer to packet
  * @param len Length of packet

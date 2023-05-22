@@ -141,7 +141,37 @@ void appif_conn_closed(struct connection *c, int status)
   }
 }
 
-void appif_listen_newconn(struct listener *l, 
+void appif_listen_newconn(struct listener *l, uint32_t remote_ip,
+    uint16_t remote_port)
+{
+  struct app_context *ctx = l->ctx;
+  volatile struct kernel_appin *kout = ctx->kout_base;
+  uint32_t kout_pos = ctx->kout_pos;
+
+  kout += kout_pos;
+
+  /* make sure we have room for a response */
+  if (kout->type != KERNEL_APPIN_INVALID) {
+    fprintf(stderr, "appif_listen_newconn: No space in kout queue (TODO)\n");
+    return;
+  }
+
+  kout->data.listen_newconn.opaque = l->opaque;
+  kout->data.listen_newconn.out_remote_ip = remote_ip;
+  kout->data.listen_newconn.remote_port = remote_port;
+  MEM_BARRIER();
+  kout->type = KERNEL_APPIN_LISTEN_NEWCONN;
+  appif_ctx_kick(ctx);
+
+  kout_pos++;
+  if (kout_pos >= ctx->kout_len) {
+    kout_pos = 0;
+  }
+  ctx->kout_pos = kout_pos;
+
+}
+
+void appif_listen_newconn_gre(struct listener *l, 
     uint32_t out_remote_ip, uint32_t in_remote_ip,
     uint16_t remote_port, uint32_t tunnel_id)
 {

@@ -70,16 +70,26 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t vm_id,
     uint32_t queue, struct network_buf_handle *nbh, uint32_t ts);
 int fast_flows_qman_fwd(struct dataplane_context *ctx,
     struct flextcp_pl_flowst *fs);
+int fast_flows_packet(struct dataplane_context *ctx,
+    struct network_buf_handle *nbh, void *fsp, struct tcp_opts *opts,
+    uint32_t ts);
 int fast_flows_packet_gre(struct dataplane_context *ctx,
     struct network_buf_handle *nbh, void *fs, struct tcp_opts *opts,
     uint32_t ts);
+void fast_flows_packet_fss(struct dataplane_context *ctx,
+    struct network_buf_handle **nbhs, void **fss, uint16_t n);
 void fast_flows_packet_fss_gre(struct dataplane_context *ctx,
     struct network_buf_handle **nbhs, void **fss, uint16_t n);
+void fast_flows_packet_parse(struct dataplane_context *ctx,
+    struct network_buf_handle **nbhs, void **fss, struct tcp_opts *tos,
+    uint16_t n);
 void fast_flows_packet_parse_gre(struct dataplane_context *ctx,
     struct network_buf_handle **nbhs, void **fss, struct tcp_opts *tos,
     uint16_t n);
 void fast_flows_packet_pfbufs(struct dataplane_context *ctx,
     void **fss, uint16_t n);
+void fast_flows_kernelxsums(struct network_buf_handle *nbh,
+    struct pkt_tcp *p);
 void fast_flows_kernelxsums_gre(struct network_buf_handle *nbh,
     struct pkt_gre *p);
 
