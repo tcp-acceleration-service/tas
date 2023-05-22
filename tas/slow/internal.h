@@ -684,7 +684,7 @@ int tcp_accept(struct app_context *ctx, uint64_t opaque,
  *
  * @return 0 if packet has been consumed, <0 otherwise.
  */
-int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
+int gre_packet(const void *pkt, uint16_t len, uint32_t fn_core,
     uint16_t flow_group);
 
 /**

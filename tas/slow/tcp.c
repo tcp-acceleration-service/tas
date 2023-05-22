@@ -75,14 +75,14 @@ struct tcp_opts {
 };
 
 static int conn_arp_done(struct connection *conn);
-static void conn_packet(struct connection *c, const struct pkt_gre *p,
+static void conn_packet_gre(struct connection *c, const struct pkt_gre *p,
     const struct tcp_opts *opts, uint32_t fn_core, uint16_t flow_group);
 static inline struct connection *conn_alloc(int vmid);
 static inline void conn_free(struct connection *conn);
 static void conn_register(struct connection *conn);
 static void conn_unregister(struct connection *conn);
-static struct connection *conn_lookup(const struct pkt_gre *p);
-static int conn_syn_sent_packet(struct connection *c, const struct pkt_gre *p,
+static struct connection *conn_lookup_gre(const struct pkt_gre *p);
+static int conn_syn_sent_packet_gre(struct connection *c, const struct pkt_gre *p,
     const struct tcp_opts *opts);
 static int conn_reg_synack(struct connection *c);
 static void conn_failed(struct connection *c, int status);
@@ -90,17 +90,17 @@ static void conn_timeout_arm(struct connection *c, int type);
 static void conn_timeout_disarm(struct connection *c);
 static void conn_close_timeout(struct connection *c);
 
-static struct listener *listener_lookup(const struct pkt_gre *p);
-static void listener_packet(struct listener *l, const struct pkt_gre *p,
+static struct listener *listener_lookup_gre(const struct pkt_gre *p);
+static void listener_packet_gre(struct listener *l, const struct pkt_gre *p,
     const struct tcp_opts *opts, uint32_t fn_core, uint16_t flow_group);
-static void listener_accept(struct listener *l);
+static void listener_accept_gre(struct listener *l);
 
 static inline uint16_t port_alloc(void);
-static inline int send_control(const struct connection *conn, uint16_t flags,
+static inline int send_control_gre(const struct connection *conn, uint16_t flags,
     int ts_opt, uint32_t ts_echo, uint16_t mss_opt);
 static inline int send_reset(const struct pkt_gre *p,
     const struct tcp_opts *opts);
-static inline int parse_options(const struct pkt_gre *p, uint16_t len,
+static inline int parse_options_gre(const struct pkt_gre *p, uint16_t len,
     struct tcp_opts *opts);
 
 static uintptr_t ports[PORT_MAX + 1];
@@ -356,12 +356,12 @@ int tcp_accept(struct app_context *ctx, uint64_t opaque,
   }
 
   if (listen->backlog_used > 0) {
-    listener_accept(listen);
+    listener_accept_gre(listen);
   }
   return 0;
 }
 
-int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
+int gre_packet(const void *pkt, uint16_t len, uint32_t fn_core,
     uint16_t flow_group)
 {
   struct connection *c;
@@ -371,26 +371,26 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
   int ret = 0;
 
   if (len < sizeof(*p)) {
-    fprintf(stderr, "tcp_packet: incomplete TCP receive (%u received, "
+    fprintf(stderr, "gre_packet: incomplete TCP receive (%u received, "
         "%u expected)\n", len, (unsigned) sizeof(*p));
     return -1;
   }
 
   if (f_beui32(p->out_ip.dest) != config.ip) {
-    fprintf(stderr, "tcp_packet: unexpected destination IP (%x received, "
+    fprintf(stderr, "gre_packet: unexpected destination IP (%x received, "
         "%x expected)\n", f_beui32(p->out_ip.dest), config.ip);
     return -1;
   }
 
-  if (parse_options(p, len, &opts) != 0) {
-    fprintf(stderr, "tcp_packet: parsing TCP options failed\n");
+  if (parse_options_gre(p, len, &opts) != 0) {
+    fprintf(stderr, "gre_packet: parsing TCP options failed\n");
     return -1;
   }
 
-  if ((c = conn_lookup(p)) != NULL) {
-    conn_packet(c, p, &opts, fn_core, flow_group);
-  } else if ((l = listener_lookup(p)) != NULL) {
-    listener_packet(l, p, &opts, fn_core, flow_group);
+  if ((c = conn_lookup_gre(p)) != NULL) {
+    conn_packet_gre(c, p, &opts, fn_core, flow_group);
+  } else if ((l = listener_lookup_gre(p)) != NULL) {
+    listener_packet_gre(l, p, &opts, fn_core, flow_group);
   } else {
     ret = -1;
 
@@ -425,7 +425,7 @@ int tcp_close(struct connection *conn)
   conn->local_seq = tx_seq;
 
   if (!tx_c || !rx_c) {
-    send_control(conn, TCP_RST, 0, 0, 0);
+    send_control_gre(conn, TCP_RST, 0, 0, 0);
   }
 
   cc_conn_remove(conn);
@@ -478,10 +478,10 @@ void tcp_timeout(struct timeout *to, enum timeout_type type)
   conn_timeout_arm(c, TO_TCP_HANDSHAKE);
 
   /* re-send SYN packet */
-  send_control(c, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS);
+  send_control_gre(c, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS);
 }
 
-static void conn_packet(struct connection *c, const struct pkt_gre *p,
+static void conn_packet_gre(struct connection *c, const struct pkt_gre *p,
     const struct tcp_opts *opts, uint32_t fn_core, uint16_t flow_group)
 {
   int ret;
@@ -491,7 +491,7 @@ static void conn_packet(struct connection *c, const struct pkt_gre *p,
     /* hopefully a SYN-ACK received */
     c->fn_core = fn_core;
     c->flow_group = flow_group;
-    if ((ret = conn_syn_sent_packet(c, p, opts)) != 0) {
+    if ((ret = conn_syn_sent_packet_gre(c, p, opts)) != 0) {
       conn_failed(c, ret);
     }
   } else if (c->status == CONN_OPEN &&
@@ -501,7 +501,7 @@ static void conn_packet(struct connection *c, const struct pkt_gre *p,
     /* TODO: should only do this if we're still waiting for initial ACK,
      * otherwise we should send a challenge ACK */
     if (opts->ts == NULL) {
-      fprintf(stderr, "conn_packet: re-transmitted SYN does not have TS "
+      fprintf(stderr, "conn_packet_gre: re-transmitted SYN does not have TS "
           "option\n");
       conn_failed(c, -1);
       return;
@@ -512,7 +512,7 @@ static void conn_packet(struct connection *c, const struct pkt_gre *p,
       ecn_flags = TCP_ECE;
     }
 
-    send_control(c, TCP_SYN | TCP_ACK | ecn_flags, 1,
+    send_control_gre(c, TCP_SYN | TCP_ACK | ecn_flags, 1,
         f_beui32(opts->ts->ts_val), TCP_MSS);
   } else if (c->status == CONN_OPEN &&
       (TCPH_FLAGS(&p->tcp) & TCP_SYN) == TCP_SYN)
@@ -523,9 +523,9 @@ static void conn_packet(struct connection *c, const struct pkt_gre *p,
   {
    /* silently ignore a FIN for an already closed connection: TODO figure out
     * why necessary*/
-    send_control(c, TCP_ACK, 1, 0, 0);
+    send_control_gre(c, TCP_ACK, 1, 0, 0);
   } else {
-    // fprintf(stderr, "tcp_packet: unexpected connection state %u\n", c->status);
+    // fprintf(stderr, "gre_packet: unexpected connection state %u\n", c->status);
   }
 }
 
@@ -541,14 +541,14 @@ static int conn_arp_done(struct connection *conn)
   conn_timeout_arm(conn, TO_TCP_HANDSHAKE);
 
   /* send SYN */
-  send_control(conn, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS);
+  send_control_gre(conn, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS);
 
   CONN_DEBUG0(conn, "SYN SENT\n");
   return 0;
 }
 
-static int conn_syn_sent_packet(struct connection *c, const struct pkt_gre *p,
-    const struct tcp_opts *opts)
+static int conn_syn_sent_packet_gre(struct connection *c, 
+    const struct pkt_gre *p, const struct tcp_opts *opts)
 {
   int vmid = c->ctx->app->vm_id;
   uint32_t ecn_flags = TCPH_FLAGS(&p->tcp) & (TCP_ECE | TCP_CWR);
@@ -557,16 +557,16 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_gre *p,
   conn_timeout_disarm(c);
 
   if ((TCPH_FLAGS(&p->tcp) & (TCP_SYN | TCP_ACK)) != (TCP_SYN | TCP_ACK)) {
-    fprintf(stderr, "conn_syn_sent_packet: unexpected flags %x\n",
+    fprintf(stderr, "conn_syn_sent_packet_gre: unexpected flags %x\n",
         TCPH_FLAGS(&p->tcp));
     return -1;
   }
   if (opts->ts == NULL) {
-    fprintf(stderr, "conn_syn_sent_packet: no timestamp option received\n");
+    fprintf(stderr, "conn_syn_sent_packet_gre: no timestamp option received\n");
     return -1;
   }
 
-  CONN_DEBUG0(c, "conn_syn_sent_packet: syn-ack received\n");
+  CONN_DEBUG0(c, "conn_syn_sent_packet_gre: syn-ack received\n");
 
   c->remote_seq = f_beui32(p->tcp.seqno) + 1;
   c->local_seq = f_beui32(p->tcp.ackno);
@@ -593,18 +593,18 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_gre *p,
         c->fn_core, c->flow_group, &c->flow_id)
       != 0)
   {
-    fprintf(stderr, "conn_syn_sent_packet: nicif_connection_add failed\n");
+    fprintf(stderr, "conn_syn_sent_packet_gre: nicif_connection_add failed\n");
     return -1;
   }
 
-  CONN_DEBUG0(c, "conn_syn_sent_packet: connection registered\n");
+  CONN_DEBUG0(c, "conn_syn_sent_packet_gre: connection registered\n");
 
   c->status = CONN_OPEN;
 
   /* send ACK */
-  send_control(c, TCP_ACK, 1, c->syn_ts, 0);
+  send_control_gre(c, TCP_ACK, 1, c->syn_ts, 0);
 
-  CONN_DEBUG0(c, "conn_syn_sent_packet: ACK sent\n");
+  CONN_DEBUG0(c, "conn_syn_sent_packet_gre: ACK sent\n");
 
   appif_conn_opened(c, 0);
 
@@ -622,7 +622,7 @@ static int conn_reg_synack(struct connection *c)
   }
 
   /* send ACK */
-  send_control(c, TCP_SYN | TCP_ACK | ecn_flags, 1, c->syn_ts, TCP_MSS);
+  send_control_gre(c, TCP_SYN | TCP_ACK | ecn_flags, 1, c->syn_ts, TCP_MSS);
 
   appif_accept_conn(c, 0);
 
@@ -726,7 +726,7 @@ static void conn_unregister(struct connection *conn)
   }
 }
 
-static struct connection *conn_lookup(const struct pkt_gre *p)
+static struct connection *conn_lookup_gre(const struct pkt_gre *p)
 {
   uint32_t h;
   struct connection *c;
@@ -817,7 +817,7 @@ static inline uint32_t hash_64_to_32(uint64_t key)
   return (uint32_t) key;
 }
 
-static struct listener *listener_lookup(const struct pkt_gre *p)
+static struct listener *listener_lookup_gre(const struct pkt_gre *p)
 {
   uint16_t local_port = f_beui16(p->tcp.dest);
   uint32_t hash, init_hash;
@@ -844,7 +844,7 @@ static struct listener *listener_lookup(const struct pkt_gre *p)
   return (struct listener *) (ports[local_port] & ~PORT_TYPE_MASK);
 }
 
-static void listener_packet(struct listener *l, const struct pkt_gre *p,
+static void listener_packet_gre(struct listener *l, const struct pkt_gre *p,
     const struct tcp_opts *opts, uint32_t fn_core, uint16_t flow_group)
 {
   struct backlog_slot *bls;
@@ -853,7 +853,7 @@ static void listener_packet(struct listener *l, const struct pkt_gre *p,
   struct pkt_gre *bl_p;
 
   if ((TCPH_FLAGS(&p->tcp) & ~(TCP_ECE | TCP_CWR)) != TCP_SYN) {
-    fprintf(stderr, "listener_packet: Not a SYN (flags %x)\n",
+    fprintf(stderr, "listener_packet_gre: Not a SYN (flags %x)\n",
             TCPH_FLAGS(&p->tcp));
     send_reset(p, opts);
     return;
@@ -862,7 +862,7 @@ static void listener_packet(struct listener *l, const struct pkt_gre *p,
   /* make sure packet is not too long */
   len = sizeof(p->eth) + f_beui16(p->out_ip.len);
   if (len > sizeof(bls->buf)) {
-    fprintf(stderr, "listener_packet: SYN larger than backlog buffer, "
+    fprintf(stderr, "listener_packet_gre: SYN larger than backlog buffer, "
         "dropping\n");
     return;
   }
@@ -886,7 +886,7 @@ static void listener_packet(struct listener *l, const struct pkt_gre *p,
   }
 
   if (l->backlog_len == l->backlog_used) {
-    fprintf(stderr, "listener_packet: backlog queue full\n");
+    fprintf(stderr, "listener_packet_gre: backlog queue full\n");
     return;
   }
 
@@ -910,11 +910,11 @@ static void listener_packet(struct listener *l, const struct pkt_gre *p,
 
   /* check if there are pending accepts */
   if (l->wait_conns != NULL) {
-    listener_accept(l);
+    listener_accept_gre(l);
   }
 }
 
-static void listener_accept(struct listener *l)
+static void listener_accept_gre(struct listener *l)
 {
   int vmid;
   struct connection *c = l->wait_conns;
@@ -932,9 +932,9 @@ static void listener_accept(struct listener *l)
   fn_core = l->backlog_cores[l->backlog_pos];
   flow_group = l->backlog_fgs[l->backlog_pos];
   p = (const struct pkt_gre *) bls->buf;
-  ret = parse_options(p, bls->len, &opts);
+  ret = parse_options_gre(p, bls->len, &opts);
   if (ret != 0 || opts.ts == NULL) {
-    fprintf(stderr, "listener_packet: parsing options failed or no timestamp "
+    fprintf(stderr, "listener_packet_gre: parsing options failed or no timestamp "
         "option\n");
     goto out;
   }
@@ -981,7 +981,7 @@ static void listener_accept(struct listener *l)
         c->fn_core, c->flow_group, &c->flow_id)
       != 0)
   {
-    fprintf(stderr, "listener_packet: nicif_connection_add failed\n");
+    fprintf(stderr, "listener_packet_gre: nicif_connection_add failed\n");
     goto out;
   }
 
@@ -1000,7 +1000,7 @@ out:
   }
 }
 
-static inline int send_control_raw(uint64_t remote_mac, 
+static inline int send_control_raw_gre(uint64_t remote_mac, 
     uint32_t tunnel_id, uint32_t out_remote_ip,
     uint32_t in_local_ip, uint32_t in_remote_ip,
     uint16_t remote_port, uint16_t local_port, uint32_t local_seq,
@@ -1025,7 +1025,7 @@ static inline int send_control_raw(uint64_t remote_mac,
 
   /** allocate send buffer */
   if (nicif_tx_alloc(len, (void **) &p, &new_tail) != 0) {
-    fprintf(stderr, "send_control failed\n");
+    fprintf(stderr, "send_control_gre failed\n");
     return -1;
   }
 
@@ -1100,10 +1100,10 @@ static inline int send_control_raw(uint64_t remote_mac,
   return 0;
 }
 
-static inline int send_control(const struct connection *conn, uint16_t flags,
+static inline int send_control_gre(const struct connection *conn, uint16_t flags,
     int ts_opt, uint32_t ts_echo, uint16_t mss_opt)
 {
-  return send_control_raw(conn->remote_mac, 
+  return send_control_raw_gre(conn->remote_mac, 
       conn->tunnel_id, conn->out_remote_ip,
       conn->in_local_ip, conn->in_remote_ip,
       conn->remote_port,
@@ -1124,7 +1124,7 @@ static inline int send_reset(const struct pkt_gre *p,
   }
 
   memcpy(&remote_mac, &p->eth.src, ETH_ADDR_LEN);
-  return send_control_raw(remote_mac, 
+  return send_control_raw_gre(remote_mac, 
       f_beui32(p->gre.key), f_beui32(p->out_ip.src),
       f_beui32(p->in_ip.dest), f_beui32(p->out_ip.dest),
       f_beui16(p->tcp.src), f_beui16(p->tcp.dest), 
@@ -1132,7 +1132,7 @@ static inline int send_reset(const struct pkt_gre *p,
       TCP_RST | TCP_ACK, ts_opt, ts_val, 0);
 }
 
-static inline int parse_options(const struct pkt_gre *p, uint16_t len,
+static inline int parse_options_gre(const struct pkt_gre *p, uint16_t len,
     struct tcp_opts *opts)
 {
   uint8_t *opt = (uint8_t *) (p + 1);
@@ -1158,14 +1158,14 @@ static inline int parse_options(const struct pkt_gre *p, uint16_t len,
       opt_len = 1;
     } else {
       if (opt_avail < 2) {
-        fprintf(stderr, "parse_options: opt_avail=%u kind=%u off=%u\n", opt_avail, opt_kind,  off);
+        fprintf(stderr, "parse_options_gre: opt_avail=%u kind=%u off=%u\n", opt_avail, opt_kind,  off);
         return -1;
       }
 
       opt_len = opt[off + 1];
       if (opt_kind == TCP_OPT_MSS) {
         if (opt_len != sizeof(struct tcp_mss_opt)) {
-          fprintf(stderr, "parse_options: mss option size wrong (expect %zu "
+          fprintf(stderr, "parse_options_gre: mss option size wrong (expect %zu "
               "got %u)\n", sizeof(struct tcp_mss_opt), opt_len);
           return -1;
         }
@@ -1173,7 +1173,7 @@ static inline int parse_options(const struct pkt_gre *p, uint16_t len,
         opts->mss = (struct tcp_mss_opt *) (opt + off);
       } else if (opt_kind == TCP_OPT_TIMESTAMP) {
         if (opt_len != sizeof(struct tcp_timestamp_opt)) {
-          fprintf(stderr, "parse_options: opt_len=%u so=%zu\n", opt_len, sizeof(struct tcp_timestamp_opt));
+          fprintf(stderr, "parse_options_gre: opt_len=%u so=%zu\n", opt_len, sizeof(struct tcp_timestamp_opt));
           return -1;
         }
 

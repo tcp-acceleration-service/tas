@@ -391,7 +391,7 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
   }
 
   /* look up flow states */
-  fast_flows_packet_fss(ctx, bhs, fss, n);
+  fast_flows_packet_fss_gre(ctx, bhs, fss, n);
 
   /* prefetch packet contents (2nd cache line, TS opt overlaps) */
   for (i = 0; i < n; i++)
@@ -400,7 +400,7 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
   }
 
   /* parse packets */
-  fast_flows_packet_parse(ctx, bhs, fss, tcpopts, n);
+  fast_flows_packet_parse_gre(ctx, bhs, fss, tcpopts, n);
 
   for (i = 0; i < n; i++)
   {
@@ -409,7 +409,7 @@ static unsigned poll_rx(struct dataplane_context *ctx, uint32_t ts,
     {
       fs = fss[i];
       /* at this point we know fss[i] is a flow state struct */
-      ret = fast_flows_packet(ctx, bhs[i], fss[i], &tcpopts[i], ts);
+      ret = fast_flows_packet_gre(ctx, bhs[i], fss[i], &tcpopts[i], ts);
       ctx->counters_total += 1;
       ctx->vm_counters[fs->vm_id] += 1;
     }

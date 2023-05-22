@@ -65,11 +65,11 @@ static void flow_rx_write(struct flextcp_pl_flowst *fs, uint32_t pos,
 static void flow_rx_seq_write(struct flextcp_pl_flowst *fs, uint32_t seq,
     uint16_t len, const void *src);
 #endif
-static void flow_tx_segment(struct dataplane_context *ctx,
+static void flow_tx_segment_gre(struct dataplane_context *ctx,
     struct network_buf_handle *nbh, struct flextcp_pl_flowst *fs,
     uint32_t seq, uint32_t ack, uint32_t rxwnd, uint16_t payload,
     uint32_t payload_pos, uint32_t ts_echo, uint32_t ts_my, uint8_t fin);
-static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
+static void flow_tx_ack_gre(struct dataplane_context *ctx, uint32_t seq,
     uint32_t ack, uint32_t rxwnd, uint32_t echo_ts, uint32_t my_ts,
     struct network_buf_handle *nbh, struct tcp_timestamp_opt *ts_opt);
 static void flow_reset_retransmit(struct flextcp_pl_flowst *fs);
@@ -202,7 +202,7 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t vm_id, uint32_t queu
   }
 
   /* send out segment */
-  flow_tx_segment(ctx, nbh, fs, tx_seq, ack, rx_wnd, len, tx_pos,
+  flow_tx_segment_gre(ctx, nbh, fs, tx_seq, ack, rx_wnd, len, tx_pos,
       fs->tx_next_ts, ts, fin);
 unlock:
   fs_unlock(fs);
@@ -234,7 +234,7 @@ int fast_flows_qman_fwd(struct dataplane_context *ctx,
   return 0;
 }
 
-void fast_flows_packet_parse(struct dataplane_context *ctx,
+void fast_flows_packet_parse_gre(struct dataplane_context *ctx,
     struct network_buf_handle **nbhs, void **fss, struct tcp_opts *tos,
     uint16_t n)
 {
@@ -260,7 +260,7 @@ void fast_flows_packet_parse(struct dataplane_context *ctx,
         (IPH_HL(&p->in_ip) != 5) |
         (TCPH_HDRLEN(&p->tcp) < 5) |
         (len < f_beui16(p->out_ip.len) + sizeof(p->eth)) |
-        (tcp_parse_options(p, len, &tos[i]) != 0) |
+        (tcp_parse_options_gre(p, len, &tos[i]) != 0) |
         (tos[i].ts == NULL);
 
     if (cond)
@@ -288,7 +288,7 @@ void fast_flows_packet_pfbufs(struct dataplane_context *ctx,
 }
 
 /* Received packet */
-int fast_flows_packet(struct dataplane_context *ctx,
+int fast_flows_packet_gre(struct dataplane_context *ctx,
     struct network_buf_handle *nbh, void *fsp, struct tcp_opts *opts,
     uint32_t ts)
 {
@@ -522,7 +522,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
   if ((fs->rx_base_sp & FLEXNIC_PL_FLOWST_RXFIN) == FLEXNIC_PL_FLOWST_RXFIN &&
       payload_bytes > 0)
   {
-    fprintf(stderr, "fast_flows_packet: data after FIN dropped\n");
+    fprintf(stderr, "fast_flows_packet_gre: data after FIN dropped\n");
     goto unlock;
   }
 
@@ -591,7 +591,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
       fs->rx_next_seq++;
       trigger_ack = 1;
     } else {
-      fprintf(stderr, "fast_flows_packet: ignored fin because out of order\n");
+      fprintf(stderr, "fast_flows_packet_gre: ignored fin because out of order\n");
     }
   }
 
@@ -643,14 +643,14 @@ unlock:
           old_avail, TCP_MSS, QMAN_SET_RATE | QMAN_SET_MAXCHUNK
           | QMAN_ADD_AVAIL) != 0)
     {
-      fprintf(stderr, "fast_flows_packet: qman_set 1 failed, UNEXPECTED\n");
+      fprintf(stderr, "fast_flows_packet_gre: qman_set 1 failed, UNEXPECTED\n");
       abort();
     }
   }
 
   /* if we need to send an ack, also send packet to TX pipeline to do so */
   if (trigger_ack) {
-    flow_tx_ack(ctx, fs->tx_next_seq, fs->rx_next_seq, fs->rx_avail,
+    flow_tx_ack_gre(ctx, fs->tx_next_seq, fs->rx_next_seq, fs->rx_avail,
         fs->tx_next_ts, ts, nbh, opts->ts);
   }
 
@@ -780,7 +780,7 @@ int fast_flows_bump(struct dataplane_context *ctx, uint32_t flow_id,
   /* receive buffer freed up from empty, need to send out a window update, if
    * we're not sending anyways. */
   if (new_avail == 0 && rx_avail_prev == 0 && fs->rx_avail != 0) {
-    flow_tx_segment(ctx, nbh, fs, fs->tx_next_seq, fs->rx_next_seq,
+    flow_tx_segment_gre(ctx, nbh, fs, fs->tx_next_seq, fs->rx_next_seq,
         fs->rx_avail, 0, 0, fs->tx_next_ts, ts, 0);
     ret = 0;
   }
@@ -897,7 +897,7 @@ static void flow_rx_seq_write(struct flextcp_pl_flowst *fs, uint32_t seq,
 }
 #endif
 
-static void flow_tx_segment(struct dataplane_context *ctx,
+static void flow_tx_segment_gre(struct dataplane_context *ctx,
     struct network_buf_handle *nbh, struct flextcp_pl_flowst *fs,
     uint32_t seq, uint32_t ack, uint32_t rxwnd, uint16_t payload,
     uint32_t payload_pos, uint32_t ts_echo, uint32_t ts_my, uint8_t fin)
@@ -996,7 +996,7 @@ static void flow_tx_segment(struct dataplane_context *ctx,
   tx_send(ctx, nbh, 0, hdrs_len + payload);
 }
 
-static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
+static void flow_tx_ack_gre(struct dataplane_context *ctx, uint32_t seq,
     uint32_t ack, uint32_t rxwnd, uint32_t echots, uint32_t myts,
     struct network_buf_handle *nbh, struct tcp_timestamp_opt *ts_opt)
 {
@@ -1138,7 +1138,7 @@ static inline void gre_checksums(struct network_buf_handle *nbh,
   }
 }
 
-void fast_flows_kernelxsums(struct network_buf_handle *nbh,
+void fast_flows_kernelxsums_gre(struct network_buf_handle *nbh,
     struct pkt_gre *p)
 {
   gre_checksums(nbh, p, f_beui16(p->in_ip.len) - sizeof(p->in_ip));
@@ -1150,7 +1150,7 @@ static inline uint32_t flow_hash(struct flow_key *k)
       crc32c_sse42_u32(k->tunnel_id.x, 0));
 }
 
-void fast_flows_packet_fss(struct dataplane_context *ctx,
+void fast_flows_packet_fss_gre(struct dataplane_context *ctx,
     struct network_buf_handle **nbhs, void **fss, uint16_t n)
 {
   uint32_t hashes[n];

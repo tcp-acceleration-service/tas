@@ -592,7 +592,7 @@ static inline void process_packet(const void *buf, uint16_t len,
         return;
       }
 
-      to_kni = !!tcp_packet(buf, len, fn_core, flow_group);
+      to_kni = !!gre_packet(buf, len, fn_core, flow_group);
     }
     else if (out_ip->proto == IP_PROTO_GRE)
     {
@@ -603,7 +603,7 @@ static inline void process_packet(const void *buf, uint16_t len,
         return;
       }
 
-      to_kni = !!tcp_packet(buf, len, fn_core, flow_group);
+      to_kni = !!gre_packet(buf, len, fn_core, flow_group);
     }
   }
 
