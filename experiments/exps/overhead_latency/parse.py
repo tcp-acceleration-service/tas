@@ -1,66 +1,26 @@
+import sys
+sys.path.append("../../../")
+
 import os
-import re
+import experiments.plot_utils as putils
 
-NUM_CORES = 8
 
-def get_stack(line):
-  stack_regex = "[a-z]+-[a-z]+"
-  stack = re.search(stack_regex, line).group(0)
-  return stack
+def check_stack(data, stack):
+  if stack not in data:
+    data[stack] = {}
 
-def get_client_id(line):
-  cid_regex = "(?<=_app)[0-9]*"
-  cid = re.search(cid_regex, line).group(0)
-  return cid
+def check_run(data, stack, run):
+  if run not in data[stack]:
+    data[stack][run] = {}
 
-def get_node_id(line):
-  nid_regex = "(?<=_node)[0-9]*"
-  nid = re.search(nid_regex, line).group(0)
+def check_nid(data, stack, run, nid):
+  if nid not in data[stack][run]:
+    data[stack][run][nid] = {}
 
-def get_tp(line):
-  tp_regex = "(?<=(total=))(.*?)(?=\ )"
-  tp = re.search(tp_regex, line).group(0)
-  return tp
+def check_cid(data, stack, run, nid, cid):
+  if cid not in data[stack][run][nid]:
+    data[stack][run][nid][cid] = ""
 
-def get_ts(line):
-  ts_regex = "(?<=(ts=))(.*?)(?=\,)"
-  ts = re.search(ts_regex, line).group(0)
-  return ts
-
-def get_nconns(fname):
-  nconns_regex = "(?<=(conn_))(.*?)(?=\-)"
-  num = re.search(nconns_regex, fname).group(0)
-  return str(int(num) * 8)
-
-def get_avg_tp(fname):
-  tp_sum = 0
-  n = 0
-
-  f = open(fname)
-  lines = f.readlines()
-
-  for l in lines[:60]:
-    tp = get_tp(l)
-    tp_sum += float(tp)
-    n += 1
-
-  return tp_sum / n
-
-def check_nconns(data, nconns):
-  if nconns not in data:
-    data[nconns] = {}
-
-def check_stack(data, nconns, stack):
-  if stack not in data[nconns]:
-    data[nconns][stack] = {}
-
-def check_nid(data, nconns, stack, nid):
-  if nid not in data[nconns][stack]:
-    data[nconns][stack][nid] = {}
-
-def check_cid(data, nconns, stack, nid, cid):
-  if cid not in data[nconns][stack][nid]:
-    data[nconns][stack][nid][cid] = ""
 
 def parse_metadata():
   dir_path = "./out/"
@@ -68,54 +28,68 @@ def parse_metadata():
 
   for f in os.listdir(dir_path):
     fname = os.fsdecode(f)
-    nconns = get_nconns(fname)
-    cid = get_client_id(fname)
-    nid = get_node_id(fname)
-    stack = get_stack(fname)
 
-    check_nconns(data, nconns)
-    check_stack(data, nconns, stack)
-    check_nid(data, nconns, stack, nid)
-    check_cid(data, nconns, stack, nid, cid)
+    if "tas_c" == fname:
+      continue
 
-    data[nconns][stack][nid][cid] = fname
+    run = putils.get_expname_run(fname)
+    cid = putils.get_client_id(fname)
+    nid = putils.get_node_id(fname)
+    stack = putils.get_stack(fname)
+
+    check_stack(data, stack)
+    check_run(data, stack, run)
+    check_nid(data, stack, run, nid)
+    check_cid(data, stack, run, nid, cid)
+
+    data[stack][run][nid][cid] = fname
 
   return data
 
 def parse_data(parsed_md):
-  tp = []
+  data = {}
   out_dir = "./out/"
-  for nconns in parsed_md:
-    data_point = {"nconns": nconns}
-    for stack in parsed_md[nconns]:
-      agg_tp = 0
-      for node in parsed_md[nconns][stack]:
-        for client in parsed_md[nconns][stack][node]:
-          fname = out_dir + parsed_md[nconns][stack][node][client]
-          avt_tp = get_avg_tp(fname)
-          agg_tp += avt_tp
+  for stack in parsed_md:
+    latencies = putils.init_latencies()
+    for run in parsed_md[stack]:
+      fname_c0 = out_dir + parsed_md[stack][run]['0']['0']
+      putils.append_latencies(latencies, fname_c0)
 
-      data_point[stack] = agg_tp
-    
-    tp.append(data_point)
+    data[stack] = {
+      "lat": putils.get_latency_avg(latencies),
+      "std": putils.get_latency_std(latencies)
+    }
   
-  tp = sorted(tp, key=lambda d: int(d['nconns']))
-  return tp
+  return data
 
-def save_dat_file(avg_tps, fpath):
-  f = open(fpath, "w+")
-  header = "nconns bare-linux virt-linux bare-tas virt-tas\n"
-  f.write(header)
-  for tp in avg_tps:
-    f.write("{} {} {} {} {}\n".format(
-        tp["nconns"], 
-        tp["bare-linux"], tp["virt-linux"], 
-        tp["bare-tas"], tp["virt-tas"]))
+def save_dat_file(data):
+  # stacks =  list(data.keys())
+  stacks = ["bare-tas", "bare-vtas", "virt-tas", "bare-tunoffvtas"]
+
+  header = "stack 50p-avg 90p-avg 99p-avg 99.9p-avg 99.99p-avg " + \
+      "50p-std 90p-std 99p-std 99.9p-std 99.99p-std\n"
+  fname = "./lat.dat"
+  f_avg = open(fname, "w+")
+  f_avg.write(header)
+
+  for stack in stacks:
+    f_avg.write("{} {} {} {} {} {} {} {} {} {} {}\n".format(
+      stack,
+      data[stack]["lat"]["50p"],
+      data[stack]["lat"]["90p"],
+      data[stack]["lat"]["99p"],
+      data[stack]["lat"]["99.9p"],
+      data[stack]["lat"]["99.99p"],      
+      data[stack]["std"]["50p"],
+      data[stack]["std"]["90p"],
+      data[stack]["std"]["99p"],
+      data[stack]["std"]["99.9p"],
+      data[stack]["std"]["99.99p"]))
 
 def main():
   parsed_md = parse_metadata()
-  avg_tps = parse_data(parsed_md)
-  save_dat_file(avg_tps, "./tp.dat")
+  latencies = parse_data(parsed_md)
+  save_dat_file(latencies)
 
 if __name__ == '__main__':
   main()
