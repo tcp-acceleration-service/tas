@@ -31,16 +31,15 @@ class Defaults:
         self.c_cleanup_pane = "{}_cleanup".format(self.client_pane_prefix)
 
         # Mellanox interfaces on client and server machine
-        # self.client_interface = 'ens1f0np0'
-        # self.server_interface = 'ens1f0'
-        self.client_interface = 'ens1f0'
+        self.client_interface = 'ens1f0np0'
         self.server_interface = 'ens1f0np0'
 
+        ### INTERVAL VM CONFIGS ###
         # Network interface used to set ip for a VM
         self.vm_interface = "enp0s3"
         # Network interface used to bind TAS in tap VM
         self.tas_interface = "enp0s3"
-        # PCI Id of tas interface
+        # PCI Id of TAS interface inside a VM
         self.pci_id = "0000:00:03.0"
 
         self.remote_connect_cmd = 'ssh swsnetlab04'
@@ -107,11 +106,11 @@ class VMConfig:
         self.pane = pane
         self.id = idx
         if machine_config.is_server:
-            self.vm_ip = '192.168.10.{}'.format(20 + idx)
-            self.tas_tap_ip = '192.168.10.{}'.format(120 + idx)
+            self.vm_ip = '10.0.0.{}'.format(1 + idx)
+            self.tas_tap_ip = '10.0.1.{}'.format(1 + idx)
         else:
-            self.vm_ip = '192.168.10.{}'.format(40 + idx)
-            self.tas_tap_ip = '192.168.10.{}'.format(140 + idx)
+            self.vm_ip = '10.0.0.{}'.format(20 + idx)
+            self.tas_tap_ip = '10.0.1.{}'.format(20 + idx)
 
 class ProxyConfig:
     def __init__(self, machine_config, comp_dir):
