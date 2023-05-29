@@ -1722,7 +1722,7 @@ static inline void gre_checksums(struct network_buf_handle *nbh,
     p->tcp.chksum = 0;
     p->in_ip.chksum = rte_ipv4_cksum((void *) &p->in_ip);
     p->out_ip.chksum = rte_ipv4_cksum((void *) &p->out_ip);
-    p->tcp.chksum = rte_ipv4_udptcp_cksum((void *) &p->out_ip, 
+    p->tcp.chksum = rte_ipv4_udptcp_cksum((void *) &p->in_ip, 
         (void *) &p->tcp);
   }
 }

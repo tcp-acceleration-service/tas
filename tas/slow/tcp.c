@@ -39,7 +39,7 @@
 #include "internal.h"
 #include "appif.h"
 
-#define TCP_MSS 1460
+#define TCP_MSS (1500 - sizeof(struct pkt_gre))
 #define TCP_HTSIZE 4096
 
 #define PORT_MAX ((1u << 16) - 1)
@@ -1584,7 +1584,7 @@ static inline int send_control_raw_gre(uint64_t remote_mac,
   /* calculate header checksums */
   p->in_ip.chksum = rte_ipv4_cksum((void *) &p->in_ip);
   p->out_ip.chksum = rte_ipv4_cksum((void *) &p->out_ip);
-  p->tcp.chksum = rte_ipv4_udptcp_cksum((void *) &p->out_ip, (void *) &p->tcp);
+  p->tcp.chksum = rte_ipv4_udptcp_cksum((void *) &p->in_ip, (void *) &p->tcp);
   
   /* send packet */
   nicif_tx_send(new_tail, 0);
