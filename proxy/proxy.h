@@ -13,6 +13,6 @@ struct proxy_context_req {
   int ctxreq_id;
   int app_id;
   struct kernel_uxsock_request req;
-} __attribute((packed))__;
+} __attribute__((packed));
 
 #endif /* ndef PROXY_H_H */

@@ -22,11 +22,8 @@
 #define MSG_TYPE_NEWAPP_REQ 9
 #define MSG_TYPE_NEWAPP_RES 10
 
-/* Used to get CTX_RESP_MAX_SIZE... kinda ugly */
-struct kernel_uxsock_response *placeholder_resp;
-
-#define PLACEHOLDER_SIZE sizeof(placeholder_resp->flexnic_qs[0])
-#define CTX_RESP_MAX_SIZE sizeof(struct kernel_uxsock_response) + FLEXTCP_MAX_FTCPCORES * PLACEHOLDER_SIZE
+#define PLACEHOLDER_SIZE sizeof(((struct kernel_uxsock_response *)0)->flexnic_qs[0])
+#define CTX_RESP_MAX_SIZE sizeof(struct kernel_uxsock_response) + FLEXTCP_MAX_FTCPCORES * 128
 
 struct hello_msg {
   uint8_t msg_type;
