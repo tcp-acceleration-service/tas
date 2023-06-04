@@ -4,7 +4,7 @@ import libtmux
 class WindowManager:
     def __init__(self, config):
         server = libtmux.Server()
-        self.session = server.get_by_id('$0')
+        self.session = server.attached_sessions[0]
         self.config = config
         self.window_names = self.init_window_names()
 
@@ -32,8 +32,12 @@ class WindowManager:
         return window_names
 
     def close_pane(self, name):
-        while self.session.find_where({"window_name" : name}) != None:
-            self.session.find_where({"window_name" : name}).kill_window()
+        try:
+            windows = self.session.windows.filter(window_name=name)
+            for window in windows:
+                window.kill_window()
+        except libtmux._internal.query_list.ObjectDoesNotExist:
+            return
 
     def add_new_pane(self, name, is_remote):
         window = self.session.new_window(attach=False, window_name=name)
