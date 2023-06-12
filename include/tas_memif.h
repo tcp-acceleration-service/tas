@@ -220,7 +220,9 @@ struct flextcp_pl_appctx {
   /* read-write fields */
   uint64_t last_ts;
   uint32_t rx_head;
+  uint32_t rx_tail;
   uint32_t tx_head;
+  uint32_t tx_tail;
   uint32_t rx_avail;
 } __attribute__((packed));
 

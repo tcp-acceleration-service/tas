@@ -132,7 +132,6 @@ void fast_kernel_packet(struct dataplane_context *ctx,
   if (kctx->rx_head >= kctx->rx_len)
     kctx->rx_head -= kctx->rx_len;
 
-
   len = network_buf_len(nbh);
   dma_write(krx->addr, len, network_buf_bufoff(nbh), SP_MEM_ID);
 

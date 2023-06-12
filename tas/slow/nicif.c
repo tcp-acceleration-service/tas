@@ -613,6 +613,7 @@ static inline int rxq_poll(void)
 
   /* update tail */
   tail = tail + 1;
+  fp_state->kctx[core].rx_tail += 1;
   if (tail == rxq_len)
   {
     tail -= rxq_len;
