@@ -33,9 +33,8 @@ if [[ "$stack" == 'virt-tas' ]]; then
     -nographic -monitor none -serial stdio \
     -machine accel=kvm,type=q35 \
     -cpu host \
-    -smp 12 \
+    -smp 20 \
     -m 25G \
-    -snapshot \
     -device virtio-net-pci,netdev=net0 \
     -netdev user,id=net0,hostfwd=tcp::222${vm_id}-:22 \
     -chardev socket,path="/run/tasproxy",id="tas" \
@@ -108,6 +107,21 @@ elif [[ "$stack" == 'tap-tas' ]]; then
     -device virtio-net-pci,mac=$mac,netdev=net1 \
     -netdev tap,ifname=$tastap,script=no,downscript=no,vhost=on,queues=10,id=net2 \
     -device virtio-net-pci,mac=$alt_mac,vectors=18,mq=on,netdev=net2 \
+    -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
+    -drive if=virtio,format=raw,file="seed.img" \
+    ;
+  elif [[ "$stack" == 'gre' ]]; then
+  sudo qemu-system-x86_64 \
+    -nographic -monitor none -serial stdio \
+    -machine accel=kvm,type=q35 \
+    -cpu host \
+    -smp 12 \
+    -m 25G \
+    -snapshot \
+    -netdev user,id=net0 \
+    -device virtio-net-pci,netdev=net0 \
+    -netdev bridge,br=br2,id=net1 \
+    -device virtio-net-pci,id=nic1,netdev=net1 \
     -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
     -drive if=virtio,format=raw,file="seed.img" \
     ;

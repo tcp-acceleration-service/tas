@@ -40,6 +40,17 @@ def append_latencies(latencies, fname_c0):
   if lat > 0:
     latencies["99.99p"] = np.append(latencies["99.99p"], lat)
 
+def get_lat_bar_size(avg_latencies):
+  lat_diffs = {
+    "50p": avg_latencies["50p"],
+    "90p": avg_latencies["90p"] - avg_latencies["50p"],
+    "99p": avg_latencies["99p"] - avg_latencies["90p"],
+    "99.9p": avg_latencies["99.9p"] - avg_latencies["99p"],
+    "99.99p": avg_latencies["99.99p"] - avg_latencies["99.9p"]
+  }
+
+  return lat_diffs
+
 def get_latency_avg(latencies):
   avg_lats = {
     "50p": latencies["50p"].mean(),
