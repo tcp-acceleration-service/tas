@@ -47,7 +47,7 @@ class Config:
 
         # Client Machine
         self.cstack = 'bare-tas'
-        self.cnum = 2
+        self.cnum = 1
         self.cnodenum = 1
         self.c_tas_configs = []
         self.c_vm_configs = []
@@ -85,4 +85,4 @@ class Config:
                 bench_dir=self.defaults.default_obenchmark_dir_bare,
                 tas_dir=self.defaults.default_otas_dir_bare)
         self.client_configs.append(client0_config)
-        self.client_configs.append(client1_config)
+        # self.client_configs.append(client1_config)

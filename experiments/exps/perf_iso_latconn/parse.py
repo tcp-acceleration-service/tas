@@ -53,30 +53,35 @@ def parse_metadata():
   return data
 
 def parse_data(parsed_md):
-  lat_list = {}
+  data = {}
   out_dir = "./out/"
-  for nconns in parsed_md:
+  for nconn in parsed_md:
     data_point = {}
-    for stack in parsed_md[nconns]:
+    for stack in parsed_md[nconn]:
       latencies = putils.init_latencies()
-      for run in parsed_md[nconns][stack]:
-        fname_c0 = out_dir + parsed_md[nconns][stack][run]['0']['0']
-        putils.add_latencies(latencies, fname_c0)
-      
-      putils.divide_latencies(latencies, len(parsed_md[nconns][stack]))
-      data_point[stack] = latencies
-  
-    lat_list[nconns] = data_point
-  
-  return lat_list
+      for run in parsed_md[nconn][stack]:
+        fname_c0 = out_dir + parsed_md[nconn][stack][run]['0']['0']
+        putils.append_latencies(latencies, fname_c0)
 
-def save_dat_file(exp_lats):
-  header = "nconns bare-tas bare-vtas\n"
+      data_point[stack] = {
+        "lat": putils.get_latency_avg(latencies),
+        "std": putils.get_latency_std(latencies)
+      }
+    data[nconn] = data_point
   
-  nconns = list(exp_lats.keys())
+  return data
+
+def save_dat_file(data):
+  header = "nconns " + \
+      "bare-tas-avg bare-vtas-avg virt-tas-avg " + \
+      "ovs-linux-avg " + \
+      "bare-tas-std bare-vtas-std virt-tas-std " + \
+      "ovs-linux-std\n"
+  
+  nconns = list(data.keys())
   nconns = list(map(str, sorted(map(int, nconns))))
-  stacks =  list(exp_lats[nconns[0]].keys())
-  percentiles =  list(exp_lats[nconns[0]][stacks[0]].keys())
+  stacks =  list(data[nconns[0]].keys())
+  percentiles =  list(data[nconns[0]][stacks[0]]['lat'].keys())
 
   for percentile in percentiles:
       fname = "./lat_{}.dat".format(percentile)
@@ -84,11 +89,12 @@ def save_dat_file(exp_lats):
       f.write(header)
 
       for nconn in nconns:
-        f.write("{} {} {}\n".format(
-          nconn,
-          exp_lats[nconn]['bare-tas'][percentile],
-          exp_lats[nconn]['bare-vtas'][percentile])
-        )
+        f.write("{} {} {} {} {}\n".format(
+          int(nconn),
+          data[nconn]['bare-vtas']["lat"][percentile],
+          data[nconn]['virt-tas']["lat"][percentile],
+          data[nconn]['bare-vtas']["std"][percentile],
+          data[nconn]['virt-tas']["std"][percentile]))
         
 def main():
   parsed_md = parse_metadata()

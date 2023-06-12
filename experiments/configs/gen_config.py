@@ -31,8 +31,8 @@ class Defaults:
         self.c_cleanup_pane = "{}_cleanup".format(self.client_pane_prefix)
 
         # Mellanox interfaces on client and server machine
-        self.client_interface = 'ens1f0np0'
-        self.server_interface = 'ens1f0np0'
+        self.client_interface = 'enp59s0f0np0'
+        self.server_interface = 'enp59s0f0np0'
 
         ### INTERVAL VM CONFIGS ###
         # Network interface used to set ip for a VM
@@ -89,7 +89,7 @@ class TasConfig:
         self.exec_file = self.comp_dir + '/tas/tas'
         self.args = '--ip-addr={}/24 --fp-cores-max={}'.format(ip, n_cores) + \
             ' --cc=const-rate --cc-const-rate=0 ' + \
-            ' --fp-no-autoscale --fp-no-ints --fp-no-xsumoffload' + \
+            ' --fp-no-autoscale --fp-no-ints' + \
             ' --dpdk-extra="-a{}"'.format(dpdk_extra)   
         
         self.pane = pane

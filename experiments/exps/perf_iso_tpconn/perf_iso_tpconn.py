@@ -5,11 +5,12 @@ from exps.perf_iso_tpconn.configs.bare_vtas import Config as VTasBareConf
 from exps.perf_iso_tpconn.configs.virt_tas import Config as TasVirtConf
 from exps.perf_iso_tpconn.configs.ovs_linux import Config as OVSLinuxConf
 from exps.perf_iso_tpconn.configs.ovs_tas import Config as OVSTasConf
+from exps.perf_iso_tpconn.configs.gre_test import Config as GRETEST
 
 experiments = []
 
 n_conns = [128, 256, 512, 1024, 2048, 4096, 8192, 16384]
-n_runs = 3
+n_runs = 5
 
 for n_r in range(n_runs):
   for n_c in n_conns:
@@ -25,4 +26,3 @@ for n_r in range(n_runs):
     experiments.append(tas_virt_exp)
     experiments.append(ovs_tas_exp)
     experiments.append(ovs_linux_exp)
-  

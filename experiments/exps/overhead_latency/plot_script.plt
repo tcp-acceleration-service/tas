@@ -11,7 +11,7 @@ set style histogram errorbars
 set boxwidth 0.75 relative
 
 set ylabel 'Latency [us]'
-set xtics ("bare-tas" 0, "bare-virtuoso" 1, "virtuoso" 2, "tunoff-virtuoso" 3)
+set xtics ("tas" 0, "bare-virtuoso" 1, "virtuoso" 2, "tunoff-virtuoso" 3)
 
 plot 'lat.dat' using 2:7 title "50p", \
      'lat.dat' using 3:8 title "90p", \

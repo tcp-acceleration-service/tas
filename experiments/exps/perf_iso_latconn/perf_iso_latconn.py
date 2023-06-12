@@ -9,7 +9,7 @@ from exps.perf_iso_latconn.configs.ovs_tas import Config as OVSTasConf
 experiments = []
 
 n_conns = [128, 256, 512, 1024, 2048, 4096, 8192, 16384]
-n_runs = 3
+n_runs = 5
 
 for n_r in range(n_runs):
   for n_c in n_conns:
