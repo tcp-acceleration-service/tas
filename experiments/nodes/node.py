@@ -78,7 +78,10 @@ class Node:
       self.setup_pane.send_keys(cmd)
       time.sleep(4)
 
-  def ovsbr_del(self, br_name):
+  def ovsbr_del(self, br_name, script_dir):
+      cmd = "cd {}".format(script_dir)
+      self.cleanup_pane.send_keys(cmd)
+      time.sleep(1)
       cmd = "sudo bash ovsbr-del.sh {}".format(br_name)
       self.cleanup_pane.send_keys(cmd)
       time.sleep(2)

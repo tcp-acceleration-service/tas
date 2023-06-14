@@ -33,7 +33,7 @@ class OvsLinux(Node):
 
   def cleanup(self):
     super().cleanup()
-    self.ovsbr_del("br0")
+    self.ovsbr_del("br0", self.vm_configs[0].manager_dir)
     self.stop_ovs(self.vm_configs[0].manager_dir)
 
     cmd = "sudo ip addr add {} dev {}".format(self.machine_config.ip + "/24",
