@@ -33,8 +33,9 @@ if [[ "$stack" == 'virt-tas' ]]; then
     -nographic -monitor none -serial stdio \
     -machine accel=kvm,type=q35 \
     -cpu host \
-    -smp 20 \
+    -smp 12 \
     -m 25G \
+    -snapshot \
     -device virtio-net-pci,netdev=net0 \
     -netdev user,id=net0,hostfwd=tcp::222${vm_id}-:22 \
     -chardev socket,path="/run/tasproxy",id="tas" \

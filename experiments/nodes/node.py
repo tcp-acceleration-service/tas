@@ -79,7 +79,7 @@ class Node:
       time.sleep(4)
 
   def ovsbr_del(self, br_name):
-      cmd = "sudo ovs-vsctl del-br {}".format(br_name)
+      cmd = "sudo bash ovsbr-del.sh {}".format(br_name)
       self.cleanup_pane.send_keys(cmd)
       time.sleep(2)
   
