@@ -40,12 +40,6 @@
 
 #define PKTBUF_SIZE 1536
 
-struct nic_buffer
-{
-  uint64_t addr;
-  void *buf;
-};
-
 struct flow_id_item
 {
   uint32_t flow_id;
@@ -621,6 +615,7 @@ static inline int rxq_poll(void)
 
   /* handle based on queue entry type */
   type = krx->type;
+
   switch (type)
   {
   case FLEXTCP_PL_KRX_PACKET:

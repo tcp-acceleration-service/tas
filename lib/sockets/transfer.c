@@ -115,7 +115,7 @@ ssize_t tas_recvmsg(int sockfd, struct msghdr *msg, int flags)
       s->data.connection.rx_len_2 = 0;
     }
 
-    len = MIN(iov[i].iov_len - off, s->data.connection.rx_len_1);
+    len = TAS_MIN(iov[i].iov_len - off, s->data.connection.rx_len_1);
     memcpy((uint8_t *) iov[i].iov_base + off, s->data.connection.rx_buf_1, len);
     ret += len;
 
@@ -205,7 +205,7 @@ static inline ssize_t recv_simple(int sockfd, void *buf, size_t len, int flags)
     s->data.connection.rx_buf_2 = NULL;
     s->data.connection.rx_len_2 = 0;
   }
-  len_2 = MIN(s->data.connection.rx_len_1, len - off);
+  len_2 = TAS_MIN(s->data.connection.rx_len_1, len - off);
   memcpy((uint8_t *) buf + ret, s->data.connection.rx_buf_1, len_2);
   ret += len_2;
   s->data.connection.rx_buf_1 += len_2;
@@ -314,7 +314,7 @@ ssize_t tas_sendmsg(int sockfd, const struct msghdr *msg, int flags)
   iov = msg->msg_iov;
   off = 0;
   for (i = 0; i < msg->msg_iovlen && len > 0; i++) {
-    l = MIN(len, iov[i].iov_len);
+    l = TAS_MIN(len, iov[i].iov_len);
     split_write(iov[i].iov_base, l, dst_1, len_1, dst_2, len_2, off);
 
     len -= l;

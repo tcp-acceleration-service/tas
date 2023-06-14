@@ -86,7 +86,7 @@ uint32_t cc_next_ts(uint32_t cur_ts)
     cc_next_ts_vm(cur_ts, i, &ts);
   }
 
-  return (ts == -1U ? -1U : MAX(ts, config.cc_control_granularity - (cur_ts - last_ts)));
+  return (ts == -1U ? -1U : TAS_MAX(ts, config.cc_control_granularity - (cur_ts - last_ts)));
 }
 
 static void cc_next_ts_vm(uint32_t cur_ts, int vmid, uint32_t *ts)
@@ -99,7 +99,7 @@ static void cc_next_ts_vm(uint32_t cur_ts, int vmid, uint32_t *ts)
 
     int32_t next_ts = (c->cc_rtt * config.cc_control_interval) - (cur_ts - c->cc_last_ts);
     if(next_ts >= 0) {
-      *ts = MIN(*ts, next_ts);
+      *ts = TAS_MIN(*ts, next_ts);
     } else {
       *ts = 0;
     }

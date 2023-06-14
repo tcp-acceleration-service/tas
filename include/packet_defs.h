@@ -37,13 +37,13 @@
 #define ETH_TYPE_IP   0x0800
 #define ETH_TYPE_ARP  0x0806
 
-struct eth_addr {
+struct tas_eth_addr {
   uint8_t addr[ETH_ADDR_LEN];
 } __attribute__ ((packed));
 
 struct eth_hdr {
-  struct eth_addr dest;
-  struct eth_addr src;
+  struct tas_eth_addr dest;
+  struct tas_eth_addr src;
   beui16_t type;
 } __attribute__ ((packed));
 
@@ -71,10 +71,10 @@ struct eth_hdr {
 #define IP_PROTO_DCCP	   33
 #define IP_PROTO_GRE     47
 
-#define IP_ECN_NONE      0x0
-#define IP_ECN_ECT0      0x2
-#define IP_ECN_ECT1      0x1
-#define IP_ECN_CE        0x3
+#define TAS_IP_ECN_NONE      0x0
+#define TAS_IP_ECN_ECT0      0x2
+#define TAS_IP_ECN_ECT1      0x1
+#define TAS_IP_ECN_CE        0x3
 
 typedef beui32_t ip_addr_t;
 
@@ -136,9 +136,9 @@ struct arp_hdr {
   uint8_t hlen;
   uint8_t plen;
   beui16_t oper;
-  struct eth_addr sha;
+  struct tas_eth_addr sha;
   ip_addr_t spa;
-  struct eth_addr tha;
+  struct tas_eth_addr tha;
   ip_addr_t tpa;
 } __attribute__((packed));
 
@@ -146,26 +146,26 @@ struct arp_hdr {
 /******************************************************************************/
 /* TCP */
 
-#define TCP_FIN 0x01U
-#define TCP_SYN 0x02U
-#define TCP_RST 0x04U
-#define TCP_PSH 0x08U
-#define TCP_ACK 0x10U
-#define TCP_URG 0x20U
-#define TCP_ECE 0x40U
-#define TCP_CWR 0x80U
-#define TCP_NS  0x100U
+#define TAS_TCP_FIN 0x01U
+#define TAS_TCP_SYN 0x02U
+#define TAS_TCP_RST 0x04U
+#define TAS_TCP_PSH 0x08U
+#define TAS_TCP_ACK 0x10U
+#define TAS_TCP_URG 0x20U
+#define TAS_TCP_ECE 0x40U
+#define TAS_TCP_CWR 0x80U
+#define TAS_TCP_NS  0x100U
 
-#define TCP_FLAGS 0x1ffU
+#define TAS_TCP_FLAGS 0x1ffU
 
 /* Length of the TCP header, excluding options. */
 #define TCP_HLEN 20
 
 #define TCPH_HDRLEN(phdr) (ntohs((phdr)->_hdrlen_rsvd_flags) >> 12)
-#define TCPH_FLAGS(phdr)  (ntohs((phdr)->_hdrlen_rsvd_flags) & TCP_FLAGS)
+#define TCPH_FLAGS(phdr)  (ntohs((phdr)->_hdrlen_rsvd_flags) & TAS_TCP_FLAGS)
 
 #define TCPH_HDRLEN_SET(phdr, len) (phdr)->_hdrlen_rsvd_flags = htons(((len) << 12) | TCPH_FLAGS(phdr))
-#define TCPH_FLAGS_SET(phdr, flags) (phdr)->_hdrlen_rsvd_flags = (((phdr)->_hdrlen_rsvd_flags & PP_HTONS((uint16_t)(~(uint16_t)(TCP_FLAGS)))) | htons(flags))
+#define TCPH_FLAGS_SET(phdr, flags) (phdr)->_hdrlen_rsvd_flags = (((phdr)->_hdrlen_rsvd_flags & PP_HTONS((uint16_t)(~(uint16_t)(TAS_TCP_FLAGS)))) | htons(flags))
 #define TCPH_HDRLEN_FLAGS_SET(phdr, len, flags) (phdr)->_hdrlen_rsvd_flags = htons(((len) << 12) | (flags))
 
 #define TCPH_SET_FLAG(phdr, flags ) (phdr)->_hdrlen_rsvd_flags = ((phdr)->_hdrlen_rsvd_flags | htons(flags))

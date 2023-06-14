@@ -55,6 +55,13 @@
 /** ID of the mem region to use for the slow path */
 #define SP_MEM_ID FLEXNIC_PL_VMST_NUM
 
+/** NIC buffer struc used by kernel queues */
+struct nic_buffer
+{
+  uint64_t addr;
+  void *buf;
+};
+
 /** Info struct: layout of info shared memory region */
 struct flexnic_info {
   /** Flags: see FLEXNIC_FLAG_* */
@@ -281,7 +288,7 @@ struct flextcp_pl_flowst {
   beui16_t remote_port;
 
   /** Remote MAC address */
-  struct eth_addr remote_mac;
+  struct tas_eth_addr remote_mac;
 
   /** Doorbell ID (identifying the app ctx to use) */
   uint16_t db_id;

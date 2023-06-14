@@ -189,7 +189,7 @@ int fast_flows_qman(struct dataplane_context *ctx, uint32_t vm_id, uint32_t queu
     ret = -1;
     goto unlock;
   }
-  len = MIN(avail, TCP_MSS);
+  len = TAS_MIN(avail, TCP_MSS);
 
   /* state snapshot for creating segment */
   tx_seq = fs->tx_next_seq;
@@ -413,10 +413,10 @@ int fast_flows_packet(struct dataplane_context *ctx,
   }
 
   /* if we get weird flags -> kernel */
-  if (UNLIKELY((TCPH_FLAGS(&p->tcp) & ~(TCP_ACK | TCP_PSH | TCP_ECE | TCP_CWR |
-            TCP_FIN)) != 0))
+  if (UNLIKELY((TCPH_FLAGS(&p->tcp) & ~(TAS_TCP_ACK | TAS_TCP_PSH | TAS_TCP_ECE | TAS_TCP_CWR |
+            TAS_TCP_FIN)) != 0))
   {
-    if ((TCPH_FLAGS(&p->tcp) & TCP_SYN) != 0) {
+    if ((TCPH_FLAGS(&p->tcp) & TAS_TCP_SYN) != 0) {
       /* for SYN/SYN-ACK we'll let the kernel handle them out of band */
       no_permanent_sp = 1;
     } else {
@@ -441,16 +441,16 @@ int fast_flows_packet(struct dataplane_context *ctx,
 #endif
 
   /* Stats for CC */
-  if ((TCPH_FLAGS(&p->tcp) & TCP_ACK) == TCP_ACK) {
+  if ((TCPH_FLAGS(&p->tcp) & TAS_TCP_ACK) == TAS_TCP_ACK) {
     fs->cnt_rx_acks++;
   }
 
   /* if there is a valid ack, process it */
-  if (LIKELY((TCPH_FLAGS(&p->tcp) & TCP_ACK) == TCP_ACK &&
+  if (LIKELY((TCPH_FLAGS(&p->tcp) & TAS_TCP_ACK) == TAS_TCP_ACK &&
       tcp_valid_rxack(fs, ack, &tx_bump) == 0))
   {
     fs->cnt_rx_ack_bytes += tx_bump;
-    if ((TCPH_FLAGS(&p->tcp) & TCP_ECE) == TCP_ECE) {
+    if ((TCPH_FLAGS(&p->tcp) & TAS_TCP_ECE) == TAS_TCP_ECE) {
       fs->cnt_rx_ecn_bytes += tx_bump;
     }
 
@@ -552,7 +552,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
 
   /* update rtt estimate */
   fs->tx_next_ts = f_beui32(opts->ts->ts_val);
-  if (LIKELY((TCPH_FLAGS(&p->tcp) & TCP_ACK) == TCP_ACK &&
+  if (LIKELY((TCPH_FLAGS(&p->tcp) & TAS_TCP_ACK) == TAS_TCP_ACK &&
       f_beui32(opts->ts->ts_ecr) != 0))
   {
     rtt = ts - f_beui32(opts->ts->ts_ecr);
@@ -630,7 +630,7 @@ int fast_flows_packet(struct dataplane_context *ctx,
 #endif
   }
 
-  if ((TCPH_FLAGS(&p->tcp) & TCP_FIN) == TCP_FIN &&
+  if ((TCPH_FLAGS(&p->tcp) & TAS_TCP_FIN) == TAS_TCP_FIN &&
       !(fs->rx_base_sp & FLEXNIC_PL_FLOWST_RXFIN))
   {
     if (fs->rx_next_seq == f_beui32(p->tcp.seqno) + orig_payload && !fs->rx_ooo_len) {
@@ -790,10 +790,10 @@ int fast_flows_packet_gre(struct dataplane_context *ctx,
   }
 
   /* if we get weird flags -> kernel */
-  if (UNLIKELY((TCPH_FLAGS(&p->tcp) & ~(TCP_ACK | TCP_PSH | TCP_ECE | TCP_CWR |
-            TCP_FIN)) != 0))
+  if (UNLIKELY((TCPH_FLAGS(&p->tcp) & ~(TAS_TCP_ACK | TAS_TCP_PSH | TAS_TCP_ECE | TAS_TCP_CWR |
+            TAS_TCP_FIN)) != 0))
   {
-    if ((TCPH_FLAGS(&p->tcp) & TCP_SYN) != 0) {
+    if ((TCPH_FLAGS(&p->tcp) & TAS_TCP_SYN) != 0) {
       /* for SYN/SYN-ACK we'll let the kernel handle them out of band */
       no_permanent_sp = 1;
     } else {
@@ -818,16 +818,16 @@ int fast_flows_packet_gre(struct dataplane_context *ctx,
 #endif
 
   /* Stats for CC */
-  if ((TCPH_FLAGS(&p->tcp) & TCP_ACK) == TCP_ACK) {
+  if ((TCPH_FLAGS(&p->tcp) & TAS_TCP_ACK) == TAS_TCP_ACK) {
     fs->cnt_rx_acks++;
   }
 
   /* if there is a valid ack, process it */
-  if (LIKELY((TCPH_FLAGS(&p->tcp) & TCP_ACK) == TCP_ACK &&
+  if (LIKELY((TCPH_FLAGS(&p->tcp) & TAS_TCP_ACK) == TAS_TCP_ACK &&
       tcp_valid_rxack(fs, ack, &tx_bump) == 0))
   {
     fs->cnt_rx_ack_bytes += tx_bump;
-    if ((TCPH_FLAGS(&p->tcp) & TCP_ECE) == TCP_ECE) {
+    if ((TCPH_FLAGS(&p->tcp) & TAS_TCP_ECE) == TAS_TCP_ECE) {
       fs->cnt_rx_ecn_bytes += tx_bump;
     }
 
@@ -929,7 +929,7 @@ int fast_flows_packet_gre(struct dataplane_context *ctx,
 
   /* update rtt estimate */
   fs->tx_next_ts = f_beui32(opts->ts->ts_val);
-  if (LIKELY((TCPH_FLAGS(&p->tcp) & TCP_ACK) == TCP_ACK &&
+  if (LIKELY((TCPH_FLAGS(&p->tcp) & TAS_TCP_ACK) == TAS_TCP_ACK &&
       f_beui32(opts->ts->ts_ecr) != 0))
   {
     rtt = ts - f_beui32(opts->ts->ts_ecr);
@@ -1007,7 +1007,7 @@ int fast_flows_packet_gre(struct dataplane_context *ctx,
 #endif
   }
 
-  if ((TCPH_FLAGS(&p->tcp) & TCP_FIN) == TCP_FIN &&
+  if ((TCPH_FLAGS(&p->tcp) & TAS_TCP_FIN) == TAS_TCP_FIN &&
       !(fs->rx_base_sp & FLEXNIC_PL_FLOWST_RXFIN))
   {
     if (fs->rx_next_seq == f_beui32(p->tcp.seqno) + orig_payload && !fs->rx_ooo_len) {
@@ -1361,17 +1361,17 @@ static void flow_tx_segment(struct dataplane_context *ctx,
 
   /* mark as ECN capable if flow marked so */
   if ((fs->rx_base_sp & FLEXNIC_PL_FLOWST_ECN) == FLEXNIC_PL_FLOWST_ECN) {
-    IPH_ECN_SET(&p->ip, IP_ECN_ECT0);
+    IPH_ECN_SET(&p->ip, TAS_IP_ECN_ECT0);
   }
 
-  fin_fl = (fin ? TCP_FIN : 0);
+  fin_fl = (fin ? TAS_TCP_FIN : 0);
 
   p->tcp.src = fs->local_port;
   p->tcp.dest = fs->remote_port;
   p->tcp.seqno = t_beui32(seq);
   p->tcp.ackno = t_beui32(ack);
-  TCPH_HDRLEN_FLAGS_SET(&p->tcp, 5 + optlen / 4, TCP_PSH | TCP_ACK | fin_fl);
-  p->tcp.wnd = t_beui16(MIN(0xFFFF, rxwnd));
+  TCPH_HDRLEN_FLAGS_SET(&p->tcp, 5 + optlen / 4, TAS_TCP_PSH | TAS_TCP_ACK | fin_fl);
+  p->tcp.wnd = t_beui16(TAS_MIN(0xFFFF, rxwnd));
   p->tcp.chksum = 0;
   p->tcp.urgp = t_beui16(0);
 
@@ -1443,7 +1443,7 @@ static void flow_tx_segment_gre(struct dataplane_context *ctx,
 
   /* mark as ECN capable if flow marked so */
   if ((fs->rx_base_sp & FLEXNIC_PL_FLOWST_ECN) == FLEXNIC_PL_FLOWST_ECN) {
-    IPH_ECN_SET(&p->in_ip, IP_ECN_ECT0);
+    IPH_ECN_SET(&p->in_ip, TAS_IP_ECN_ECT0);
   }
 
   GREH_CKSV_SET(&p->gre, 0, 1, 0, 0);
@@ -1462,14 +1462,14 @@ static void flow_tx_segment_gre(struct dataplane_context *ctx,
   p->in_ip.src = fs->in_local_ip;
   p->in_ip.dest = fs->in_remote_ip;
 
-  fin_fl = (fin ? TCP_FIN : 0);
+  fin_fl = (fin ? TAS_TCP_FIN : 0);
 
   p->tcp.src = fs->local_port;
   p->tcp.dest = fs->remote_port;
   p->tcp.seqno = t_beui32(seq);
   p->tcp.ackno = t_beui32(ack);
-  TCPH_HDRLEN_FLAGS_SET(&p->tcp, 5 + optlen / 4, TCP_PSH | TCP_ACK | fin_fl);
-  p->tcp.wnd = t_beui16(MIN(0xFFFF, rxwnd));
+  TCPH_HDRLEN_FLAGS_SET(&p->tcp, 5 + optlen / 4, TAS_TCP_PSH | TAS_TCP_ACK | fin_fl);
+  p->tcp.wnd = t_beui16(TAS_MIN(0xFFFF, rxwnd));
   p->tcp.chksum = 0;
   p->tcp.urgp = t_beui16(0);
 
@@ -1515,7 +1515,7 @@ static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
     struct network_buf_handle *nbh, struct tcp_timestamp_opt *ts_opt)
 {
   struct pkt_tcp *p;
-  struct eth_addr eth;
+  struct tas_eth_addr eth;
   ip_addr_t ip;
   beui16_t port;
   uint16_t hdrlen;
@@ -1543,18 +1543,18 @@ static void flow_tx_ack(struct dataplane_context *ctx, uint32_t seq,
   hdrlen = sizeof(*p) + (TCPH_HDRLEN(&p->tcp) - 5) * 4;
 
   /* If ECN flagged, set TCP response flag */
-  if (IPH_ECN(&p->ip) == IP_ECN_CE) {
-    ecn_flags = TCP_ECE;
+  if (IPH_ECN(&p->ip) == TAS_IP_ECN_CE) {
+    ecn_flags = TAS_TCP_ECE;
   }
 
   /* mark ACKs as ECN in-capable */
-  IPH_ECN_SET(&p->ip, IP_ECN_NONE);
+  IPH_ECN_SET(&p->ip, TAS_IP_ECN_NONE);
 
   /* change TCP header to ACK */
   p->tcp.seqno = t_beui32(seq);
   p->tcp.ackno = t_beui32(ack);
-  TCPH_HDRLEN_FLAGS_SET(&p->tcp, TCPH_HDRLEN(&p->tcp), TCP_ACK | ecn_flags);
-  p->tcp.wnd = t_beui16(MIN(0xFFFF, rxwnd));
+  TCPH_HDRLEN_FLAGS_SET(&p->tcp, TCPH_HDRLEN(&p->tcp), TAS_TCP_ACK | ecn_flags);
+  p->tcp.wnd = t_beui16(TAS_MIN(0xFFFF, rxwnd));
   p->tcp.urgp = t_beui16(0);
 
   /* fill in timestamp option */
@@ -1590,7 +1590,7 @@ static void flow_tx_ack_gre(struct dataplane_context *ctx, uint32_t seq,
     struct network_buf_handle *nbh, struct tcp_timestamp_opt *ts_opt)
 {
   struct pkt_gre *p;
-  struct eth_addr eth;
+  struct tas_eth_addr eth;
   ip_addr_t in_ip, out_ip;
   beui16_t port;
   uint16_t hdrlen;
@@ -1623,18 +1623,18 @@ static void flow_tx_ack_gre(struct dataplane_context *ctx, uint32_t seq,
   hdrlen = sizeof(*p) + (TCPH_HDRLEN(&p->tcp) - 5) * 4;
 
   /* If ECN flagged, set TCP response flag */
-  if (IPH_ECN(&p->out_ip) == IP_ECN_CE) {
-    ecn_flags = TCP_ECE;
+  if (IPH_ECN(&p->out_ip) == TAS_IP_ECN_CE) {
+    ecn_flags = TAS_TCP_ECE;
   }
 
   /* mark ACKs as ECN in-capable */
-  IPH_ECN_SET(&p->out_ip, IP_ECN_NONE);
+  IPH_ECN_SET(&p->out_ip, TAS_IP_ECN_NONE);
 
   /* change TCP header to ACK */
   p->tcp.seqno = t_beui32(seq);
   p->tcp.ackno = t_beui32(ack);
-  TCPH_HDRLEN_FLAGS_SET(&p->tcp, TCPH_HDRLEN(&p->tcp), TCP_ACK | ecn_flags);
-  p->tcp.wnd = t_beui16(MIN(0xFFFF, rxwnd));
+  TCPH_HDRLEN_FLAGS_SET(&p->tcp, TCPH_HDRLEN(&p->tcp), TAS_TCP_ACK | ecn_flags);
+  p->tcp.wnd = t_beui16(TAS_MIN(0xFFFF, rxwnd));
   p->tcp.urgp = t_beui16(0);
 
   /* fill in timestamp option */

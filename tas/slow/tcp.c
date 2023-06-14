@@ -416,7 +416,7 @@ int tcp_packet(const void *pkt, uint16_t len, uint32_t fn_core,
     ret = -1;
 
     /* send reset if the packet received wasn't a reset */
-    if (!(TCPH_FLAGS(&p->tcp) & TCP_RST) &&
+    if (!(TCPH_FLAGS(&p->tcp) & TAS_TCP_RST) &&
         config.kni_name == NULL)
       send_reset(p, &opts);
   }
@@ -458,7 +458,7 @@ int gre_packet(const void *pkt, uint16_t len, uint32_t fn_core,
     ret = -1;
 
     /* send reset if the packet received wasn't a reset */
-    if (!(TCPH_FLAGS(&p->tcp) & TCP_RST) &&
+    if (!(TCPH_FLAGS(&p->tcp) & TAS_TCP_RST) &&
         config.kni_name == NULL)
       send_reset_gre(p, &opts);
   }
@@ -490,10 +490,10 @@ int tcp_close(struct connection *conn)
   if (!tx_c || !rx_c) {
     if (config.fp_gre)
     {
-      send_control_gre(conn, TCP_RST, 0, 0, 0);
+      send_control_gre(conn, TAS_TCP_RST, 0, 0, 0);
     } else
     {
-      send_control(conn, TCP_RST, 0, 0, 0);
+      send_control(conn, TAS_TCP_RST, 0, 0, 0);
     }
   }
 
@@ -549,10 +549,10 @@ void tcp_timeout(struct timeout *to, enum timeout_type type)
   /* re-send SYN packet */
   if (config.fp_gre)
   {
-    send_control_gre(c, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS);
+    send_control_gre(c, TAS_TCP_SYN | TAS_TCP_ECE | TAS_TCP_CWR, 1, 0, TCP_MSS);
   } else
   {
-    send_control(c, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS);
+    send_control(c, TAS_TCP_SYN | TAS_TCP_ECE | TAS_TCP_CWR, 1, 0, TCP_MSS);
   }
 }
 
@@ -570,7 +570,7 @@ static void conn_packet(struct connection *c, const struct pkt_tcp *p,
       conn_failed(c, ret);
     }
   } else if (c->status == CONN_OPEN &&
-      (TCPH_FLAGS(&p->tcp) & ~ecn_flags) == TCP_SYN)
+      (TCPH_FLAGS(&p->tcp) & ~ecn_flags) == TAS_TCP_SYN)
   {
     /* handle re-transmitted SYN for dropped SYN-ACK */
     /* TODO: should only do this if we're still waiting for initial ACK,
@@ -584,21 +584,21 @@ static void conn_packet(struct connection *c, const struct pkt_tcp *p,
 
     /* send ECN accepting SYN-ACK */
     if ((c->flags & NICIF_CONN_ECN) == NICIF_CONN_ECN) {
-      ecn_flags = TCP_ECE;
+      ecn_flags = TAS_TCP_ECE;
     }
 
-    send_control(c, TCP_SYN | TCP_ACK | ecn_flags, 1,
+    send_control(c, TAS_TCP_SYN | TAS_TCP_ACK | ecn_flags, 1,
         f_beui32(opts->ts->ts_val), TCP_MSS);
   } else if (c->status == CONN_OPEN &&
-      (TCPH_FLAGS(&p->tcp) & TCP_SYN) == TCP_SYN)
+      (TCPH_FLAGS(&p->tcp) & TAS_TCP_SYN) == TAS_TCP_SYN)
   {
     /* silently ignore a re-transmited SYN_ACK */
   } else if (c->status == CONN_CLOSED &&
-      (TCPH_FLAGS(&p->tcp) & TCP_FIN) == TCP_FIN)
+      (TCPH_FLAGS(&p->tcp) & TAS_TCP_FIN) == TAS_TCP_FIN)
   {
    /* silently ignore a FIN for an already closed connection: TODO figure out
     * why necessary*/
-    send_control(c, TCP_ACK, 1, 0, 0);
+    send_control(c, TAS_TCP_ACK, 1, 0, 0);
   } else {
     fprintf(stderr, "tcp_packet: unexpected connection state %u\n", c->status);
   }
@@ -618,7 +618,7 @@ static void conn_packet_gre(struct connection *c, const struct pkt_gre *p,
       conn_failed(c, ret);
     }
   } else if (c->status == CONN_OPEN &&
-      (TCPH_FLAGS(&p->tcp) & ~ecn_flags) == TCP_SYN)
+      (TCPH_FLAGS(&p->tcp) & ~ecn_flags) == TAS_TCP_SYN)
   {
     /* handle re-transmitted SYN for dropped SYN-ACK */
     /* TODO: should only do this if we're still waiting for initial ACK,
@@ -632,21 +632,21 @@ static void conn_packet_gre(struct connection *c, const struct pkt_gre *p,
 
     /* send ECN accepting SYN-ACK */
     if ((c->flags & NICIF_CONN_ECN) == NICIF_CONN_ECN) {
-      ecn_flags = TCP_ECE;
+      ecn_flags = TAS_TCP_ECE;
     }
 
-    send_control_gre(c, TCP_SYN | TCP_ACK | ecn_flags, 1,
+    send_control_gre(c, TAS_TCP_SYN | TAS_TCP_ACK | ecn_flags, 1,
         f_beui32(opts->ts->ts_val), TCP_MSS);
   } else if (c->status == CONN_OPEN &&
-      (TCPH_FLAGS(&p->tcp) & TCP_SYN) == TCP_SYN)
+      (TCPH_FLAGS(&p->tcp) & TAS_TCP_SYN) == TAS_TCP_SYN)
   {
     /* silently ignore a re-transmited SYN_ACK */
   } else if (c->status == CONN_CLOSED &&
-      (TCPH_FLAGS(&p->tcp) & TCP_FIN) == TCP_FIN)
+      (TCPH_FLAGS(&p->tcp) & TAS_TCP_FIN) == TAS_TCP_FIN)
   {
    /* silently ignore a FIN for an already closed connection: TODO figure out
     * why necessary*/
-    send_control_gre(c, TCP_ACK, 1, 0, 0);
+    send_control_gre(c, TAS_TCP_ACK, 1, 0, 0);
   } else {
     // fprintf(stderr, "gre_packet: unexpected connection state %u\n", c->status);
   }
@@ -666,10 +666,10 @@ static int conn_arp_done(struct connection *conn)
   /* send SYN */
   if (config.fp_gre)
   {
-    send_control_gre(conn, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS);
+    send_control_gre(conn, TAS_TCP_SYN | TAS_TCP_ECE | TAS_TCP_CWR, 1, 0, TCP_MSS);
   } else
   {
-    send_control(conn, TCP_SYN | TCP_ECE | TCP_CWR, 1, 0, TCP_MSS);
+    send_control(conn, TAS_TCP_SYN | TAS_TCP_ECE | TAS_TCP_CWR, 1, 0, TCP_MSS);
   }
 
   CONN_DEBUG0(conn, "SYN SENT\n");
@@ -680,12 +680,12 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
     const struct tcp_opts *opts)
 {
   int vmid = c->ctx->app->vm_id;
-  uint32_t ecn_flags = TCPH_FLAGS(&p->tcp) & (TCP_ECE | TCP_CWR);
+  uint32_t ecn_flags = TCPH_FLAGS(&p->tcp) & (TAS_TCP_ECE | TAS_TCP_CWR);
 
   /* dis-arm timeout */
   conn_timeout_disarm(c);
 
-  if ((TCPH_FLAGS(&p->tcp) & (TCP_SYN | TCP_ACK)) != (TCP_SYN | TCP_ACK)) {
+  if ((TCPH_FLAGS(&p->tcp) & (TAS_TCP_SYN | TAS_TCP_ACK)) != (TAS_TCP_SYN | TAS_TCP_ACK)) {
     fprintf(stderr, "conn_syn_sent_packet: unexpected flags %x\n",
         TCPH_FLAGS(&p->tcp));
     return -1;
@@ -702,7 +702,7 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
   c->syn_ts = f_beui32(opts->ts->ts_val);
 
   /* enable ECN if SYN-ACK confirms */
-  if (ecn_flags == TCP_ECE) {
+  if (ecn_flags == TAS_TCP_ECE) {
     c->flags |= NICIF_CONN_ECN;
   }
 
@@ -729,7 +729,7 @@ static int conn_syn_sent_packet(struct connection *c, const struct pkt_tcp *p,
   c->status = CONN_OPEN;
 
   /* send ACK */
-  send_control(c, TCP_ACK, 1, c->syn_ts, 0);
+  send_control(c, TAS_TCP_ACK, 1, c->syn_ts, 0);
 
   CONN_DEBUG0(c, "conn_syn_sent_packet: ACK sent\n");
 
@@ -742,12 +742,12 @@ static int conn_syn_sent_packet_gre(struct connection *c,
     const struct pkt_gre *p, const struct tcp_opts *opts)
 {
   int vmid = c->ctx->app->vm_id;
-  uint32_t ecn_flags = TCPH_FLAGS(&p->tcp) & (TCP_ECE | TCP_CWR);
+  uint32_t ecn_flags = TCPH_FLAGS(&p->tcp) & (TAS_TCP_ECE | TAS_TCP_CWR);
 
   /* dis-arm timeout */
   conn_timeout_disarm(c);
 
-  if ((TCPH_FLAGS(&p->tcp) & (TCP_SYN | TCP_ACK)) != (TCP_SYN | TCP_ACK)) {
+  if ((TCPH_FLAGS(&p->tcp) & (TAS_TCP_SYN | TAS_TCP_ACK)) != (TAS_TCP_SYN | TAS_TCP_ACK)) {
     fprintf(stderr, "conn_syn_sent_packet_gre: unexpected flags %x\n",
         TCPH_FLAGS(&p->tcp));
     return -1;
@@ -764,7 +764,7 @@ static int conn_syn_sent_packet_gre(struct connection *c,
   c->syn_ts = f_beui32(opts->ts->ts_val);
 
   /* enable ECN if SYN-ACK confirms */
-  if (ecn_flags == TCP_ECE) {
+  if (ecn_flags == TAS_TCP_ECE) {
     c->flags |= NICIF_CONN_ECN;
   }
 
@@ -793,7 +793,7 @@ static int conn_syn_sent_packet_gre(struct connection *c,
   c->status = CONN_OPEN;
 
   /* send ACK */
-  send_control_gre(c, TCP_ACK, 1, c->syn_ts, 0);
+  send_control_gre(c, TAS_TCP_ACK, 1, c->syn_ts, 0);
 
   CONN_DEBUG0(c, "conn_syn_sent_packet_gre: ACK sent\n");
 
@@ -809,16 +809,16 @@ static int conn_reg_synack(struct connection *c)
   c->status = CONN_OPEN;
 
   if ((c->flags & NICIF_CONN_ECN) == NICIF_CONN_ECN) {
-    ecn_flags = TCP_ECE;
+    ecn_flags = TAS_TCP_ECE;
   }
 
   /* send ACK */
   if (config.fp_gre)
   {
-    send_control_gre(c, TCP_SYN | TCP_ACK | ecn_flags, 1, c->syn_ts, TCP_MSS);
+    send_control_gre(c, TAS_TCP_SYN | TAS_TCP_ACK | ecn_flags, 1, c->syn_ts, TCP_MSS);
   } else
   {
-    send_control(c, TCP_SYN | TCP_ACK | ecn_flags, 1, c->syn_ts, TCP_MSS);
+    send_control(c, TAS_TCP_SYN | TAS_TCP_ACK | ecn_flags, 1, c->syn_ts, TCP_MSS);
   }
 
   appif_accept_conn(c, 0);
@@ -1115,7 +1115,7 @@ static void listener_packet(struct listener *l, const struct pkt_tcp *p,
   uint32_t bp, n;
   struct pkt_tcp *bl_p;
 
-  if ((TCPH_FLAGS(&p->tcp) & ~(TCP_ECE | TCP_CWR)) != TCP_SYN) {
+  if ((TCPH_FLAGS(&p->tcp) & ~(TAS_TCP_ECE | TAS_TCP_CWR)) != TAS_TCP_SYN) {
     fprintf(stderr, "listener_packet: Not a SYN (flags %x)\n",
             TCPH_FLAGS(&p->tcp));
     send_reset(p, opts);
@@ -1181,7 +1181,7 @@ static void listener_packet_gre(struct listener *l, const struct pkt_gre *p,
   uint32_t bp, n;
   struct pkt_gre *bl_p;
 
-  if ((TCPH_FLAGS(&p->tcp) & ~(TCP_ECE | TCP_CWR)) != TCP_SYN) {
+  if ((TCPH_FLAGS(&p->tcp) & ~(TAS_TCP_ECE | TAS_TCP_CWR)) != TAS_TCP_SYN) {
     fprintf(stderr, "listener_packet_gre: Not a SYN (flags %x)\n",
             TCPH_FLAGS(&p->tcp));
     send_reset_gre(p, opts);
@@ -1282,8 +1282,8 @@ static void listener_accept(struct listener *l)
   c->syn_ts = f_beui32(opts.ts->ts_val);
 
   /* check if ECN is offered */
-  ecn_flags = TCPH_FLAGS(&p->tcp) & (TCP_ECE | TCP_CWR);
-  if (ecn_flags == (TCP_ECE | TCP_CWR)) {
+  ecn_flags = TCPH_FLAGS(&p->tcp) & (TAS_TCP_ECE | TAS_TCP_CWR);
+  if (ecn_flags == (TAS_TCP_ECE | TAS_TCP_CWR)) {
     c->flags |= NICIF_CONN_ECN;
   }
 
@@ -1366,8 +1366,8 @@ static void listener_accept_gre(struct listener *l)
   c->syn_ts = f_beui32(opts.ts->ts_val);
 
   /* check if ECN is offered */
-  ecn_flags = TCPH_FLAGS(&p->tcp) & (TCP_ECE | TCP_CWR);
-  if (ecn_flags == (TCP_ECE | TCP_CWR)) {
+  ecn_flags = TCPH_FLAGS(&p->tcp) & (TAS_TCP_ECE | TAS_TCP_CWR);
+  if (ecn_flags == (TAS_TCP_ECE | TAS_TCP_CWR)) {
     c->flags |= NICIF_CONN_ECN;
   }
 
@@ -1625,7 +1625,7 @@ static inline int send_reset(const struct pkt_tcp *p,
   memcpy(&remote_mac, &p->eth.src, ETH_ADDR_LEN);
   return send_control_raw(remote_mac, f_beui32(p->ip.src), f_beui16(p->tcp.src),
       f_beui16(p->tcp.dest), f_beui32(p->tcp.ackno), f_beui32(p->tcp.seqno) + 1,
-      TCP_RST | TCP_ACK, ts_opt, ts_val, 0);
+      TAS_TCP_RST | TAS_TCP_ACK, ts_opt, ts_val, 0);
 }
 
 static inline int send_reset_gre(const struct pkt_gre *p,
@@ -1646,7 +1646,7 @@ static inline int send_reset_gre(const struct pkt_gre *p,
       f_beui32(p->in_ip.dest), f_beui32(p->out_ip.dest),
       f_beui16(p->tcp.src), f_beui16(p->tcp.dest), 
       f_beui32(p->tcp.ackno), f_beui32(p->tcp.seqno) + 1,
-      TCP_RST | TCP_ACK, ts_opt, ts_val, 0);
+      TAS_TCP_RST | TAS_TCP_ACK, ts_opt, ts_val, 0);
 }
 
 static inline int parse_options(const struct pkt_tcp *p, uint16_t len,
