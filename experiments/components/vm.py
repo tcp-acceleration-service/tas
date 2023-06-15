@@ -25,7 +25,7 @@ class VM:
         cmd = "sudo mount -t hugetlbfs nodev /dev/hugepages"
         self.pane.send_keys(cmd)
         time.sleep(1)
-        cmd = "echo 8192 | sudo tee /sys/devices/system/node/node*/hugepages/hugepages-2048kB/nr_hugepages"
+        cmd = "echo 1024 | sudo tee /sys/devices/system/node/node*/hugepages/hugepages-2048kB/nr_hugepages"
         self.pane.send_keys(cmd)
         time.sleep(5)
 

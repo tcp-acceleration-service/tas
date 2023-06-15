@@ -29,7 +29,7 @@ class Config:
                 project_dir=self.defaults.default_otas_dir_bare,
                 ip=self.s_machine_config.ip,
                 n_cores=5)
-        tas_config.args = tas_config.args + ' --shm-len=8589934592'
+        tas_config.args = tas_config.args
         self.s_tas_configs.append(tas_config)
 
         server0_config = ServerConfig(pane=self.defaults.s_server_pane,
@@ -65,7 +65,7 @@ class Config:
                 project_dir=self.defaults.default_otas_dir_bare,
                 ip=self.c_machine_config.ip,
                 n_cores=1)
-        tas_config.args = tas_config.args + ' --shm-len=8589934592'
+        tas_config.args = tas_config.args
         self.c_tas_configs.append(tas_config)
 
         client0_config = ClientConfig(exp_name=exp_name, 

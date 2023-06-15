@@ -57,7 +57,7 @@ def parse_metadata():
       continue
 
     run = putils.get_expname_run(fname)
-    nconns = putils.get_expname_conns(fname)
+    nconns = str(int(putils.get_expname_conns(fname)) * 3)
     cid = putils.get_client_id(fname)
     nid = putils.get_node_id(fname)
     stack = putils.get_stack(fname)
@@ -113,10 +113,10 @@ def save_dat_file(data, fname):
   for dp in data:
     f.write("{} {} {} {} {} {} {} {} {}\n".format(
       dp["nconns"],
-      dp["bare-tas"]["tp"], dp["bare-vtas"]["tp"], dp["virt-tas"]["tp"],
-      dp["ovs-linux"]["tp"],
-      dp["bare-tas"]["std"], dp["bare-vtas"]["std"], dp["virt-tas"]["std"],
-      dp["ovs-linux"]["std"]))
+      dp["bare-tas"]["tp"], dp["virt-tas"]["tp"],
+      dp["ovs-linux"]["tp"], dp["ovs-tas"]["tp"],
+      dp["bare-tas"]["std"], dp["virt-tas"]["std"],
+      dp["ovs-linux"]["std"], dp["ovs-linux"]["std"]))
         
 def main():
   parsed_md = parse_metadata()

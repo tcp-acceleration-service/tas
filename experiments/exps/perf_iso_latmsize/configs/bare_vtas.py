@@ -10,7 +10,7 @@ class Config:
         self.defaults = Defaults()
         
         # Server Machine
-        self.sstack = 'bare-tas'
+        self.sstack = 'bare-vtas'
         self.snum = 2
         self.snodenum = 1
         self.s_tas_configs = []
@@ -26,22 +26,23 @@ class Config:
 
         tas_config = TasConfig(pane=self.defaults.s_tas_pane,
                 machine_config=self.s_machine_config,
-                project_dir=self.defaults.default_otas_dir_bare,
+                project_dir=self.defaults.default_vtas_dir_bare,
                 ip=self.s_machine_config.ip,
-                n_cores=14)
-        tas_config.args = tas_config.args + ' --shm-len=8589934592'
+                n_cores=5)
+        tas_config.args = tas_config.args
         self.s_tas_configs.append(tas_config)
 
         server0_config = ServerConfig(pane=self.defaults.s_server_pane,
-                idx=0, vmid=0,
-                port=1234, ncores=12, max_flows=4096, max_bytes=4096,
-                bench_dir=self.defaults.default_obenchmark_dir_bare,
-                tas_dir=self.defaults.default_otas_dir_bare)
+                idx=0, vmid=0, groupid=0,
+                port=1234, ncores=5, max_flows=8192, max_bytes=4096,
+                bench_dir=self.defaults.default_vbenchmark_dir_bare,
+                tas_dir=self.defaults.default_vtas_dir_bare)
         server1_config = ServerConfig(pane=self.defaults.s_server_pane,
-                idx=1, vmid=0,
-                port=1235, ncores=12, max_flows=4096, max_bytes=4096,
-                bench_dir=self.defaults.default_obenchmark_dir_bare,
-                tas_dir=self.defaults.default_otas_dir_bare)
+                idx=1, vmid=0, groupid=1,
+                port=1235, ncores=5, max_flows=8192, max_bytes=4096,
+                bench_dir=self.defaults.default_vbenchmark_dir_bare,
+                tas_dir=self.defaults.default_vtas_dir_bare)
+                
         self.server_configs.append(server0_config)
         self.server_configs.append(server1_config)
 
@@ -65,7 +66,7 @@ class Config:
                 project_dir=self.defaults.default_vtas_dir_bare,
                 ip=self.c_machine_config.ip,
                 n_cores=1)
-        tas_config.args = tas_config.args + ' --vm-shm-len=8589934592'
+        tas_config.args = tas_config.args
         self.c_tas_configs.append(tas_config)
 
         client0_config = ClientConfig(exp_name=exp_name, 

@@ -15,7 +15,7 @@ class OvsTasServer(OvsTas):
     self.server_configs = config.server_configs
     self.nodenum = config.snodenum
     self.snum = config.snum
-    self.server = []
+    self.servers = []
 
   def start_servers(self):
     for i in range(self.nodenum):
@@ -29,7 +29,7 @@ class OvsTasServer(OvsTas):
                 vm_config,
                 self.wmanager)
         self.servers.append(server)
-        server.run_virt(False, True)
+        server.run_virt(True, True)
         time.sleep(3)
 
   def run(self):
