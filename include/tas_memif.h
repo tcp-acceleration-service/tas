@@ -27,6 +27,7 @@
 
 #include <stdint.h>
 #include <utils.h>
+#include <stdatomic.h>
 #include <packet_defs.h>
 
 /**
@@ -72,6 +73,8 @@ struct flexnic_info {
   uint64_t dma_mem_off;
   /** Size of internal flexnic memory in bytes. */
   uint64_t internal_mem_size;
+  /** Size of TAS -> OVS queue in messages */
+  uint32_t tasovs_len;
   /** export mac address */
   uint64_t mac_address;
   /** Cycles to poll before blocking for application */
@@ -133,6 +136,47 @@ struct flextcp_pl_ktx {
 } __attribute__((packed));
 
 STATIC_ASSERT(sizeof(struct flextcp_pl_ktx) == 64, ktx_size);
+
+/******************************************************************************/
+/* TAS->OvS queue */
+
+#define FLEXTCP_PL_TASOVS_INVALID 0x0
+#define FLEXTCP_PL_TASOVS_VALID 0x1
+
+/** TAS to OvS queue entry. */
+struct flextcp_pl_tasovs {
+  uint64_t addr;
+  union {
+    struct {
+      uint16_t len;
+      uint16_t fn_core;
+    } packet;
+    uint8_t raw[53];
+  } __attribute__((packed)) msg;
+  uint16_t ctxid;
+  volatile uint8_t type;
+} __attribute__((packed));
+
+STATIC_ASSERT(sizeof(struct flextcp_pl_tasovs) == 64, krx_size);
+
+
+/******************************************************************************/
+/* OvS->TAS queue */
+
+#define FLEXTCP_PL_OVSTAS_INVALID 0x0
+#define FLEXTCP_PL_OVSTAS_VALID 0x1
+
+/** OvS to TAS queue entry */
+struct flextcp_pl_ovstas {
+  union {
+    uint8_t raw[63];
+  } __attribute__((packed)) msg;
+  volatile uint8_t type;
+} __attribute__((packed));
+
+STATIC_ASSERT(sizeof(struct flextcp_pl_ovstas) == 64, ktx_size);
+
+/******************************************************************************/
 
 /******************************************************************************/
 /* App RX queue */
@@ -227,9 +271,7 @@ struct flextcp_pl_appctx {
   /* read-write fields */
   uint64_t last_ts;
   uint32_t rx_head;
-  uint32_t rx_tail;
   uint32_t tx_head;
-  uint32_t tx_tail;
   uint32_t rx_avail;
 } __attribute__((packed));
 
@@ -370,6 +412,23 @@ struct flextcp_pl_flowhte {
 
 #define FLEXNIC_PL_MAX_FLOWGROUPS 4096
 
+/** OvS state */
+struct flextcp_pl_ovsctx {
+  /********************************************************/
+  /* read-only fields */
+  uint64_t ovstas_base;
+  uint64_t tasovs_base;
+  uint32_t ovstas_len;
+  uint32_t tasovs_len;
+
+  /********************************************************/
+  /* read-write fields */
+  uint32_t ovstas_head;
+  uint32_t ovstas_tail;
+  uint32_t tasovs_head;
+  uint32_t tasovs_tail;
+} __attribute__((packed));
+
 /** Layout of internal pipeline memory */
 struct flextcp_pl_mem {
   /* registers for application context queues */
@@ -390,6 +449,9 @@ struct flextcp_pl_mem {
 
   /* registers for application state */
   struct flextcp_pl_appst appst[FLEXNIC_PL_APPST_NUM];
+
+  /* register for ovs queue */
+  struct flextcp_pl_ovsctx ovsctx;
 
   uint8_t flow_group_steering[FLEXNIC_PL_MAX_FLOWGROUPS];
 } __attribute__((packed));
