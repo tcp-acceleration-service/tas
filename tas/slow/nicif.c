@@ -54,7 +54,8 @@ static inline int tas_ovs_packet(volatile struct flextcp_pl_krx *krx);
 static inline void process_packet(const void *buf, uint16_t len,
     uint32_t fn_core, uint16_t flow_group);
 static inline void process_packet_gre(const void *buf, uint16_t len,
-    uint32_t fn_core, uint16_t flow_group);
+    uint32_t fn_core, uint16_t flow_group,
+    volatile struct flextcp_pl_krx *krx);
 static inline volatile struct flextcp_pl_ktx *ktx_try_alloc(uint32_t core,
     struct nic_buffer **buf, uint32_t *new_tail);
 static inline uint32_t flow_hash(ip_addr_t lip, beui16_t lp,
@@ -513,9 +514,12 @@ static int adminq_init()
 
 static int adminq_init_core(uint16_t core)
 {
-  struct packetmem_handle *pm_bufs, *pm_rx, *pm_tx, *pm_ovstas, *pm_tasovs;
-  uintptr_t off_bufs, off_rx, off_tx, off_ovstas, off_tasovs;
-  size_t i, sz_bufs, sz_rx, sz_tx, sz_ovstas, sz_tasovs;
+  struct packetmem_handle *pm_bufs, *pm_rx, *pm_tx;
+  struct packetmem_handle *pm_tasovstx, *pm_tasovsrx, *pm_ovstastx, *pm_ovstasrx;
+  uintptr_t off_bufs, off_rx, off_tx;
+  uintptr_t off_tasovstx, off_tasovsrx, off_ovstastx, off_ovstasrx;
+  size_t i, sz_bufs, sz_rx, sz_tx;
+  size_t sz_tasovstx, sz_tasovsrx, sz_ovstastx, sz_ovstasrx;
 
   if ((rxq_bufs[core] = calloc(config.nic_rx_len, sizeof(**rxq_bufs))) == NULL)
   {
@@ -558,10 +562,20 @@ static int adminq_init_core(uint16_t core)
     return -1;
   }
 
-  sz_ovstas = config.ovs_tas_len * sizeof(struct flextcp_pl_ovstas);
-  if (packetmem_alloc(sz_ovstas, &off_ovstas, &pm_ovstas) != 0)
+  sz_tasovstx = config.nic_tx_len * sizeof(struct flextcp_pl_ovstx);
+  if (packetmem_alloc(sz_tasovstx , &off_tasovstx, &pm_tasovstx) != 0)
   {
-    fprintf(stderr, "adminq_init: packetmem_alloc ovstas queue failed\n");
+    fprintf(stderr, "adminq_init: packetmem_alloc tasovstx queue failed\n");
+    packetmem_free(pm_rx);
+    packetmem_free(pm_bufs);
+    free(txq_bufs[core]);
+    free(rxq_bufs[core]);
+    return -1;
+  }
+  sz_tasovsrx = config.nic_rx_len * sizeof(struct flextcp_pl_ovsrx);
+  if (packetmem_alloc(sz_tasovsrx, &off_tasovsrx, &pm_tasovsrx) != 0)
+  {
+    fprintf(stderr, "adminq_init: packetmem_alloc tasovsrx queue failed\n");
     packetmem_free(pm_rx);
     packetmem_free(pm_bufs);
     free(txq_bufs[core]);
@@ -569,14 +583,26 @@ static int adminq_init_core(uint16_t core)
     return -1;
     return -1;
   }
-  sz_tasovs = config.ovs_tas_len * sizeof(struct flextcp_pl_tasovs);
-  if (packetmem_alloc(sz_tasovs, &off_tasovs, &pm_tasovs) != 0)
+
+  sz_ovstastx = config.nic_tx_len * sizeof(struct flextcp_pl_ovstx);
+  if (packetmem_alloc(sz_ovstastx , &off_ovstastx, &pm_ovstastx) != 0)
   {
-    fprintf(stderr, "adminq_init: packetmem_alloc tasovs queue failed\n");
+    fprintf(stderr, "adminq_init: packetmem_alloc ovstastx queue failed\n");
     packetmem_free(pm_rx);
     packetmem_free(pm_bufs);
     free(txq_bufs[core]);
     free(rxq_bufs[core]);
+    return -1;
+  }
+  sz_ovstasrx = config.nic_rx_len * sizeof(struct flextcp_pl_ovsrx);
+  if (packetmem_alloc(sz_ovstasrx, &off_ovstasrx, &pm_ovstasrx) != 0)
+  {
+    fprintf(stderr, "adminq_init: packetmem_alloc ovstasrx queue failed\n");
+    packetmem_free(pm_rx);
+    packetmem_free(pm_bufs);
+    free(txq_bufs[core]);
+    free(rxq_bufs[core]);
+    return -1;
     return -1;
   }
 
@@ -606,11 +632,18 @@ static int adminq_init_core(uint16_t core)
   fp_state->kctx[core].tx_len = sz_tx;
   fp_state->kctx[core].rx_len = sz_rx;
 
-  fp_state->ovsctx.ovstas_base = off_ovstas;
-  fp_state->ovsctx.tasovs_base = off_tasovs;
+  fp_state->tasovs.tx_base = off_tasovstx;
+  fp_state->tasovs.rx_base = off_tasovsrx;
   MEM_BARRIER();
-  fp_state->ovsctx.ovstas_len = sz_ovstas;
-  fp_state->ovsctx.tasovs_len = sz_tasovs;
+  fp_state->tasovs.tx_len = sz_tasovstx;
+  fp_state->tasovs.rx_len = sz_tasovsrx;
+
+  fp_state->ovstas.tx_base = off_tasovstx;
+  fp_state->ovstas.rx_base = off_tasovsrx;
+  MEM_BARRIER();
+  fp_state->ovstas.tx_len = sz_ovstastx;
+  fp_state->ovstas.rx_len = sz_ovstasrx;
+
   return 0;
 }
 
@@ -635,11 +668,9 @@ static inline int rxq_poll(void)
     return -1;
   }
 
+
   /* update tail */
   tail = tail + 1;
-  printf("got control path packet\n");
-  tas_ovs_packet(krx);
-  sleep(600);
   if (tail == rxq_len)
   {
     tail -= rxq_len;
@@ -654,7 +685,7 @@ static inline int rxq_poll(void)
     if (config.fp_gre)
     {
       process_packet_gre(buf->buf, krx->msg.packet.len, krx->msg.packet.fn_core,
-                    krx->msg.packet.flow_group);
+                    krx->msg.packet.flow_group, krx);
     } else
     {
       process_packet(buf->buf, krx->msg.packet.len, krx->msg.packet.fn_core,
@@ -675,28 +706,28 @@ static inline int rxq_poll(void)
 
 static inline int tas_ovs_packet(volatile struct flextcp_pl_krx *krx)
 {
-  volatile struct flextcp_pl_ovsctx *ovsctx = &fp_state->ovsctx;
-  volatile struct flextcp_pl_tasovs *tasovs;
+  volatile struct flextcp_pl_ovsctx *tasovs = &fp_state->tasovs;
+  volatile struct flextcp_pl_ovsrx *ovsrx;
 
-  tasovs = dma_pointer(ovsctx->tasovs_base + ovsctx->tasovs_head,
-      sizeof(*tasovs), SP_MEM_ID);
+  ovsrx = dma_pointer(tasovs->rx_base + tasovs->rx_head,
+      sizeof(*ovsrx), SP_MEM_ID);
 
   /* queue full */
-  if (tasovs->type != 0) {
+  if (ovsrx->type != 0) {
     return -1;
   }
 
-  ovsctx->tasovs_head += sizeof(*tasovs);
-  if (ovsctx->tasovs_base >= ovsctx->tasovs_len)
-    ovsctx->tasovs_head -= ovsctx->tasovs_len;
+  tasovs->rx_head += sizeof(*ovsrx);
+  if (tasovs->rx_base >= tasovs->rx_len)
+    tasovs->rx_head -= tasovs->rx_len;
 
-  tasovs->addr = krx->addr;
-  tasovs->msg.packet.len = krx->msg.packet.len;
-  tasovs->msg.packet.fn_core = krx->msg.packet.fn_core;
+  ovsrx->addr = krx->addr;
+  ovsrx->msg.packet.len = krx->msg.packet.len;
+  ovsrx->msg.packet.fn_core = krx->msg.packet.fn_core;
   MEM_BARRIER();
 
   /* ovstas queue header */
-  tasovs->type = FLEXTCP_PL_TASOVS_VALID;
+  ovsrx->type = FLEXTCP_PL_OVSRX_VALID;
 
   return 0;
 }
@@ -738,7 +769,8 @@ static inline void process_packet(const void *buf, uint16_t len,
 }
 
 static inline void process_packet_gre(const void *buf, uint16_t len,
-                                  uint32_t fn_core, uint16_t flow_group)
+                                  uint32_t fn_core, uint16_t flow_group,
+                                  volatile struct flextcp_pl_krx *krx)
 {
   const struct eth_hdr *eth = buf;
   const struct ip_hdr *out_ip = (struct ip_hdr *)(eth + 1);
@@ -784,6 +816,8 @@ static inline void process_packet_gre(const void *buf, uint16_t len,
         return;
       }
 
+      /* Send packet to OvS and get control plane info */ 
+      tas_ovs_packet(krx);
       to_kni = !!gre_packet(buf, len, fn_core, flow_group);
     }
   }
