@@ -79,6 +79,22 @@ class Node:
       self.cleanup_pane.send_keys(cmd)
       time.sleep(2)
 
+  def start_ovsdpdk(self, script_dir):
+      cmd = "cd {}".format(script_dir)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(1)
+      cmd = "sudo bash ovsdpdk-start.sh"
+      self.setup_pane.send_keys(cmd)
+      time.sleep(4)
+
+  def stop_ovsdpdk(self, script_dir):
+      cmd = "cd {}".format(script_dir)
+      self.cleanup_pane.send_keys(cmd)
+      time.sleep(1)
+      cmd = "sudo bash ovsdpdk-stop.sh"
+      self.cleanup_pane.send_keys(cmd)
+      time.sleep(2)
+
   def ovsbr_add(self, br_name, ip, interface, script_dir):
       cmd = "cd {}".format(script_dir)
       self.setup_pane.send_keys(cmd)
@@ -87,11 +103,16 @@ class Node:
       self.setup_pane.send_keys(cmd)
       time.sleep(4)
 
-  def ovsbr_del(self, br_name, script_dir):
+  def ovsbr_add_vtuoso(self, br_name, script_dir):
       cmd = "cd {}".format(script_dir)
-      self.cleanup_pane.send_keys(cmd)
+      self.setup_pane.send_keys(cmd)
       time.sleep(1)
-      cmd = "sudo bash ovsbr-del.sh {}".format(br_name)
+      cmd = "sudo bash ovs-add-vtuosobr.sh {}".format(br_name)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(4)
+
+  def ovsbr_del(self, br_name):
+      cmd = "sudo ovs-vsctl del-br {}".format(br_name)
       self.cleanup_pane.send_keys(cmd)
       time.sleep(2)
   
@@ -105,6 +126,24 @@ class Node:
           br_name, vhost_name, gre_name, remote_ip, gre_key)
       self.setup_pane.send_keys(cmd)
       time.sleep(4)
+
+  def ovsport_add_vtuoso(self, br_name, port_name, script_dir):
+      cmd = "cd {}".format(script_dir)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(1)
+      cmd = "sudo bash ovs-add-vtuosoport.sh {} {}".format(
+          br_name, port_name)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(2)
+
+  def ovstunnel_add(self, br_name, tun_name, remote_ip, script_dir):
+      cmd = "cd {}".format(script_dir)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(1)
+      cmd = "sudo bash ovs-add-tunnel.sh {} {} {}".format(
+          br_name, tun_name, remote_ip)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(2)    
 
   def ovstap_add(self, br_name, tap_name, multi_queue, script_dir):
       cmd = "cd {}".format(script_dir)

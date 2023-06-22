@@ -27,6 +27,8 @@ class VirtTas(Node):
 
   def cleanup(self):
     super().cleanup()
+    self.ovsbr_del("br0")
+    self.stop_ovs(self.vm_configs[0].manager_dir)
     for vm in self.vms:
       vm.del_dummy_intf("eth0", vm.vm_config.vm_ip)
       vm.shutdown()

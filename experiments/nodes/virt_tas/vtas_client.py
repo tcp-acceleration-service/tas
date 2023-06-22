@@ -47,6 +47,13 @@ class VirtTasClient(VirtTas):
     proxyh.run()
     time.sleep(3)
 
+    self.start_ovs(self.vm_configs[0].manager_dir)
+    self.ovsbr_add_vtuoso("br0", self.vm_configs[0].manager_dir)
+    self.ovsport_add_vtuoso("br0", "vtuoso", 
+        self.vm_configs[0].manager_dir)
+    self.ovstunnel_add("br0", "gre0", self.defaults.server_ip,
+        self.vm_configs[0].manager_dir)
+
     self.start_vms()
     self.start_guest_proxies()
     self.start_clients()
