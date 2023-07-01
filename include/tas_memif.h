@@ -140,42 +140,49 @@ struct flextcp_pl_ktx {
 STATIC_ASSERT(sizeof(struct flextcp_pl_ktx) == 64, ktx_size);
 
 /******************************************************************************/
-/* OvS RX queue entry */
+/* TAS to OvS Entry*/
 
-#define FLEXTCP_PL_OVSRX_INVALID 0x0
-#define FLEXTCP_PL_OVSRX_VALID 0x1
+#define FLEXTCP_PL_TOE_INVALID 0x0
+#define FLEXTCP_PL_TOE_VALID 0x1
 
 /** TAS to OvS queue entry. */
-struct flextcp_pl_ovsrx {
+struct flextcp_pl_toe {
   uint64_t addr;
   union {
     struct {
       uint16_t len;
       uint16_t fn_core;
+      uint16_t flow_group;
     } packet;
     uint8_t raw[55];
   } __attribute__((packed)) msg;
   volatile uint8_t type;
 } __attribute__((packed));
 
-STATIC_ASSERT(sizeof(struct flextcp_pl_ovsrx) == 64, krx_size);
+STATIC_ASSERT(sizeof(struct flextcp_pl_toe) == 64, toe_size);
 
 
 /******************************************************************************/
-/* OvS TX queue entry */
+/* OvS to TAS Entry */
 
-#define FLEXTCP_PL_OVSTX_INVALID 0x0
-#define FLEXTCP_PL_OVSTX_VALID 0x1
+#define FLEXTCP_PL_OTE_INVALID 0x0
+#define FLEXTCP_PL_OTE_VALID 0x1
 
 /** OvS to TAS queue entry */
-struct flextcp_pl_ovstx {
+struct flextcp_pl_ote {
+  uint64_t addr;
   union {
-    uint8_t raw[63];
+    struct {
+      uint16_t len;
+      uint16_t fn_core;
+      uint16_t flow_group;
+    } packet;
+    uint8_t raw[55];
   } __attribute__((packed)) msg;
   volatile uint8_t type;
 } __attribute__((packed));
 
-STATIC_ASSERT(sizeof(struct flextcp_pl_ovstx) == 64, ktx_size);
+STATIC_ASSERT(sizeof(struct flextcp_pl_ote) == 64, ote_size);
 
 /******************************************************************************/
 
@@ -417,17 +424,13 @@ struct flextcp_pl_flowhte {
 struct flextcp_pl_ovsctx {
   /********************************************************/
   /* read-only fields */
-  uint64_t tx_base;
-  uint64_t rx_base;
-  uint32_t tx_len;
-  uint32_t rx_len;
+  uint64_t base;
+  uint32_t len;
 
   /********************************************************/
   /* read-write fields */
-  uint32_t tx_head;
-  uint32_t tx_tail;
-  uint32_t rx_head;
-  uint32_t rx_tail;
+  uint32_t head;
+  uint32_t tail;
 } __attribute__((packed));
 
 /** Layout of internal pipeline memory */

@@ -99,6 +99,8 @@ int nicif_init(void);
 
 /** Poll NIC queues */
 unsigned nicif_poll(void);
+/** Poll OvS queue. Only polls when GRE is on */
+unsigned ovs_poll(void);
 
 /**
  * Register application context (must be called from poll thread).

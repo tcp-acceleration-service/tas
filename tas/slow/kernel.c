@@ -145,6 +145,8 @@ int slowpath_main(int threads_launched)
     cur_ts = util_timeout_time_us();
 
     n += nicif_poll();
+    if (config.fp_gre)
+      n += ovs_poll();
     n += cc_poll(cur_ts);
     n += appif_poll();
     n += kni_poll();

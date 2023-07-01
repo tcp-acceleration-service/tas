@@ -456,7 +456,6 @@ int gre_packet(const void *pkt, uint16_t len, uint32_t fn_core,
     listener_packet_gre(l, p, &opts, fn_core, flow_group);
   } else {
     ret = -1;
-
     /* send reset if the packet received wasn't a reset */
     if (!(TCPH_FLAGS(&p->tcp) & TAS_TCP_RST) &&
         config.kni_name == NULL)
@@ -634,7 +633,6 @@ static void conn_packet_gre(struct connection *c, const struct pkt_gre *p,
     if ((c->flags & NICIF_CONN_ECN) == NICIF_CONN_ECN) {
       ecn_flags = TAS_TCP_ECE;
     }
-
     send_control_gre(c, TAS_TCP_SYN | TAS_TCP_ACK | ecn_flags, 1,
         f_beui32(opts->ts->ts_val), TCP_MSS);
   } else if (c->status == CONN_OPEN &&
@@ -648,7 +646,7 @@ static void conn_packet_gre(struct connection *c, const struct pkt_gre *p,
     * why necessary*/
     send_control_gre(c, TAS_TCP_ACK, 1, 0, 0);
   } else {
-    // fprintf(stderr, "gre_packet: unexpected connection state %u\n", c->status);
+    fprintf(stderr, "gre_packet: unexpected connection state %u\n", c->status);
   }
 }
 
