@@ -424,13 +424,17 @@ struct flextcp_pl_flowhte {
 struct flextcp_pl_ovsctx {
   /********************************************************/
   /* read-only fields */
-  uint64_t base;
-  uint32_t len;
+  uint64_t rx_base;
+  uint32_t rx_len;
+  uint64_t tx_base;
+  uint32_t tx_len;
 
   /********************************************************/
   /* read-write fields */
-  uint32_t head;
-  uint32_t tail;
+  uint32_t rx_head;
+  uint32_t rx_tail;
+  uint32_t tx_head;
+  uint32_t tx_tail;
 } __attribute__((packed));
 
 /** Layout of internal pipeline memory */

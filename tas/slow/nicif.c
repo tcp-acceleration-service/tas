@@ -51,7 +51,7 @@ static int adminq_init();
 static int adminq_init_core(uint16_t core);
 static int adminq_init_ovs();
 static inline int rxq_poll(void);
-static inline int ovsq_poll(void);
+static inline int ovsrxq_poll(void);
 static inline int ovs_upcall(volatile struct flextcp_pl_krx *krx);
 static inline void process_packet(const void *buf, uint16_t len,
     uint32_t fn_core, uint16_t flow_group);
@@ -88,13 +88,21 @@ static volatile struct flextcp_pl_ktx **txq_base;
 static uint32_t txq_len;
 static uint32_t *txq_tail;
 
-static struct nic_buffer *tasovs_bufs;
-static volatile struct flextcp_pl_toe *tasovs_base;
+static struct nic_buffer *tasovs_rx_bufs;
+static volatile struct flextcp_pl_toe *tasovs_rx_base;
 
-static struct nic_buffer *ovstas_bufs;
-static volatile struct flextcp_pl_ote *ovstas_base;
-static uint32_t ovstas_len;
-static uint32_t ovstas_tail;
+static struct nic_buffer *tasovs_tx_bufs;
+static volatile struct flextcp_pl_toe *tasovs_tx_base;
+
+static struct nic_buffer *ovstas_rx_bufs;
+static volatile struct flextcp_pl_ote *ovstas_rx_base;
+static uint32_t ovstas_rx_len;
+static uint32_t ovstas_rx_tail;
+
+static struct nic_buffer *ovstas_tx_bufs;
+static volatile struct flextcp_pl_ote *ovstas_tx_base;
+static uint32_t ovstas_tx_len;
+static uint32_t ovstas_tx_tail;
 
 int nicif_init(void)
 {
@@ -151,7 +159,7 @@ unsigned ovs_poll(void)
 
   for (i = 0; i < 1; i++)
   {
-    x = ovsq_poll();
+    x = ovsrxq_poll();
     ret += (x == -1 ? 0 : 1);
   }
 
@@ -513,15 +521,17 @@ static int adminq_init()
 
   rxq_len = config.nic_rx_len;
   txq_len = config.nic_tx_len;
-  ovstas_len = rxq_len + txq_len;
+  ovstas_rx_len = rxq_len;
+  ovstas_tx_len = txq_len;
 
+  ovstas_rx_tail = 0;
+  ovstas_tx_tail = 0;
   rxq_bufs = calloc(fn_cores, sizeof(*rxq_bufs));
   rxq_base = calloc(fn_cores, sizeof(*rxq_base));
   rxq_tail = calloc(fn_cores, sizeof(*rxq_tail));
   txq_bufs = calloc(fn_cores, sizeof(*txq_bufs));
   txq_base = calloc(fn_cores, sizeof(*txq_base));
   txq_tail = calloc(fn_cores, sizeof(*txq_tail));
-  ovstas_tail = 0;
   if (rxq_bufs == NULL || rxq_base == NULL || rxq_tail == NULL ||
       txq_bufs == NULL || txq_base == NULL || txq_tail == NULL)
   {
@@ -621,21 +631,47 @@ static int adminq_init_core(uint16_t core)
 
 static int adminq_init_ovs()
 {
-  struct packetmem_handle *pm_bufs, *pm_tasovs, *pm_ovstas;
-  uintptr_t off_bufs, off_tasovs, off_ovstas;
-  size_t i, sz_bufs, sz_tasovs, sz_ovstas;
+  struct packetmem_handle *pm_bufs, 
+      *pm_tasovs_rx, *pm_tasovs_tx, 
+      *pm_ovstas_rx, *pm_ovstas_tx;
+  uintptr_t off_bufs, 
+      off_tasovs_rx, off_tasovs_tx, 
+      off_ovstas_rx, off_ovstas_tx;
+  size_t i, sz_bufs, 
+      sz_tasovs_rx, sz_tasovs_tx, 
+      sz_ovstas_rx, sz_ovstas_tx;
 
-  if ((tasovs_bufs = calloc(config.nic_rx_len + config.nic_tx_len,
-      sizeof(*tasovs_bufs))) == NULL)
+  if ((tasovs_rx_bufs = calloc(config.nic_rx_len, 
+      sizeof(*tasovs_rx_bufs))) == NULL)
   {
-    fprintf(stderr, "adminq_init_ovs: calloc tasovs bufs failed\n");
+    fprintf(stderr, "adminq_init_ovs: calloc tasovs_rx bufs failed\n");
     return -1;
   }
-  if ((ovstas_bufs = calloc(config.nic_rx_len + config.nic_tx_len,
-      sizeof(*ovstas_bufs))) == NULL)
+
+  if ((tasovs_tx_bufs = calloc(config.nic_tx_len, 
+      sizeof(*tasovs_tx_bufs))) == NULL)
   {
-    fprintf(stderr, "adminq_init_ovs: calloc ovstas bufs failed\n");
-    free(tasovs_bufs);
+    fprintf(stderr, "adminq_init_ovs: calloc tasovs_tx bufs failed\n");
+    free(tasovs_rx_bufs);
+    return -1;
+  }
+
+  if ((ovstas_rx_bufs = calloc(config.nic_rx_len,
+      sizeof(*ovstas_rx_bufs))) == NULL)
+  {
+    fprintf(stderr, "adminq_init_ovs: calloc ovstas_rx bufs failed\n");
+    free(tasovs_rx_bufs);
+    free(tasovs_tx_bufs);
+    return -1;
+  }
+
+  if ((ovstas_tx_bufs = calloc(config.nic_tx_len,
+      sizeof(*ovstas_tx_bufs))) == NULL)
+  {
+    fprintf(stderr, "adminq_init_ovs: calloc ovstas_tx bufs failed\n");
+    free(tasovs_tx_bufs);
+    free(tasovs_tx_bufs);
+    free(ovstas_rx_bufs);
     return -1;
   }
 
@@ -644,63 +680,132 @@ static int adminq_init_ovs()
   if (packetmem_alloc(sz_bufs, &off_bufs, &pm_bufs) != 0)
   {
     fprintf(stderr, "adminq_init_ovs: packetmem_alloc bufs failed\n");
-    free(tasovs_bufs);
-    free(ovstas_bufs);
+    free(tasovs_rx_bufs);
+    free(tasovs_tx_bufs);
+    free(ovstas_rx_bufs);
+    free(ovstas_tx_bufs);
     return -1;
   }
 
-  sz_tasovs = (config.nic_tx_len + config.nic_rx_len) 
-      * sizeof(struct flextcp_pl_toe);
-  if (packetmem_alloc(sz_tasovs , &off_tasovs, &pm_tasovs) != 0)
+  sz_tasovs_rx = config.nic_rx_len * sizeof(struct flextcp_pl_toe);
+  if (packetmem_alloc(sz_tasovs_rx , &off_tasovs_rx, &pm_tasovs_rx) != 0)
   {
-    fprintf(stderr, "adminq_init_ovs: packetmem_alloc tasovs queue failed\n");
+    fprintf(stderr, "adminq_init_ovs: "
+        "packetmem_alloc tasovs_rx queue failed\n");
     packetmem_free(pm_bufs);
-    free(tasovs_bufs);
-    free(ovstas_bufs);
+    free(tasovs_rx_bufs);
+    free(tasovs_tx_bufs);
+    free(ovstas_rx_bufs);
+    free(ovstas_tx_bufs);
     return -1;
   }
 
-  sz_ovstas = (config.nic_tx_len + config.nic_rx_len)
-      * sizeof(struct flextcp_pl_ote);
-  if (packetmem_alloc(sz_ovstas , &off_ovstas, &pm_ovstas) != 0)
+  sz_tasovs_tx = config.nic_tx_len * sizeof(struct flextcp_pl_toe);
+  if (packetmem_alloc(sz_tasovs_tx , &off_tasovs_tx, &pm_tasovs_tx) != 0)
   {
-    fprintf(stderr, "adminq_init_ovs: packetmem_alloc ovstas queue failed\n");
+    fprintf(stderr, "adminq_init_ovs: "
+        "packetmem_alloc tasovs_tx queue failed\n");
     packetmem_free(pm_bufs);
-    packetmem_free(pm_tasovs);
-    free(tasovs_bufs);
-    free(ovstas_bufs);
+    packetmem_free(pm_tasovs_rx);
+    free(tasovs_rx_bufs);
+    free(tasovs_tx_bufs);
+    free(ovstas_rx_bufs);
+    free(ovstas_tx_bufs);
     return -1;
   }
 
-  tasovs_base = (volatile struct flextcp_pl_toe *)((uint8_t *)vm_shm[SP_MEM_ID] + off_tasovs);
-  ovstas_base = (volatile struct flextcp_pl_ote *)((uint8_t *)vm_shm[SP_MEM_ID] + off_ovstas);
-
-  memset((void *)tasovs_base, 0, sz_tasovs);
-  memset((void *)ovstas_base, 0, sz_ovstas);
-
-  for (i = 0; i < rxq_len + txq_len; i++)
+  sz_ovstas_rx = config.nic_rx_len * sizeof(struct flextcp_pl_ote);
+  if (packetmem_alloc(sz_ovstas_rx , &off_ovstas_rx, &pm_ovstas_rx) != 0)
   {
-    tasovs_bufs[i].addr = off_bufs;
-    tasovs_bufs[i].buf = (uint8_t *)vm_shm[SP_MEM_ID] + off_bufs;
-    tasovs_base[i].addr = off_bufs;
+    fprintf(stderr, "adminq_init_ovs: "
+        "packetmem_alloc ovstas_rx queue failed\n");
+    packetmem_free(pm_bufs);
+    packetmem_free(pm_tasovs_rx);
+    packetmem_free(pm_tasovs_tx);
+    free(tasovs_rx_bufs);
+    free(ovstas_rx_bufs);
+    free(tasovs_rx_bufs);
+    free(tasovs_tx_bufs);
+    free(ovstas_rx_bufs);
+    free(ovstas_tx_bufs);
+    return -1;
+  }
+
+  sz_ovstas_tx = config.nic_tx_len * sizeof(struct flextcp_pl_ote);
+  if (packetmem_alloc(sz_ovstas_tx , &off_ovstas_tx, &pm_ovstas_tx) != 0)
+  {
+    fprintf(stderr, "adminq_init_ovs: "
+        "packetmem_alloc ovstas_tx queue failed\n");
+    packetmem_free(pm_bufs);
+    packetmem_free(pm_tasovs_rx);
+    packetmem_free(pm_tasovs_tx);
+    packetmem_free(pm_ovstas_rx);
+    free(tasovs_rx_bufs);
+    free(ovstas_rx_bufs);
+    free(tasovs_rx_bufs);
+    free(tasovs_tx_bufs);
+    free(ovstas_rx_bufs);
+    free(ovstas_tx_bufs);
+    return -1;
+  }
+
+  tasovs_rx_base = (volatile struct flextcp_pl_toe *)((uint8_t *)vm_shm[SP_MEM_ID] + off_tasovs_rx);
+  tasovs_tx_base = (volatile struct flextcp_pl_toe *)((uint8_t *)vm_shm[SP_MEM_ID] + off_tasovs_tx);
+  ovstas_rx_base = (volatile struct flextcp_pl_ote *)((uint8_t *)vm_shm[SP_MEM_ID] + off_ovstas_rx);
+  ovstas_tx_base = (volatile struct flextcp_pl_ote *)((uint8_t *)vm_shm[SP_MEM_ID] + off_ovstas_tx);
+
+  memset((void *)tasovs_rx_base, 0, sz_tasovs_rx);
+  memset((void *)tasovs_tx_base, 0, sz_tasovs_tx);
+  memset((void *)ovstas_rx_base, 0, sz_ovstas_rx);
+  memset((void *)ovstas_tx_base, 0, sz_ovstas_tx);
+
+  for (i = 0; i < rxq_len; i++)
+  {
+    tasovs_rx_bufs[i].addr = off_bufs;
+    tasovs_rx_bufs[i].buf = (uint8_t *)vm_shm[SP_MEM_ID] + off_bufs;
+    tasovs_rx_base[i].addr = off_bufs;
     off_bufs += PKTBUF_SIZE;
   }
 
-  for (i = 0; i < rxq_len + txq_len; i++)
+  for (i = 0; i < txq_len; i++)
   {
-    ovstas_bufs[i].addr = off_bufs;
-    ovstas_bufs[i].buf = (uint8_t *)vm_shm[SP_MEM_ID] + off_bufs;
-    ovstas_base[i].addr = off_bufs;
+    tasovs_tx_bufs[i].addr = off_bufs;
+    tasovs_tx_bufs[i].buf = (uint8_t *)vm_shm[SP_MEM_ID] + off_bufs;
+    tasovs_tx_base[i].addr = off_bufs;
     off_bufs += PKTBUF_SIZE;
   }
 
-  fp_state->tasovs.base = off_tasovs;
-  MEM_BARRIER();
-  fp_state->tasovs.len = sz_tasovs;
+  for (i = 0; i < rxq_len; i++)
+  {
+    ovstas_rx_bufs[i].addr = off_bufs;
+    ovstas_rx_bufs[i].buf = (uint8_t *)vm_shm[SP_MEM_ID] + off_bufs;
+    ovstas_rx_base[i].addr = off_bufs;
+    off_bufs += PKTBUF_SIZE;
+  }
 
-  fp_state->ovstas.base = off_ovstas;
+  for (i = 0; i < txq_len; i++)
+  {
+    ovstas_tx_bufs[i].addr = off_bufs;
+    ovstas_tx_bufs[i].buf = (uint8_t *)vm_shm[SP_MEM_ID] + off_bufs;
+    ovstas_tx_base[i].addr = off_bufs;
+    off_bufs += PKTBUF_SIZE;
+  }
+
+  fp_state->tasovs.rx_base = off_tasovs_rx;
   MEM_BARRIER();
-  fp_state->ovstas.len = sz_ovstas;
+  fp_state->tasovs.rx_len = sz_tasovs_rx;
+
+  fp_state->tasovs.tx_base = off_tasovs_tx;
+  MEM_BARRIER();
+  fp_state->tasovs.tx_len = sz_tasovs_tx;
+
+  fp_state->ovstas.rx_base = off_ovstas_rx;
+  MEM_BARRIER();
+  fp_state->ovstas.rx_len = sz_ovstas_rx;
+
+  fp_state->ovstas.tx_base = off_ovstas_tx;
+  MEM_BARRIER();
+  fp_state->ovstas.tx_len = sz_ovstas_tx;
 
   return 0;
 }
@@ -761,7 +866,7 @@ static inline int rxq_poll(void)
   return ret;
 }
 
-static inline int ovsq_poll(void)
+static inline int ovsrxq_poll(void)
 {
   uint32_t old_tail, tail;
   volatile struct flextcp_pl_ote *ote;
@@ -769,9 +874,9 @@ static inline int ovsq_poll(void)
   uint8_t type;
   int ret = 0;
 
-  old_tail = tail = ovstas_tail;
-  ote = &ovstas_base[tail];
-  buf = &ovstas_bufs[tail];
+  old_tail = tail = ovstas_rx_tail;
+  ote = &ovstas_rx_base[tail];
+  buf = &ovstas_rx_bufs[tail];
 
   /* no queue entry here */
   type = ote->type;
@@ -782,9 +887,9 @@ static inline int ovsq_poll(void)
 
   /* update tail */
   tail = tail + 1;
-  if (tail == (rxq_len + txq_len))
+  if (tail == rxq_len)
   {
-    tail -= (rxq_len + txq_len);
+    tail -= rxq_len;
   }
 
   /* handle based on queue entry type */
@@ -799,12 +904,12 @@ static inline int ovsq_poll(void)
     break;
 
   default:
-    fprintf(stderr, "ovsq_poll: unknown ovs queue type 0x%x old %x len %x\n", 
+    fprintf(stderr, "ovsrxq_poll: unknown ovs queue type 0x%x old %x len %x\n", 
         type, old_tail, rxq_len);
   }
 
   ote->type = 0;
-  ovstas_tail = tail;
+  ovstas_rx_tail = tail;
 
   return ret;
 }
@@ -814,7 +919,7 @@ static inline int ovs_upcall(volatile struct flextcp_pl_krx *krx)
   volatile struct flextcp_pl_ovsctx *tasovs = &fp_state->tasovs;
   volatile struct flextcp_pl_toe *toe;
 
-  toe = dma_pointer(tasovs->base + tasovs->head,
+  toe = dma_pointer(tasovs->rx_base + tasovs->rx_head,
       sizeof(*toe), SP_MEM_ID);
 
   /* queue full */
@@ -822,9 +927,9 @@ static inline int ovs_upcall(volatile struct flextcp_pl_krx *krx)
     return -1;
   }
 
-  tasovs->head += sizeof(*toe);
-  if (tasovs->base >= tasovs->len)
-    tasovs->head -= tasovs->len;
+  tasovs->rx_head += sizeof(*toe);
+  if (tasovs->rx_base >= tasovs->rx_len)
+    tasovs->rx_head -= tasovs->rx_len;
 
   toe->addr = krx->addr;
   toe->msg.packet.len = krx->msg.packet.len;
