@@ -118,6 +118,13 @@ static inline int parse_options(const struct pkt_tcp *p, uint16_t len,
 static inline int parse_options_gre(const struct pkt_gre *p, uint16_t len,
     struct tcp_opts *opts);
 
+static int tcp_open_resolve_routing(struct connection *conn);
+static inline int send_ovs_fake_packet(uint32_t in_remote_ip, 
+    uint16_t remote_port, uint16_t local_port, 
+    uint16_t vmid, struct connection *conn,
+    uint16_t flags, int ts_opt, 
+    uint32_t ts_echo, uint16_t mss_opt);
+
 static uintptr_t ports[PORT_MAX + 1];
 static uint16_t port_eph_hint = PORT_FIRST_EPH;
 static struct nbqueue conn_async_q;
@@ -144,7 +151,11 @@ void tcp_poll(void)
 
   while ((p = nbqueue_deq(&conn_async_q)) != NULL) {
     conn = (struct connection *) (p - offsetof(struct connection, comp.el));
-    if (conn->status == CONN_ARP_PENDING) {
+    if (conn->status == CONN_OVS_COMP) {
+      if ((ret = tcp_open_resolve_routing(conn)) < 0) {
+        conn_free(conn);
+      } 
+    } else if (conn->status == CONN_ARP_PENDING) {
       if ((ret = conn->comp.status) != 0 || (ret = conn_arp_done(conn)) != 0) {
         conn_failed(conn, ret);
       }
@@ -161,13 +172,12 @@ void tcp_poll(void)
 }
 
 int tcp_open(struct app_context *ctx, 
-    uint64_t opaque, uint32_t tunnel_id,
-    uint32_t out_remote_ip, uint32_t in_remote_ip,
+    uint64_t opaque,uint32_t remote_ip,
     uint16_t remote_port, uint32_t db_id, struct connection **pconn)
 {
   int ret;
   struct connection *conn;
-  uint16_t local_port;
+  uint16_t local_port, vmid = ctx->app->vm_id;
 
   /* allocate connection struct */
   if ((conn = conn_alloc(ctx->app->vm_id)) == NULL) {
@@ -175,9 +185,9 @@ int tcp_open(struct app_context *ctx,
     return -1;
   }
 
-  CONN_DEBUG(conn, "opening connection (ctx=%p, op=%"PRIx64", o_rip=%x, i_rip=%x, "
+  CONN_DEBUG(conn, "opening connection (ctx=%p, op=%"PRIx64", rip=%x, "
       "rp=%u, db=%u)\n",
-      ctx, opaque, out_remote_ip, in_remote_ip, remote_port, db_id);
+      ctx, opaque, remote_ip, remote_port, db_id);
 
   /* allocate local port */
   if ((local_port = port_alloc()) == 0) {
@@ -188,12 +198,9 @@ int tcp_open(struct app_context *ctx,
 
   conn->ctx = ctx;
   conn->opaque = opaque;
-  conn->status = CONN_ARP_PENDING;
-  conn->tunnel_id = tunnel_id;
-  conn->out_remote_ip = fp_state->tunt[tunnel_id - 1].out_remote_ip;
+  conn->status = CONN_OVS_PENDING;
   conn->out_local_ip = config.ip;
-  conn->in_remote_ip = fp_state->tunt[tunnel_id - 1].in_remote_ip;
-  conn->in_local_ip = fp_state->tunt[tunnel_id - 1].in_local_ip;
+  conn->in_remote_ip = remote_ip;
   conn->remote_port = remote_port;
   conn->local_port = local_port;
   conn->local_seq = 0; /* TODO: assign random */
@@ -202,10 +209,59 @@ int tcp_open(struct app_context *ctx,
   conn->db_id = db_id;
   conn->flags = 0;
 
+  /* These fields are 0 because we are waiting for OvS */
+  conn->tunnel_id = 0;
+  conn->in_local_ip = 0;
+  conn->out_remote_ip = 0;
+
   conn->comp.q = &conn_async_q;
   conn->comp.notify_fd = -1;
   conn->comp.status = 0;
 
+  if (config.fp_gre)
+  {
+    ret = send_ovs_fake_packet(remote_ip, remote_port, local_port, vmid, conn,
+        TAS_TCP_SYN | TAS_TCP_ECE | TAS_TCP_CWR, 1, 0, TCP_MSS);
+
+    if (ret < 0)
+    {
+      fprintf(stderr, "tcp_open: failed to send fake ovs packet\n");
+      conn_free(conn);
+      return -1;
+    }
+  } else {
+    ret = routing_resolve(&conn->comp, remote_ip, &conn->remote_mac);
+    if (ret < 0) {
+      fprintf(stderr, "tcp_open: nicif_arp failed\n");
+      conn_free(conn);
+      return -1;
+    } else if (ret == 0) {
+      CONN_DEBUG0(conn, "routing_resolve succeeded immediately\n");
+      conn_register(conn);
+
+      ret = conn_arp_done(conn);
+    } else {
+      CONN_DEBUG0(conn, "routing_resolve pending\n");
+      conn_register(conn);
+      ret = 0;
+    }
+
+    ports[local_port] = (uintptr_t) conn | PORT_TYPE_CONN;
+
+    conn->status = CONN_ARP_PENDING;
+    conn->comp.notify_fd = -1;
+    conn->comp.status = 0;
+  }
+
+  *pconn = conn;
+
+  return 0;
+}
+
+static int tcp_open_resolve_routing(struct connection *conn)
+{
+  int ret;
+  uint16_t local_port = conn->local_port;
 
   /* resolve IP to mac */
   ret = routing_resolve(&conn->comp, conn->out_remote_ip, &conn->remote_mac);
@@ -226,7 +282,10 @@ int tcp_open(struct app_context *ctx,
 
   ports[local_port] = (uintptr_t) conn | PORT_TYPE_CONN;
 
-  *pconn = conn;
+  conn->status = CONN_ARP_PENDING;
+  conn->comp.notify_fd = -1;
+  conn->comp.status = 0;
+
   return ret;
 }
 
@@ -1750,6 +1809,113 @@ static inline int parse_options_gre(const struct pkt_gre *p, uint16_t len,
       }
     }
     off += opt_len;
+  }
+
+  return 0;
+}
+
+/* Creates a fake packet that is sent to OvS.
+   OvS uses this fake packet to match the relevant
+   information and return us the proper tunnel to be
+   used. */
+static inline int send_ovs_fake_packet(uint32_t in_remote_ip, 
+    uint16_t remote_port, uint16_t local_port, 
+    uint16_t vmid, struct connection *conn,
+    uint16_t flags, int ts_opt, 
+    uint32_t ts_echo, uint16_t mss_opt)
+{
+  uint32_t new_tail;
+  struct pkt_gre *p;
+  struct tcp_mss_opt *opt_mss;
+  struct tcp_timestamp_opt *opt_ts;
+  uint8_t optlen;
+  uint16_t len, off_ts, off_mss;
+
+  /* calculate header length depending on options */
+  optlen = 0;
+  off_mss = optlen;
+  optlen += (mss_opt ? sizeof(*opt_mss) : 0);
+  off_ts = optlen;
+  optlen += (ts_opt ? sizeof(*opt_ts) : 0);
+  optlen = (optlen + 3) & ~3;
+  len = sizeof(*p) + optlen;
+
+  /** allocate send buffer */
+  if (nicif_tasovs_tx_alloc(len, (void **) &p, &new_tail) != 0) {
+    fprintf(stderr, "send_ovs_fake_packet failed\n");
+    return -1;
+  }
+
+  /* fill ethernet header */
+  memset(&p->eth.dest, 0, ETH_ADDR_LEN);
+  memset(&p->eth.src, 0, ETH_ADDR_LEN);
+  p->eth.type = t_beui16(ETH_TYPE_IP);
+
+  /* fill outer ipv4 header */
+  IPH_VHL_SET(&p->out_ip, 4, 5);
+  p->out_ip._tos = 0;
+  p->out_ip.len = t_beui16(len - offsetof(struct pkt_gre, out_ip));
+  p->out_ip.id = t_beui16(3); /* TODO: not sure why we have 3 here */
+  p->out_ip.offset = t_beui16(0);
+  p->out_ip.ttl = 0xff;
+  p->out_ip.proto = IP_PROTO_GRE;
+  p->out_ip.chksum = 0;
+  p->out_ip.src = t_beui32(config.ip);
+  p->out_ip.dest = t_beui32(0);
+
+  GREH_CKSV_SET(&p->gre, 0, 1, 0, 0);
+  p->gre.proto = t_beui16(GRE_PROTO_IP);
+  p->gre.key = t_beui32(0);
+
+  /* fill inner ipv4 header */
+  IPH_VHL_SET(&p->in_ip, 4, 5);
+  p->in_ip._tos = 0;
+  p->in_ip.len = t_beui16(len - offsetof(struct pkt_gre, in_ip));
+  p->in_ip.id = t_beui16(3); /* TODO: not sure why we have 3 here */
+  p->in_ip.offset = t_beui16(0);
+  p->in_ip.ttl = 0xff;
+  p->in_ip.proto = IP_PROTO_TCP;
+  p->in_ip.chksum = 0;
+  p->in_ip.src = t_beui32(0);
+  p->in_ip.dest = t_beui32(in_remote_ip);
+
+  /* fill tcp header */
+  p->tcp.src = t_beui16(local_port);
+  p->tcp.dest = t_beui16(remote_port);
+  p->tcp.seqno = t_beui32(0);
+  p->tcp.ackno = t_beui32(0);
+  TCPH_HDRLEN_FLAGS_SET(&p->tcp, 5 + optlen / 4, flags);
+  p->tcp.wnd = t_beui16(11680); /* TODO */
+  p->tcp.chksum = 0;
+  p->tcp.urgp = t_beui16(0);
+
+  /* if requested: add mss option */
+  if (mss_opt) {
+    opt_mss = (struct tcp_mss_opt *) ((uint8_t *) (p + 1) + off_mss);
+    opt_mss->kind = TCP_OPT_MSS;
+    opt_mss->length = sizeof(*opt_mss);
+    opt_mss->mss = t_beui16(mss_opt);
+  }
+
+  /* if requested: add timestamp option */
+  if (ts_opt) {
+    opt_ts = (struct tcp_timestamp_opt *) ((uint8_t *) (p + 1) + off_ts);
+    memset(opt_ts, 0, optlen);
+    opt_ts->kind = TCP_OPT_TIMESTAMP;
+    opt_ts->length = sizeof(*opt_ts);
+    opt_ts->ts_val = t_beui32(0);
+    opt_ts->ts_ecr = t_beui32(ts_echo);
+  }
+
+  /* calculate header checksums */
+  p->in_ip.chksum = rte_ipv4_cksum((void *) &p->in_ip);
+  p->out_ip.chksum = rte_ipv4_cksum((void *) &p->out_ip);
+  p->tcp.chksum = rte_ipv4_udptcp_cksum((void *) &p->in_ip, (void *) &p->tcp);
+
+  if (ovs_tx_upcall(p, vmid, len, conn) < 0)
+  {
+    fprintf(stderr, "send_ovs_fake_packet: ovs_tx_upcall failed\n");
+    return -1;
   }
 
   return 0;

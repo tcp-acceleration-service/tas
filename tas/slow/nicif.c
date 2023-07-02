@@ -52,16 +52,21 @@ static int adminq_init_core(uint16_t core);
 static int adminq_init_ovs();
 static inline int rxq_poll(void);
 static inline int ovsrxq_poll(void);
-static inline int ovs_upcall(volatile struct flextcp_pl_krx *krx);
+static inline int ovstxq_poll(void);
 static inline void process_packet(const void *buf, uint16_t len,
     uint32_t fn_core, uint16_t flow_group);
 static inline void process_packet_gre(const void *buf, uint16_t len,
     uint32_t fn_core, uint16_t flow_group,
     volatile struct flextcp_pl_krx *krx);
-static inline void process_ovs_upcall(const void *buf, uint16_t len, 
+static inline void process_ovs_rx_upcall(const void *buf, uint16_t len, 
     uint32_t fn_core, uint16_t flow_group);
+static inline void process_ovs_tx_upcall(const void *buf, 
+    struct connection *conn);
 static inline volatile struct flextcp_pl_ktx *ktx_try_alloc(uint32_t core,
     struct nic_buffer **buf, uint32_t *new_tail);
+static inline volatile struct flextcp_pl_toe *
+toetx_try_alloc(uint32_t core, struct nic_buffer **pbuf,
+    uint32_t *new_tail);
 static inline uint32_t flow_hash(ip_addr_t lip, beui16_t lp,
     ip_addr_t rip, beui16_t rp);
 static inline uint32_t flow_hash_gre(beui16_t lp, beui16_t rp, beui32_t tid);
@@ -90,9 +95,13 @@ static uint32_t *txq_tail;
 
 static struct nic_buffer *tasovs_rx_bufs;
 static volatile struct flextcp_pl_toe *tasovs_rx_base;
+static uint32_t tasovs_rx_len;
+static uint32_t tasovs_rx_tail;
 
 static struct nic_buffer *tasovs_tx_bufs;
 static volatile struct flextcp_pl_toe *tasovs_tx_base;
+static uint32_t tasovs_tx_len;
+static uint32_t tasovs_tx_tail;
 
 static struct nic_buffer *ovstas_rx_bufs;
 static volatile struct flextcp_pl_ote *ovstas_rx_base;
@@ -103,6 +112,7 @@ static struct nic_buffer *ovstas_tx_bufs;
 static volatile struct flextcp_pl_ote *ovstas_tx_base;
 static uint32_t ovstas_tx_len;
 static uint32_t ovstas_tx_tail;
+
 
 int nicif_init(void)
 {
@@ -160,6 +170,12 @@ unsigned ovs_poll(void)
   for (i = 0; i < 1; i++)
   {
     x = ovsrxq_poll();
+    ret += (x == -1 ? 0 : 1);
+  }
+
+  for (i = 0; i < 1; i++)
+  {
+    x = ovstxq_poll();
     ret += (x == -1 ? 0 : 1);
   }
 
@@ -502,6 +518,23 @@ int nicif_tx_alloc(uint16_t len, void **pbuf, uint32_t *opaque)
   return 0;
 }
 
+/** Allocate transmit buffer used for OvS */
+int nicif_tasovs_tx_alloc(uint16_t len, void **pbuf, uint32_t *opaque)
+{
+  volatile struct flextcp_pl_toe *toe;
+  struct nic_buffer *buf;
+
+  if ((toe = toetx_try_alloc(0, &buf, opaque)) == NULL)
+  {
+    return -1;
+  }
+
+  toe->addr = buf->addr;
+  toe->msg.packet.len = len;
+  *pbuf = buf->buf;
+  return 0;
+}
+
 /** Actually send out transmit buffer (lens need to match) */
 void nicif_tx_send(uint32_t opaque, int no_ts)
 {
@@ -521,9 +554,13 @@ static int adminq_init()
 
   rxq_len = config.nic_rx_len;
   txq_len = config.nic_tx_len;
+  tasovs_rx_len = rxq_len;
+  tasovs_tx_len = txq_len;
   ovstas_rx_len = rxq_len;
   ovstas_tx_len = txq_len;
 
+  tasovs_rx_tail = 0;
+  tasovs_tx_tail = 0;
   ovstas_rx_tail = 0;
   ovstas_tx_tail = 0;
   rxq_bufs = calloc(fn_cores, sizeof(*rxq_bufs));
@@ -898,7 +935,7 @@ static inline int ovsrxq_poll(void)
   switch (type)
   {
   case FLEXTCP_PL_OTE_VALID:
-    process_ovs_upcall(buf->buf, ote->msg.packet.len, 
+    process_ovs_rx_upcall(buf->buf, ote->msg.packet.len, 
         ote->msg.packet.fn_core,
         ote->msg.packet.flow_group);
     break;
@@ -914,7 +951,56 @@ static inline int ovsrxq_poll(void)
   return ret;
 }
 
-static inline int ovs_upcall(volatile struct flextcp_pl_krx *krx)
+static inline int ovstxq_poll(void)
+{
+  uint32_t old_tail, tail;
+  volatile struct flextcp_pl_ote *ote;
+  struct nic_buffer *buf;
+  uint8_t type;
+  int ret = 0;
+  struct connection *conn;
+  
+  old_tail = tail = ovstas_tx_tail;
+  ote = &ovstas_tx_base[tail];
+  buf = &ovstas_tx_bufs[tail];
+
+  /* no queue entry here */
+  type = ote->type;
+  if (type == FLEXTCP_PL_OTE_INVALID)
+  {
+    return -1;
+  }
+
+  /* update tail */
+  tail = tail + 1;
+  if (tail == txq_len)
+  {
+    tail -= txq_len;
+  }
+
+  /* handle based on queue entry type */
+  type = ote->type;
+
+  switch (type)
+  {
+  case FLEXTCP_PL_OTE_VALID:
+    conn = (struct connection *) ote->msg.packet.connaddr;
+    process_ovs_tx_upcall(buf->buf, conn);
+    break;
+
+  default:
+    fprintf(stderr, "ovstxq_poll: unknown ovs queue type 0x%x old %x len %x\n", 
+        type, old_tail, txq_len);
+  }
+
+  ote->type = 0;
+  ovstas_tx_tail = tail;
+
+  return ret;
+}
+
+/* Sends a rx packet for OvS to process */
+int ovs_rx_upcall(volatile struct flextcp_pl_krx *krx)
 {
   volatile struct flextcp_pl_ovsctx *tasovs = &fp_state->tasovs;
   volatile struct flextcp_pl_toe *toe;
@@ -935,6 +1021,39 @@ static inline int ovs_upcall(volatile struct flextcp_pl_krx *krx)
   toe->msg.packet.len = krx->msg.packet.len;
   toe->msg.packet.fn_core = krx->msg.packet.fn_core;
   toe->msg.packet.flow_group = krx->msg.packet.flow_group;
+  MEM_BARRIER();
+
+  /* ovstas queue header */
+  toe->type = FLEXTCP_PL_TOE_VALID;
+
+  return 0;
+}
+
+/* Sends a fake packet for OvS to process and gets control path information */
+int ovs_tx_upcall(struct pkt_gre *p, uint16_t vmid, 
+    uint16_t len, struct connection *conn)
+{
+  volatile struct flextcp_pl_ovsctx *tasovs = &fp_state->tasovs;
+  volatile struct flextcp_pl_toe *toe;
+
+  toe = dma_pointer(tasovs->tx_base + tasovs->tx_head,
+      sizeof(*toe), SP_MEM_ID);
+
+  /* queue full */
+  if (toe->type != 0) {
+    return -1;
+  }
+
+  tasovs->tx_head += sizeof(*toe);
+  if (tasovs->tx_base >= tasovs->tx_len)
+    tasovs->tx_head -= tasovs->tx_len;
+
+  toe->addr = (uint64_t) p;
+  toe->msg.packet.len = len;
+  toe->msg.packet.fn_core = 0;
+  toe->msg.packet.flow_group = 0;
+  toe->msg.packet.vmid = vmid;
+  toe->msg.packet.connaddr = (uint64_t) conn;
   MEM_BARRIER();
 
   /* ovstas queue header */
@@ -1028,7 +1147,7 @@ static inline void process_packet_gre(const void *buf, uint16_t len,
       }
 
       /* Send packet to OvS and get control plane info */ 
-      ovs_upcall(krx);
+      ovs_rx_upcall(krx);
     }
   }
 
@@ -1036,7 +1155,7 @@ static inline void process_packet_gre(const void *buf, uint16_t len,
     kni_packet(buf, len);
 }
 
-static inline void process_ovs_upcall(const void *buf, uint16_t len, 
+static inline void process_ovs_rx_upcall(const void *buf, uint16_t len, 
     uint32_t fn_core, uint16_t flow_group)
 {   
   int to_kni;
@@ -1047,8 +1166,22 @@ static inline void process_ovs_upcall(const void *buf, uint16_t len,
     kni_packet(buf, len);
 }
 
-static inline volatile struct flextcp_pl_ktx *ktx_try_alloc(uint32_t core,
-                                                            struct nic_buffer **pbuf, uint32_t *new_tail)
+static inline void process_ovs_tx_upcall(const void *buf, 
+    struct connection *conn)
+{
+  const struct pkt_gre *p = buf;
+  
+  conn->tunnel_id = f_beui32(p->gre.key);
+  conn->in_local_ip = f_beui32(p->in_ip.src);
+  conn->out_remote_ip = f_beui32(p->out_ip.dest);
+  conn->status = CONN_OVS_COMP;
+  
+  /* Alert tcp_poll to process CONN_OVS_PENDING */
+  nbqueue_enq(conn->comp.q, &conn->comp.el);
+}
+
+static inline volatile struct flextcp_pl_ktx *
+ktx_try_alloc(uint32_t core, struct nic_buffer **pbuf, uint32_t *new_tail)
 {
   uint32_t tail = txq_tail[core];
   volatile struct flextcp_pl_ktx *ktx = &txq_base[core][tail];
@@ -1071,6 +1204,32 @@ static inline volatile struct flextcp_pl_ktx *ktx_try_alloc(uint32_t core,
   *new_tail = tail;
 
   return ktx;
+}
+
+static inline volatile struct flextcp_pl_toe *
+toetx_try_alloc(uint32_t core, struct nic_buffer **pbuf, uint32_t *new_tail)
+{
+  uint32_t tail = tasovs_tx_tail;
+  volatile struct flextcp_pl_toe *toe = &tasovs_tx_base[tail];
+  struct nic_buffer *buf = &tasovs_tx_bufs[tail];
+
+  /* queue is full */
+  if (toe->type != 0)
+  {
+    return NULL;
+  }
+
+  /* update tail */
+  tail = tail + 1;
+  if (tail == rxq_len)
+  {
+    tail -= rxq_len;
+  }
+
+  *pbuf = buf;
+  *new_tail = tail;
+
+  return toe;
 }
 
 static inline uint32_t flow_hash(ip_addr_t lip, beui16_t lp,

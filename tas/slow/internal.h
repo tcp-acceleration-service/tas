@@ -101,6 +101,11 @@ int nicif_init(void);
 unsigned nicif_poll(void);
 /** Poll OvS queue. Only polls when GRE is on */
 unsigned ovs_poll(void);
+/** Makes an ovs upcall for a received packet */
+int ovs_rx_upcall(volatile struct flextcp_pl_krx *krx);
+/** Makes an ovs upcall for a packet to be sent */
+int ovs_tx_upcall(struct pkt_gre *p, uint16_t vmid, 
+    uint16_t len, struct connection *conn);
 
 /**
  * Register application context (must be called from poll thread).
@@ -283,11 +288,22 @@ int nicif_connection_retransmit(uint32_t f_id, uint16_t core);
  * @param buf     Pointer to location where base address will be stored
  * @param opaque  Pointer to location to store opaque value that needs to be
  *                passed to nicif_tx_send().
- * @param vmid    Id of the vm that wants to send this packet
  *
  * @return 0 on success, <0 else
  */
 int nicif_tx_alloc(uint16_t len, void **buf, uint32_t *opaque);
+
+/**
+ * Allocate buffer for packet destined to OvSt.
+ *
+ * @param len     Length of packet to be sent
+ * @param buf     Pointer to location where base address will be stored
+ * @param opaque  Pointer to location to store opaque value that needs to be
+ *                passed to nicif_tx_send().
+ *
+ * @return 0 on success, <0 else
+ */
+int nicif_tasovs_tx_alloc(uint16_t len, void **pbuf, uint32_t *opaque);
 
 /**
  * Actually send out transmit buffer (lens need to match).
@@ -416,6 +432,10 @@ void appif_accept_conn(struct connection *c, int status);
 enum connection_status {
   /** Accepted: waiting for a SYN. */
   CONN_SYN_WAIT,
+  /** Opening: wairing for OvS response. */
+  CONN_OVS_PENDING,
+  /** Opening: received OvS response. */
+  CONN_OVS_COMP,
   /** Opening: waiting for ARP request. */
   CONN_ARP_PENDING,
   /** Opening: SYN request sent. */
@@ -675,9 +695,7 @@ void tcp_poll(void);
  *
  * @param ctx             Application context
  * @param opaque          Opaque value passed from application
- * @param tunnel_id       ID of the tunnel
- * @param out_remote_ip   Remote IP address of tunnel endpoint
- * @param in_remote_ip    Remote IP address of VM
+ * @param remote_ip    Remote IP address of VM
  * @param remote_port     Remote port number
  * @param db_id           Doorbell ID to use for connection
  * @param conn            Pointer to location for storing pointer of created conn
@@ -686,8 +704,7 @@ void tcp_poll(void);
  * @return 0 on success, <0 else
  */
 int tcp_open(struct app_context *ctx, 
-    uint64_t opaque, uint32_t tunnel_id, 
-    uint32_t out_remote_ip, uint32_t in_remote_ip,
+    uint64_t opaque, uint32_t remote_ip,
     uint16_t remote_port, uint32_t db_id, struct connection **conn);
 
 /**

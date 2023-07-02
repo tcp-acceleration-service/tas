@@ -153,6 +153,8 @@ struct flextcp_pl_toe {
       uint16_t len;
       uint16_t fn_core;
       uint16_t flow_group;
+      uint16_t vmid;
+      uint64_t connaddr;
     } packet;
     uint8_t raw[55];
   } __attribute__((packed)) msg;
@@ -176,6 +178,8 @@ struct flextcp_pl_ote {
       uint16_t len;
       uint16_t fn_core;
       uint16_t flow_group;
+      uint16_t vmid;
+      uint64_t connaddr;
     } packet;
     uint8_t raw[55];
   } __attribute__((packed)) msg;
