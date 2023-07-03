@@ -27,7 +27,7 @@ def compile_and_run(pane, comp_dir, comp_cmd, clean_cmd,
         break_file=None, line_break=None, save_log=False):
 
     pane.send_keys('cd ' + comp_dir)
-    pane.send_keys('git pull')
+    #pane.send_keys('git pull')
     time.sleep(1)
     
     if clean:

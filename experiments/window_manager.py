@@ -32,8 +32,9 @@ class WindowManager:
         return window_names
 
     def close_pane(self, name):
-        while self.session.find_where({"window_name" : name}) != None:
-            self.session.find_where({"window_name" : name}).kill_window()
+        window = self.session.find_where({"window_name": name})
+        if window is not None:
+            window.kill_window()
 
     def add_new_pane(self, name, is_remote):
         window = self.session.new_window(attach=False, window_name=name)

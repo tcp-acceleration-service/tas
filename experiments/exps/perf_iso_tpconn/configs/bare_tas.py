@@ -11,7 +11,7 @@ class Config:
         
         # Server Machine
         self.sstack = 'bare-tas'
-        self.snum = 2
+        self.snum = 1
         self.snodenum = 1
         self.s_tas_configs = []
         self.s_vm_configs = []
@@ -28,26 +28,26 @@ class Config:
                 machine_config=self.s_machine_config,
                 project_dir=self.defaults.default_otas_dir_bare,
                 ip=self.s_machine_config.ip,
-                n_cores=14)
-        tas_config.args = tas_config.args + ' --shm-len=8589934592'
+                n_cores=1)
+        tas_config.args = tas_config.args  
         self.s_tas_configs.append(tas_config)
 
         server0_config = ServerConfig(pane=self.defaults.s_server_pane,
                 idx=0, vmid=0,
-                port=1234, ncores=12, max_flows=4096, max_bytes=4096,
+                port=1234, ncores=8, max_flows=4096, max_bytes=64,
                 bench_dir=self.defaults.default_obenchmark_dir_bare,
                 tas_dir=self.defaults.default_otas_dir_bare)
-        server1_config = ServerConfig(pane=self.defaults.s_server_pane,
-                idx=1, vmid=0,
-                port=1235, ncores=12, max_flows=4096, max_bytes=4096,
-                bench_dir=self.defaults.default_obenchmark_dir_bare,
-                tas_dir=self.defaults.default_otas_dir_bare)
+        #server1_config = ServerConfig(pane=self.defaults.s_server_pane,
+        #        idx=1, vmid=0,
+        #        port=1235, ncores=12, max_flows=4096, max_bytes=4096,
+        #        bench_dir=self.defaults.default_obenchmark_dir_bare,
+        #        tas_dir=self.defaults.default_otas_dir_bare)
         self.server_configs.append(server0_config)
-        self.server_configs.append(server1_config)
+        #self.server_configs.append(server1_config)
 
         # Client Machine
         self.cstack = 'bare-tas'
-        self.cnum = 2
+        self.cnum = 1
         self.cnodenum = 1
         self.c_tas_configs = []
         self.c_vm_configs = []
@@ -64,16 +64,16 @@ class Config:
                 machine_config=self.c_machine_config,
                 project_dir=self.defaults.default_otas_dir_bare,
                 ip=self.c_machine_config.ip,
-                n_cores=1)
-        tas_config.args = tas_config.args + ' --shm-len=8589934592'
+                n_cores=8)
+        tas_config.args = tas_config.args 
         self.c_tas_configs.append(tas_config)
 
         client0_config = ClientConfig(exp_name=exp_name, 
                 pane=self.defaults.c_client_pane,
                 idx=0, vmid=0, stack=self.cstack,
-                ip=self.defaults.server_ip, port=1234, ncores=3,
-                msize=64, mpending=64, nconns=128,
-                open_delay=15, max_msgs_conn=0, max_pend_conns=1,
+                ip=self.defaults.server_ip, port=1234, ncores=8,
+                msize=64, mpending=8, nconns=8,
+                open_delay=1, max_msgs_conn=0, max_pend_conns=1,
                 bench_dir=self.defaults.default_obenchmark_dir_bare,
                 tas_dir=self.defaults.default_otas_dir_bare)
         client1_config = ClientConfig(exp_name=exp_name, 
@@ -85,4 +85,4 @@ class Config:
                 bench_dir=self.defaults.default_obenchmark_dir_bare,
                 tas_dir=self.defaults.default_otas_dir_bare)
         self.client_configs.append(client0_config)
-        self.client_configs.append(client1_config)
+        #self.client_configs.append(client1_config)

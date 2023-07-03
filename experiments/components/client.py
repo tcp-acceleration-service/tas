@@ -41,6 +41,7 @@ class Client:
 
         cmd = 'stdbuf -oL '
         
+        cmd += "taskset -c 12,14,16,18,20,22,24,26 "
         if w_sudo:
             cmd += 'sudo -E '
         

@@ -4,8 +4,8 @@
 
 class Defaults:
     def __init__(self):
-        self.client_ip = '192.168.10.13'
-        self.server_ip = '192.168.10.14'
+        self.client_ip = '192.168.10.32'
+        self.server_ip = '192.168.10.33'
 
         self.pane_prefix = 'e_'
         self.server_pane_prefix = '{}server'.format(self.pane_prefix)
@@ -31,30 +31,30 @@ class Defaults:
         self.c_cleanup_pane = "{}_cleanup".format(self.client_pane_prefix)
 
         # Mellanox interfaces on client and server machine
-        self.client_interface = 'ens1f0np0'
-        self.server_interface = 'ens1f0'
+        self.client_interface = 'enp75s0f1'
+        self.server_interface = 'enp75s0f1'
 
         # Network interface used to set ip for a VM
         self.vm_interface = "enp0s3"
         # Network interface used to bind TAS in tap VM
         self.tas_interface = "enp0s3"
         # PCI Id of tas interface
-        self.pci_id = "0000:00:03.0"
+        self.pci_id = "0000:4b:00.1"
 
-        self.remote_connect_cmd = 'ssh swsnetlab04'
+        self.remote_connect_cmd = 'ssh swsnetlab07'
 
-        self.home_dir = '/local/mstolet'
+        self.home_dir = '/local/vaastav'
         self.home_dir_virt = '/home/tas'
 
-        self.default_vtas_dir_bare = '{}/projects/tas'.format(self.home_dir)
-        self.default_vtas_dir_virt = '{}/projects/tas'.format(self.home_dir_virt)
-        self.default_otas_dir_bare = '{}/projects/o-tas/tas'.format(self.home_dir)
-        self.default_otas_dir_virt = '{}/projects/o-tas/tas'.format(self.home_dir_virt)
+        self.default_vtas_dir_bare = '{}/iridescent-systems/tas'.format(self.home_dir)
+        self.default_vtas_dir_virt = '{}/iridescent-systems/tas'.format(self.home_dir_virt)
+        self.default_otas_dir_bare = '{}/iridescent-systems/tas'.format(self.home_dir)
+        self.default_otas_dir_virt = '{}/iridescent-systems/tas'.format(self.home_dir_virt)
 
-        self.default_vbenchmark_dir_bare = '{}/projects/benchmarks'.format(self.home_dir)
-        self.default_vbenchmark_dir_virt = '{}/projects/benchmarks'.format(self.home_dir_virt)
-        self.default_obenchmark_dir_bare = '{}/projects/o-benchmarks/benchmarks'.format(self.home_dir)
-        self.default_obenchmark_dir_virt = '{}/projects/o-benchmarks/benchmarks'.format(self.home_dir_virt)
+        self.default_vbenchmark_dir_bare = '{}/iridescent-systems/benchmarks'.format(self.home_dir)
+        self.default_vbenchmark_dir_virt = '{}/iridescent-systems/benchmarks'.format(self.home_dir_virt)
+        self.default_obenchmark_dir_bare = '{}/iridescent-systems/benchmarks'.format(self.home_dir)
+        self.default_obenchmark_dir_virt = '{}/iridescent-systems/benchmarks'.format(self.home_dir_virt)
 
         self.ovs_ctl_path = "/usr/local/share/openvswitch/scripts/ovs-ctl"
 
@@ -68,7 +68,7 @@ class MachineConfig:
 
 class TasConfig:
     def __init__(self, pane, machine_config, project_dir, ip, n_cores, 
-            dpdk_extra="3b:00.0"):
+            dpdk_extra="4b:00.1"):
         self.name = "server" if machine_config. is_server else "client"
         
         self.project_dir = project_dir
@@ -88,8 +88,9 @@ class TasConfig:
         self.exec_file = self.comp_dir + '/tas/tas'
         self.args = '--ip-addr={}/24 --fp-cores-max={}'.format(ip, n_cores) + \
             ' --cc=const-rate --cc-const-rate=0' + \
-            ' --fp-no-autoscale --fp-no-ints --fp-no-xsumoffload --fp-no-rss' + \
-            ' --dpdk-extra="-a{}"'.format(dpdk_extra)   
+            ' --fp-no-autoscale --fp-no-ints' + \
+            ' --dpdk-extra="-a{}"'.format(dpdk_extra) + \
+            ' --dpdk-extra="--lcores=0@0,1@2,2@4,3@6,4@8,5@10,6@12,7@14,8@16,9@18,10@20"'
         
         self.pane = pane
         self.ip = ip

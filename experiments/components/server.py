@@ -38,10 +38,11 @@ class Server:
 
         cmd = ''
         stack = self.machine_config.stack
-        
+       
+        cmd += "taskset -c 12,14,16,18,20,22,24,26 "
         if w_sudo:
-            cmd = 'sudo -E '
-        
+            cmd += 'sudo -E '
+       
         if ld_preload:
             cmd += 'LD_PRELOAD=' + self.server_config.lib_so + ' '
        
