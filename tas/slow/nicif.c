@@ -1048,7 +1048,7 @@ int ovs_tx_upcall(struct pkt_gre *p, uint16_t vmid,
   if (tasovs->tx_base >= tasovs->tx_len)
     tasovs->tx_head -= tasovs->tx_len;
 
-  toe->addr = (uint64_t) p;
+  dma_write(toe->addr, len, p, SP_MEM_ID);
   toe->msg.packet.len = len;
   toe->msg.packet.fn_core = 0;
   toe->msg.packet.flow_group = 0;
