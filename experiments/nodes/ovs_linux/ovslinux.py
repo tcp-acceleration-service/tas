@@ -18,7 +18,7 @@ class OvsLinux(Node):
 
   def setup(self):
     super().setup()
-
+    self.ovs_make_install(self.defaults.original_ovs_path)
     self.start_ovs(self.vm_configs[0].manager_dir)
     self.ovsbr_add("br0", 
                    self.machine_config.ip + "/24", 
@@ -27,9 +27,13 @@ class OvsLinux(Node):
     
     for vm_config in self.vm_configs:
       # Tap that allows us to ssh to VM
+      greid = vm_config.id + 1
       self.ovsvhost_add("br0", 
                         "vhost{}".format(vm_config.id),
-                         vm_config.manager_dir)
+                        "gre" + str(greid),
+                        vm_config.vm_ip,
+                        greid,
+                        vm_config.manager_dir)
 
   def cleanup(self):
     super().cleanup()

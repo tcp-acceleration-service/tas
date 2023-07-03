@@ -54,6 +54,15 @@ class Node:
       self.cleanup_pane.send_keys(cmd)
       time.sleep(2)
 
+
+  def ovs_make_install(self, ovs_dir):
+      cmd = "cd {}".format(ovs_dir)
+      self.setup_pane.send_keys(cmd)
+      time.sleep(1)
+      cmd = "sudo make install"
+      self.setup_pane.send_keys(cmd)
+      time.sleep(4)
+
   def start_ovs(self, script_dir):
       cmd = "cd {}".format(script_dir)
       self.setup_pane.send_keys(cmd)
@@ -86,12 +95,14 @@ class Node:
       self.cleanup_pane.send_keys(cmd)
       time.sleep(2)
   
-  def ovsvhost_add(self, br_name, vhost_name, script_dir):
+  def ovsvhost_add(self, br_name, vhost_name, 
+                   gre_name, remote_ip, gre_key, 
+                   script_dir):
       cmd = "cd {}".format(script_dir)
       self.setup_pane.send_keys(cmd)
       time.sleep(1)
-      cmd = "sudo bash ovsvhost-add.sh {} {}".format(
-          br_name, vhost_name)
+      cmd = "sudo bash ovsvhost-add.sh {} {} {} {} {}".format(
+          br_name, vhost_name, gre_name, remote_ip, gre_key)
       self.setup_pane.send_keys(cmd)
       time.sleep(4)
 

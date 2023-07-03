@@ -21,7 +21,7 @@ class OvsTas(Node):
 
   def setup(self):
     super().setup()
-
+    self.ovs_make_install(self.defaults.original_ovs_path)
     self.start_ovs(self.vm_configs[0].manager_dir)
     self.ovsbr_add("br0", 
                    self.machine_config.ip + "/24",
@@ -29,9 +29,13 @@ class OvsTas(Node):
                    self.vm_configs[0].manager_dir)
     
     for vm_config in self.vm_configs:
+      greid = vm_config.id + 1
       self.ovsvhost_add("br0", 
                         "vhost{}".format(vm_config.id),
-                         vm_config.manager_dir)
+                        "gre" + str(greid),
+                        vm_config.vm_ip,
+                        greid,
+                        vm_config.manager_dir)
 
   def cleanup(self):
     super().cleanup()

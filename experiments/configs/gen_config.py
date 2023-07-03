@@ -58,6 +58,8 @@ class Defaults:
         self.default_obenchmark_dir_virt = '{}/projects/o-benchmarks/benchmarks'.format(self.home_dir_virt)
 
         self.ovs_ctl_path = "/usr/local/share/openvswitch/scripts/ovs-ctl"
+        self.original_ovs_path = "/local/mstolet/projects/o-ovs/ovs"
+        self.modified_ovs_path = "/local/mstolet/projects/ovs"
 
 class MachineConfig:
     def __init__(self, ip, interface, stack, is_remote, is_server):
