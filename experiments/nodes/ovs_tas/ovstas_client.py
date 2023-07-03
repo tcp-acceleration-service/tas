@@ -33,7 +33,7 @@ class OvsTasClient(OvsTas):
         time.sleep(3)
 
   def run(self):
-    self.setup()
+    self.setup(is_client=True)
     self.start_vms()
     self.start_tas()
     self.start_clients()

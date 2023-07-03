@@ -93,7 +93,7 @@ class Config:
         tas0_config = TasConfig(pane=self.defaults.c_tas_pane,
                 machine_config=self.c_machine_config,
                 project_dir=self.defaults.default_otas_dir_virt,
-                ip=vm0_config.tas_tap_ip,
+                ip=vm0_config.vm_ip,
                 n_cores=1, dpdk_extra="00:03.0")
         tas0_config.args = tas0_config.args + " --fp-no-xsumoffload --fp-no-rss"
         
@@ -106,7 +106,7 @@ class Config:
         tas1_config = TasConfig(pane=self.defaults.c_tas_pane,
                 machine_config=self.c_machine_config,
                 project_dir=self.defaults.default_otas_dir_virt,
-                ip=vm1_config.tas_tap_ip,
+                ip=vm1_config.vm_ip,
                 n_cores=1, dpdk_extra="00:03.0")
         tas1_config.args = tas1_config.args + " --fp-no-xsumoffload --fp-no-rss"
 

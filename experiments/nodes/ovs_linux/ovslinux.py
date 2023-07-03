@@ -16,7 +16,7 @@ class OvsLinux(Node):
     self.vm_configs = vm_configs
     self.vms = []
 
-  def setup(self):
+  def setup(self, is_client=False):
     super().setup()
     self.ovs_make_install(self.defaults.original_ovs_path)
     self.start_ovs(self.vm_configs[0].manager_dir)
@@ -26,12 +26,16 @@ class OvsLinux(Node):
                    self.vm_configs[0].manager_dir)
     
     for vm_config in self.vm_configs:
-      # Tap that allows us to ssh to VM
+      if is_client:
+        remote_ip = self.defaults.server_ip
+      else:
+        remote_ip = self.defaults.client_ip
+
       greid = vm_config.id + 1
       self.ovsvhost_add("br0", 
                         "vhost{}".format(vm_config.id),
                         "gre" + str(greid),
-                        vm_config.vm_ip,
+                        remote_ip,
                         greid,
                         vm_config.manager_dir)
 

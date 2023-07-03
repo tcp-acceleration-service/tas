@@ -73,10 +73,10 @@ def parse_data(parsed_md):
 
 def save_dat_file(data):
   header = "nconns " + \
-      "bare-tas-avg bare-vtas-avg virt-tas-avg " + \
-      "ovs-linux-avg " + \
-      "bare-tas-std bare-vtas-std virt-tas-std " + \
-      "ovs-linux-std\n"
+      "bare-tas-avg virt-tas-avg " + \
+      "ovs-linux-avg ovs-tas-avg" + \
+      "bare-tas-std virt-tas-std " + \
+      "ovs-linux-std ovs-tas-std\n"
   
   nconns = list(data.keys())
   nconns = list(map(str, sorted(map(int, nconns))))
@@ -89,12 +89,16 @@ def save_dat_file(data):
       f.write(header)
 
       for nconn in nconns:
-        f.write("{} {} {} {} {}\n".format(
+        f.write("{} {} {} {} {} {} {} {} {}\n".format(
           int(nconn),
-          data[nconn]['bare-vtas']["lat"][percentile],
+          data[nconn]['bare-tas']["lat"][percentile],
           data[nconn]['virt-tas']["lat"][percentile],
-          data[nconn]['bare-vtas']["std"][percentile],
-          data[nconn]['virt-tas']["std"][percentile]))
+          data[nconn]['ovs-linux']["lat"][percentile],
+          data[nconn]['ovs-tas']["lat"][percentile],
+          data[nconn]['bare-tas']["std"][percentile],
+          data[nconn]['virt-tas']["std"][percentile],
+          data[nconn]['ovs-linux']["std"][percentile],
+          data[nconn]['ovs-tas']["std"][percentile]))
         
 def main():
   parsed_md = parse_metadata()
