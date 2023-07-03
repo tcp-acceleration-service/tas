@@ -20,4 +20,4 @@ echo "Adding interface ${vhost_name} to port"
 ovs-vsctl add-port ${br_name} ${vhost_name} -- set Interface ${vhost_name} type=dpdkvhostuser
 
 echo "Adding GRE port"
-ovs-vsctl add-port br0 $gre_name -- set interface $gre_name type=gre options:remote_ip=$remote_ip options:tunnel_id=$gre_key
+ovs-vsctl add-port br0 $gre_name -- set interface $gre_name type=gre options:remote_ip=$remote_ip options:key=$gre_key
