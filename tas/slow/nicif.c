@@ -985,6 +985,11 @@ static inline int ovstxq_poll(void)
   {
   case FLEXTCP_PL_OTE_VALID:
     conn = (struct connection *) ote->msg.packet.connaddr;
+    conn->tunnel_id = ote->key;
+    conn->out_remote_ip = ote->out_remote_ip;
+    conn->out_local_ip = ote->out_local_ip;
+    conn->in_remote_ip = ote->in_remote_ip;
+    conn->in_local_ip = ote->in_local_ip;
     process_ovs_tx_upcall(buf->buf, conn);
     break;
 
@@ -1031,6 +1036,38 @@ int ovs_rx_upcall(volatile struct flextcp_pl_krx *krx)
 
 /* Sends a fake packet for OvS to process and gets control path information */
 int ovs_tx_upcall(struct pkt_gre *p, uint16_t vmid, 
+    uint16_t len, struct connection *conn)
+{
+  volatile struct flextcp_pl_ovsctx *tasovs = &fp_state->tasovs;
+  volatile struct flextcp_pl_toe *toe;
+
+  toe = dma_pointer(tasovs->tx_base + tasovs->tx_head,
+      sizeof(*toe), SP_MEM_ID);
+
+  /* queue full */
+  if (toe->type != 0) {
+    return -1;
+  }
+
+  tasovs->tx_head += sizeof(*toe);
+  if (tasovs->tx_base >= tasovs->tx_len)
+    tasovs->tx_head -= tasovs->tx_len;
+
+  dma_write(toe->addr, len, p, SP_MEM_ID);
+  toe->msg.packet.len = len;
+  toe->msg.packet.fn_core = 0;
+  toe->msg.packet.flow_group = 0;
+  toe->msg.packet.vmid = vmid;
+  toe->msg.packet.connaddr = (uint64_t) conn;
+  MEM_BARRIER();
+
+  /* ovstas queue header */
+  toe->type = FLEXTCP_PL_TOE_VALID;
+
+  return 0;
+}
+
+int ovs_tx_upcall_decapsed(struct pkt_tcp *p, uint16_t vmid, 
     uint16_t len, struct connection *conn)
 {
   volatile struct flextcp_pl_ovsctx *tasovs = &fp_state->tasovs;
@@ -1159,7 +1196,6 @@ static inline void process_ovs_rx_upcall(const void *buf, uint16_t len,
     uint32_t fn_core, uint16_t flow_group)
 {   
   int to_kni;
-
   to_kni = !!gre_packet(buf, len, fn_core, flow_group);
 
   if (to_kni)

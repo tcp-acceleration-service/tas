@@ -173,6 +173,11 @@ STATIC_ASSERT(sizeof(struct flextcp_pl_toe) == 64, toe_size);
 /** OvS to TAS queue entry */
 struct flextcp_pl_ote {
   uint64_t addr;
+  uint32_t key;
+  uint32_t out_remote_ip;
+  uint32_t out_local_ip;
+  uint32_t in_remote_ip;
+  uint32_t in_local_ip;
   union {
     struct {
       uint16_t len;
@@ -181,7 +186,7 @@ struct flextcp_pl_ote {
       uint16_t vmid;
       uint64_t connaddr;
     } packet;
-    uint8_t raw[55];
+    uint8_t raw[35];
   } __attribute__((packed)) msg;
   volatile uint8_t type;
 } __attribute__((packed));
@@ -452,9 +457,6 @@ struct flextcp_pl_mem {
 
   /* flow lookup table */
   struct flextcp_pl_flowhte flowht[FLEXNIC_PL_FLOWHT_ENTRIES];
-
-  /* tunnel entry lookup table */
-  struct flextcp_pl_tun tunt[FLEXNIC_PL_TUN_NUM];
 
   /* registers for kernel queues */
   struct flextcp_pl_appctx kctx[FLEXNIC_PL_APPST_CTX_MCS];
