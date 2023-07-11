@@ -60,7 +60,7 @@ static inline void process_packet_gre(const void *buf, uint16_t len,
     volatile struct flextcp_pl_krx *krx);
 static inline void process_ovs_rx_upcall(const void *buf, uint16_t len, 
     uint32_t fn_core, uint16_t flow_group);
-static inline void process_ovs_tx_upcall(const void *buf, 
+static inline void process_ovs_tx_upcall(volatile struct flextcp_pl_ote *ote, 
     struct connection *conn);
 static inline volatile struct flextcp_pl_ktx *ktx_try_alloc(uint32_t core,
     struct nic_buffer **buf, uint32_t *new_tail);
@@ -955,14 +955,12 @@ static inline int ovstxq_poll(void)
 {
   uint32_t old_tail, tail;
   volatile struct flextcp_pl_ote *ote;
-  struct nic_buffer *buf;
   uint8_t type;
   int ret = 0;
   struct connection *conn;
   
   old_tail = tail = ovstas_tx_tail;
   ote = &ovstas_tx_base[tail];
-  buf = &ovstas_tx_bufs[tail];
 
   /* no queue entry here */
   type = ote->type;
@@ -985,12 +983,8 @@ static inline int ovstxq_poll(void)
   {
   case FLEXTCP_PL_OTE_VALID:
     conn = (struct connection *) ote->msg.packet.connaddr;
-    conn->tunnel_id = ote->key;
-    conn->out_remote_ip = ote->out_remote_ip;
-    conn->out_local_ip = ote->out_local_ip;
-    conn->in_remote_ip = ote->in_remote_ip;
-    conn->in_local_ip = ote->in_local_ip;
-    process_ovs_tx_upcall(buf->buf, conn);
+
+    process_ovs_tx_upcall(ote, conn);
     break;
 
   default:
@@ -1202,14 +1196,14 @@ static inline void process_ovs_rx_upcall(const void *buf, uint16_t len,
     kni_packet(buf, len);
 }
 
-static inline void process_ovs_tx_upcall(const void *buf, 
-    struct connection *conn)
+static inline void process_ovs_tx_upcall(volatile struct flextcp_pl_ote *ote, 
+  struct connection *conn)
 {
-  const struct pkt_gre *p = buf;
-  
-  conn->tunnel_id = f_beui32(p->gre.key);
-  conn->in_local_ip = f_beui32(p->in_ip.src);
-  conn->out_remote_ip = f_beui32(p->out_ip.dest);
+  conn->tunnel_id = ote->key;
+  conn->out_remote_ip = ote->out_remote_ip;
+  conn->out_local_ip = ote->out_local_ip;
+  conn->in_remote_ip = ote->in_remote_ip;
+  conn->in_local_ip = ote->in_local_ip;
   conn->status = CONN_OVS_COMP;
   
   /* Alert tcp_poll to process CONN_OVS_PENDING */
