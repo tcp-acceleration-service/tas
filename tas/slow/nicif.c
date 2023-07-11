@@ -1061,38 +1061,6 @@ int ovs_tx_upcall(struct pkt_gre *p, uint16_t vmid,
   return 0;
 }
 
-int ovs_tx_upcall_decapsed(struct pkt_tcp *p, uint16_t vmid, 
-    uint16_t len, struct connection *conn)
-{
-  volatile struct flextcp_pl_ovsctx *tasovs = &fp_state->tasovs;
-  volatile struct flextcp_pl_toe *toe;
-
-  toe = dma_pointer(tasovs->tx_base + tasovs->tx_head,
-      sizeof(*toe), SP_MEM_ID);
-
-  /* queue full */
-  if (toe->type != 0) {
-    return -1;
-  }
-
-  tasovs->tx_head += sizeof(*toe);
-  if (tasovs->tx_base >= tasovs->tx_len)
-    tasovs->tx_head -= tasovs->tx_len;
-
-  dma_write(toe->addr, len, p, SP_MEM_ID);
-  toe->msg.packet.len = len;
-  toe->msg.packet.fn_core = 0;
-  toe->msg.packet.flow_group = 0;
-  toe->msg.packet.vmid = vmid;
-  toe->msg.packet.connaddr = (uint64_t) conn;
-  MEM_BARRIER();
-
-  /* ovstas queue header */
-  toe->type = FLEXTCP_PL_TOE_VALID;
-
-  return 0;
-}
-
 static inline void process_packet(const void *buf, uint16_t len,
     uint32_t fn_core, uint16_t flow_group)
 {

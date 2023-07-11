@@ -106,8 +106,6 @@ int ovs_rx_upcall(volatile struct flextcp_pl_krx *krx);
 /** Makes an ovs upcall for a packet to be sent */
 int ovs_tx_upcall(struct pkt_gre *p, uint16_t vmid, 
     uint16_t len, struct connection *conn);
-int ovs_tx_upcall_decapsed(struct pkt_tcp *p, uint16_t vmid, 
-    uint16_t len, struct connection *conn);
 
 /**
  * Register application context (must be called from poll thread).
