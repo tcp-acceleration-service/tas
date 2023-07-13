@@ -263,6 +263,10 @@ static int tcp_open_resolve_routing(struct connection *conn)
   int ret;
   uint16_t local_port = conn->local_port;
 
+  conn->status = CONN_ARP_PENDING;
+  conn->comp.notify_fd = -1;
+  conn->comp.status = 0;
+
   /* resolve IP to mac */
   ret = routing_resolve(&conn->comp, conn->out_remote_ip, &conn->remote_mac);
   if (ret < 0) {
@@ -281,10 +285,6 @@ static int tcp_open_resolve_routing(struct connection *conn)
   }
 
   ports[local_port] = (uintptr_t) conn | PORT_TYPE_CONN;
-
-  conn->status = CONN_ARP_PENDING;
-  conn->comp.notify_fd = -1;
-  conn->comp.status = 0;
 
   return ret;
 }
@@ -712,7 +712,6 @@ static void conn_packet_gre(struct connection *c, const struct pkt_gre *p,
 static int conn_arp_done(struct connection *conn)
 {
   CONN_DEBUG0(conn, "arp resolution done\n");
-
   conn->status = CONN_SYN_SENT;
 
   /* arm timeout */

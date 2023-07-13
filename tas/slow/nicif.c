@@ -96,12 +96,12 @@ static uint32_t *txq_tail;
 static struct nic_buffer *tasovs_rx_bufs;
 static volatile struct flextcp_pl_toe *tasovs_rx_base;
 static uint32_t tasovs_rx_len;
-static uint32_t tasovs_rx_tail;
+static uint32_t tasovs_rx_head;
 
 static struct nic_buffer *tasovs_tx_bufs;
 static volatile struct flextcp_pl_toe *tasovs_tx_base;
 static uint32_t tasovs_tx_len;
-static uint32_t tasovs_tx_tail;
+static uint32_t tasovs_tx_head;
 
 static struct nic_buffer *ovstas_rx_bufs;
 static volatile struct flextcp_pl_ote *ovstas_rx_base;
@@ -167,13 +167,13 @@ unsigned ovs_poll(void)
   unsigned i, ret = 0 /*, nonsuc = 0*/;
   int x;
 
-  for (i = 0; i < 1; i++)
+  for (i = 0; i < 512; i++)
   {
     x = ovsrxq_poll();
     ret += (x == -1 ? 0 : 1);
   }
 
-  for (i = 0; i < 1; i++)
+  for (i = 0; i < 512; i++)
   {
     x = ovstxq_poll();
     ret += (x == -1 ? 0 : 1);
@@ -559,8 +559,8 @@ static int adminq_init()
   ovstas_rx_len = rxq_len;
   ovstas_tx_len = txq_len;
 
-  tasovs_rx_tail = 0;
-  tasovs_tx_tail = 0;
+  tasovs_rx_head = 0;
+  tasovs_tx_head = 0;
   ovstas_rx_tail = 0;
   ovstas_tx_tail = 0;
   rxq_bufs = calloc(fn_cores, sizeof(*rxq_bufs));
@@ -924,9 +924,11 @@ static inline int ovsrxq_poll(void)
 
   /* update tail */
   tail = tail + 1;
+  fp_state->ovstas.rx_tail += sizeof(*ote);
   if (tail == rxq_len)
   {
     tail -= rxq_len;
+    fp_state->ovstas.rx_tail -= fp_state->ovstas.rx_len;
   }
 
   /* handle based on queue entry type */
@@ -971,9 +973,11 @@ static inline int ovstxq_poll(void)
 
   /* update tail */
   tail = tail + 1;
+  fp_state->ovstas.tx_tail += sizeof(*ote);
   if (tail == txq_len)
   {
     tail -= txq_len;
+    fp_state->ovstas.tx_tail -= fp_state->ovstas.tx_len;
   }
 
   /* handle based on queue entry type */
@@ -1012,9 +1016,13 @@ int ovs_rx_upcall(volatile struct flextcp_pl_krx *krx)
     return -1;
   }
 
+  tasovs_rx_head += 1;
   tasovs->rx_head += sizeof(*toe);
-  if (tasovs->rx_base >= tasovs->rx_len)
+  if (tasovs_rx_head == tasovs_rx_len)
+  {
+    tasovs_rx_head -= tasovs_rx_len;
     tasovs->rx_head -= tasovs->rx_len;
+  }
 
   toe->addr = krx->addr;
   toe->msg.packet.len = krx->msg.packet.len;
@@ -1043,9 +1051,13 @@ int ovs_tx_upcall(struct pkt_gre *p, uint16_t vmid,
     return -1;
   }
 
+  tasovs_tx_head += 1;
   tasovs->tx_head += sizeof(*toe);
-  if (tasovs->tx_base >= tasovs->tx_len)
+  if (tasovs_tx_head == tasovs_tx_len)
+  {
+    tasovs_tx_head -= tasovs_tx_len;
     tasovs->tx_head -= tasovs->tx_len;
+  }
 
   dma_write(toe->addr, len, p, SP_MEM_ID);
   toe->msg.packet.len = len;
@@ -1207,7 +1219,7 @@ ktx_try_alloc(uint32_t core, struct nic_buffer **pbuf, uint32_t *new_tail)
 static inline volatile struct flextcp_pl_toe *
 toetx_try_alloc(uint32_t core, struct nic_buffer **pbuf, uint32_t *new_tail)
 {
-  uint32_t tail = tasovs_tx_tail;
+  uint32_t tail = tasovs_tx_head;
   volatile struct flextcp_pl_toe *toe = &tasovs_tx_base[tail];
   struct nic_buffer *buf = &tasovs_tx_bufs[tail];
 
