@@ -46,13 +46,18 @@ class VirtTasClient(VirtTas):
     time.sleep(5)
     proxyh.run()
     time.sleep(3)
-
+    self.ovs_make_install(self.defaults.modified_ovs_path)
     self.start_ovs(self.vm_configs[0].manager_dir)
     self.ovsbr_add_vtuoso("br0", self.vm_configs[0].manager_dir)
-    self.ovsport_add_vtuoso("br0", "vtuoso", 
-        self.vm_configs[0].manager_dir)
-    self.ovstunnel_add("br0", "gre0", self.defaults.server_ip,
-        self.vm_configs[0].manager_dir)
+    # self.ovstunnel_add("br0", "gre1", "192.168.10.14", self.vm_configs[0].manager_dir, key="1")
+    self.ovsport_add_vtuoso("br0", "rx_vtuoso", "virtuosorx", 
+                            self.vm_configs[0].manager_dir)
+    self.ovsport_add_vtuoso("br0", "tx_vtuoso", "virtuosotx",
+                            self.vm_configs[0].manager_dir,
+                            out_remote_ip="192.168.10.14", out_local_ip="192.168.10.13",
+                            in_remote_ip="10.0.0.1", in_local_ip="10.0.0.20",
+                            key=1)
+    self.ovsflow_add("br0", self.vm_configs[0].manager_dir)
 
     self.start_vms()
     self.start_guest_proxies()

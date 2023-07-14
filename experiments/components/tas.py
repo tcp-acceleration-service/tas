@@ -23,8 +23,9 @@ class TAS:
                 exec_file=self.tas_config.exec_file,
                 out=self.tas_config.out,
                 args=tas_args,
-                save_log=True,
-                clean=False)
+                save_log=False,
+                clean=False,
+                gdb=False)
 
     def run_virt(self):
         ssh_com = utils.get_ssh_command(self.machine_config, self.vm_config)
