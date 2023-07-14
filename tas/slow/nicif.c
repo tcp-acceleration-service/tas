@@ -55,8 +55,7 @@ static inline int ovsrxq_poll(void);
 static inline int ovstxq_poll(void);
 static inline void process_packet(const void *buf, uint16_t len,
     uint32_t fn_core, uint16_t flow_group);
-static inline void process_packet_gre(const void *buf, uint16_t len,
-    uint32_t fn_core, uint16_t flow_group,
+static inline void process_packet_gre(const void *buf,
     volatile struct flextcp_pl_krx *krx);
 static inline void process_ovs_rx_upcall(const void *buf, uint16_t len, 
     uint32_t fn_core, uint16_t flow_group);
@@ -883,8 +882,7 @@ static inline int rxq_poll(void)
   case FLEXTCP_PL_KRX_PACKET:
     if (config.fp_gre)
     {
-      process_packet_gre(buf->buf, krx->msg.packet.len, krx->msg.packet.fn_core,
-                    krx->msg.packet.flow_group, krx);
+      process_packet_gre(buf->buf, krx);
     } else
     {
       process_packet(buf->buf, krx->msg.packet.len, krx->msg.packet.fn_core,
@@ -1031,7 +1029,7 @@ int ovs_rx_upcall(volatile struct flextcp_pl_krx *krx)
   MEM_BARRIER();
 
   /* ovstas queue header */
-  toe->type = FLEXTCP_PL_TOE_VALID;
+  toe->type = krx->msg.packet.vmid;
 
   return 0;
 }
@@ -1068,7 +1066,7 @@ int ovs_tx_upcall(struct pkt_gre *p, uint16_t vmid,
   MEM_BARRIER();
 
   /* ovstas queue header */
-  toe->type = FLEXTCP_PL_TOE_VALID;
+  toe->type = vmid;
 
   return 0;
 }
@@ -1109,10 +1107,13 @@ static inline void process_packet(const void *buf, uint16_t len,
 
 }
 
-static inline void process_packet_gre(const void *buf, uint16_t len,
-                                  uint32_t fn_core, uint16_t flow_group,
-                                  volatile struct flextcp_pl_krx *krx)
+static inline void process_packet_gre(const void *buf, 
+    volatile struct flextcp_pl_krx *krx)
 {
+  uint16_t len = krx->msg.packet.len;
+  uint32_t fn_core = krx->msg.packet.fn_core;
+  uint16_t flow_group = krx->msg.packet.flow_group;
+
   const struct eth_hdr *eth = buf;
   const struct ip_hdr *out_ip = (struct ip_hdr *)(eth + 1);
   const struct gre_hdr *gre = (struct gre_hdr *)(out_ip + 1);

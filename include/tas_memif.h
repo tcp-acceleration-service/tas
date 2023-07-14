@@ -105,6 +105,7 @@ struct flextcp_pl_krx {
       uint16_t len;
       uint16_t fn_core;
       uint16_t flow_group;
+      uint16_t vmid;
     } packet;
     uint8_t raw[55];
   } __attribute__((packed)) msg;
@@ -142,8 +143,7 @@ STATIC_ASSERT(sizeof(struct flextcp_pl_ktx) == 64, ktx_size);
 /******************************************************************************/
 /* TAS to OvS Entry*/
 
-#define FLEXTCP_PL_TOE_INVALID 0x0
-#define FLEXTCP_PL_TOE_VALID 0x1
+#define FLEXTCP_PL_TOE_INVALID 0xff
 
 /** TAS to OvS queue entry. */
 struct flextcp_pl_toe {

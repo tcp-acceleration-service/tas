@@ -142,6 +142,7 @@ void fast_kernel_packet(struct dataplane_context *ctx,
 
   krx->msg.packet.len = len;
   krx->msg.packet.fn_core = ctx->id;
+  krx->msg.packet.vmid = kctx->vm_id;
   MEM_BARRIER();
 
   /* krx queue header */
