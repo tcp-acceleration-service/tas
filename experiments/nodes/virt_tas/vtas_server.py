@@ -62,7 +62,7 @@ class VirtTasServer(VirtTas):
     time.sleep(5)
     proxyh.run()
     time.sleep(3)
-
+    self.setup_tunnels()
     self.start_vms()
     self.start_guest_proxies()
     self.start_servers()

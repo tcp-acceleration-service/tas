@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-if [ "$#" -ne 1 ]; then
+if [ "$#" -ne 3 ]; then
     echo "Illegal number of parameters"
     echo "usage:"
-    echo "[br_name ip interface]"
+    echo "[br_name in_port out_port]"
     exit
 fi
 
