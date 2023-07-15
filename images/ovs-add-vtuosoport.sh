@@ -3,18 +3,19 @@
 if [ "$#" -lt 3 ]; then
     echo "Illegal number of parameters"
     echo "usage:"
-    echo "[br_name, port_name, type, out_remote_ip, out_local_ip, in_remote_ip, in_local_ip, key]"
+    echo "[br_name, port_name, type, vmid, out_remote_ip, out_local_ip, in_remote_ip, in_local_ip, key]"
     exit
 fi
 
 br_name=$1
 port_name=$2
 type=$3
-out_remote_ip=$4
-out_local_ip=$5
-in_remote_ip=$6
-in_local_ip=$7
-key=$8
+vmid=$4
+out_remote_ip=$5
+out_local_ip=$6
+in_remote_ip=$7
+in_local_ip=$8
+key=$9
 
 if [[ "$type" == "virtuosotx" ]]
 then
@@ -25,5 +26,5 @@ then
         options:key=$key 
 else
     echo "Adding regular Virtuoso port"
-    ovs-vsctl add-port $br_name $port_name -- set Interface $port_name type=$type
+    ovs-vsctl add-port $br_name $port_name -- set Interface $port_name type=$type vmid=$vmid
 fi
