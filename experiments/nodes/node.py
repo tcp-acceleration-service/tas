@@ -184,10 +184,10 @@ class Node:
       self.cleanup_pane.send_keys(cmd)
       time.sleep(1)
 
-  def ovsflow_add(self, br_name, script_dir):
+  def ovsflow_add(self, br_name, in_port, out_port, script_dir):
       cmd = "cd {}".format(script_dir)
       self.setup_pane.send_keys(cmd)
       time.sleep(1)
-      cmd = "sudo bash ovsflow-add.sh {}".format(br_name)
+      cmd = "sudo bash ovsflow-add.sh {} {} {}".format(br_name, in_port, out_port)
       self.setup_pane.send_keys(cmd)
       time.sleep(2)

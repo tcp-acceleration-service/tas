@@ -18,7 +18,27 @@ class VirtTasClient(VirtTas):
     self.client_configs = config.client_configs
     self.nodenum = config.cnodenum
     self.cnum = config.cnum
+    self.server_vm_configs = config.s_vm_configs
     self.clients = []
+
+  def setup_tunnels(self):
+    self.ovs_make_install(self.defaults.modified_ovs_path)
+    self.start_ovs(self.vm_configs[0].manager_dir)
+    self.ovsbr_add_vtuoso("br0", self.vm_configs[0].manager_dir)
+
+    for i, vm_config in enumerate(self.vm_configs):
+      rxport_name = "rx_vtuoso{}".format(vm_config.id)
+      txport_name = "tx_vtuoso{}".format(vm_config.id)
+      self.ovsport_add_vtuoso("br0", rxport_name, "virtuosorx", 
+                              vm_config.manager_dir)
+      self.ovsport_add_vtuoso("br0", txport_name, "virtuosotx",
+                              vm_config.manager_dir,
+                              out_remote_ip=self.defaults.server_ip, 
+                              out_local_ip=self.defaults.client_ip,
+                              in_remote_ip=self.server_vm_configs[i].vm_ip, 
+                              in_local_ip=vm_config.vm_ip,
+                              key=i + 1)
+      self.ovsflow_add("br0", rxport_name, txport_name, vm_config.manager_dir)
 
   def start_clients(self):
     for i in range(self.nodenum):
@@ -46,19 +66,7 @@ class VirtTasClient(VirtTas):
     time.sleep(5)
     proxyh.run()
     time.sleep(3)
-    self.ovs_make_install(self.defaults.modified_ovs_path)
-    self.start_ovs(self.vm_configs[0].manager_dir)
-    self.ovsbr_add_vtuoso("br0", self.vm_configs[0].manager_dir)
-    # self.ovstunnel_add("br0", "gre1", "192.168.10.14", self.vm_configs[0].manager_dir, key="1")
-    self.ovsport_add_vtuoso("br0", "rx_vtuoso", "virtuosorx", 
-                            self.vm_configs[0].manager_dir)
-    self.ovsport_add_vtuoso("br0", "tx_vtuoso", "virtuosotx",
-                            self.vm_configs[0].manager_dir,
-                            out_remote_ip="192.168.10.14", out_local_ip="192.168.10.13",
-                            in_remote_ip="10.0.0.1", in_local_ip="10.0.0.20",
-                            key=1)
-    self.ovsflow_add("br0", self.vm_configs[0].manager_dir)
-
+    self.setup_tunnels()
     self.start_vms()
     self.start_guest_proxies()
     self.start_clients()
