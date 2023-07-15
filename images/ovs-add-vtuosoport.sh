@@ -26,5 +26,5 @@ then
         options:key=$key 
 else
     echo "Adding regular Virtuoso port"
-    ovs-vsctl add-port $br_name $port_name -- set Interface $port_name type=$type vmid=$vmid
+    ovs-vsctl add-port $br_name $port_name -- set Interface $port_name type=$type options:vmid=$vmid
 fi
