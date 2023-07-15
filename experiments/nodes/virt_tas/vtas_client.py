@@ -30,8 +30,10 @@ class VirtTasClient(VirtTas):
       rxport_name = "rx_vtuoso{}".format(vm_config.id)
       txport_name = "tx_vtuoso{}".format(vm_config.id)
       self.ovsport_add_vtuoso("br0", rxport_name, "virtuosorx", 
+                              vm_config.id, 
                               vm_config.manager_dir)
       self.ovsport_add_vtuoso("br0", txport_name, "virtuosotx",
+                              vm_config.id, 
                               vm_config.manager_dir,
                               out_remote_ip=self.defaults.server_ip, 
                               out_local_ip=self.defaults.client_ip,

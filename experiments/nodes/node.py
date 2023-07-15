@@ -141,19 +141,19 @@ class Node:
       self.setup_pane.send_keys(cmd)
       time.sleep(4)
 
-  def ovsport_add_vtuoso(self, br_name, port_name, port_type, script_dir,
+  def ovsport_add_vtuoso(self, br_name, port_name, port_type, vmid, script_dir,
                          out_remote_ip=None, out_local_ip=None,
                          in_remote_ip=None, in_local_ip=None, key=None):
       cmd = "cd {}".format(script_dir)
       self.setup_pane.send_keys(cmd)
       time.sleep(1)
       if port_type == "virtuosotx":
-        cmd = "sudo bash ovs-add-vtuosoport.sh {} {} {} {} {} {} {} {}".format(
-            br_name, port_name, port_type, 
+        cmd = "sudo bash ovs-add-vtuosoport.sh {} {} {} {} {} {} {} {} {}".format(
+            br_name, port_name, port_type, vmid,
             out_remote_ip, out_local_ip, in_remote_ip, in_local_ip, key) 
       else:
-        cmd = "sudo bash ovs-add-vtuosoport.sh {} {} {}".format(
-            br_name, port_name, port_type)
+        cmd = "sudo bash ovs-add-vtuosoport.sh {} {} {} {}".format(
+            br_name, port_name, port_type, vmid)
       self.setup_pane.send_keys(cmd)
       time.sleep(2)
 
