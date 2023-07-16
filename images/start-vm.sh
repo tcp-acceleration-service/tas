@@ -29,13 +29,12 @@ echo $alt_mac
 # Note: vectors=<2 + 2 * queues_nr>
 
 if [[ "$stack" == 'virt-tas' ]]; then
-  sudo qemu-system-x86_64 \
+  taskset -c 22,24,26,28,30,32,34,36,38,40,42 sudo qemu-system-x86_64 \
     -nographic -monitor none -serial stdio \
     -machine accel=kvm,type=q35 \
     -cpu host \
     -smp 12 \
     -m 10G \
-    -snapshot \
     -device virtio-net-pci,netdev=net0 \
     -netdev user,id=net0,hostfwd=tcp::222${vm_id}-:22 \
     -chardev socket,path="/run/tasproxy",id="tas" \
@@ -44,7 +43,7 @@ if [[ "$stack" == 'virt-tas' ]]; then
     -drive if=virtio,format=raw,file="seed.img" \
     ;
 elif [[ "$stack" == 'virt-linux' ]]; then
-    sudo qemu-system-x86_64 \
+  taskset -c 22,24,26,28,30,32,34,36,38,40,42 sudo qemu-system-x86_64 \
       -nographic -monitor none -serial stdio \
       -machine accel=kvm,type=q35 \
       -cpu host \
@@ -59,7 +58,7 @@ elif [[ "$stack" == 'virt-linux' ]]; then
       -drive if=virtio,format=raw,file="seed.img" \
       ;
 elif [[ "$stack" == 'ovs-linux' ]]; then
-  sudo qemu-system-x86_64 \
+  taskset -c 22,24,26,28,30,32,34,36,38,40,42 sudo qemu-system-x86_64 \
     -nographic -monitor none -serial stdio \
     -machine accel=kvm,type=q35 \
     -cpu host \
@@ -77,7 +76,7 @@ elif [[ "$stack" == 'ovs-linux' ]]; then
     -drive if=virtio,format=raw,file="seed.img" \
     ;
 elif [[ "$stack" == 'ovs-tas' ]]; then
-  sudo qemu-system-x86_64 \
+  taskset -c 22,24,26,28,30,32,34,36,38,40,42 sudo qemu-system-x86_64 \
     -nographic -monitor none -serial stdio \
     -machine accel=kvm,type=q35 \
     -cpu host \
@@ -95,7 +94,7 @@ elif [[ "$stack" == 'ovs-tas' ]]; then
     -drive if=virtio,format=raw,file="seed.img" \
     ;
 elif [[ "$stack" == 'tap-tas' ]]; then
-  sudo qemu-system-x86_64 \
+  taskset -c 22,24,26,28,30,32,34,36,38,40,42 sudo qemu-system-x86_64 \
     -nographic -monitor none -serial stdio \
     -machine accel=kvm,type=q35 \
     -cpu host \
@@ -111,8 +110,8 @@ elif [[ "$stack" == 'tap-tas' ]]; then
     -drive if=virtio,format=qcow2,file="base.snapshot.qcow2" \
     -drive if=virtio,format=raw,file="seed.img" \
     ;
-  elif [[ "$stack" == 'gre' ]]; then
-  sudo qemu-system-x86_64 \
+elif [[ "$stack" == 'gre' ]]; then
+  taskset -c 22,24,26,28,30,32,34,36,38,40,42 sudo qemu-system-x86_64 \
     -nographic -monitor none -serial stdio \
     -machine accel=kvm,type=q35 \
     -cpu host \

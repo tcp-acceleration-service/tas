@@ -17,7 +17,8 @@ class Client:
                 machine_config.is_remote)
 
     def run_bare(self, w_sudo, ld_preload):
-        self.run_benchmark_rpc(w_sudo, ld_preload, clean=False)
+        cores = "22,24,26,28,30,32,34,36,38,40,42"
+        self.run_benchmark_rpc(w_sudo, ld_preload, clean=False, cores=cores)
 
     def run_virt(self, w_sudo, ld_preload):
         ssh_com = utils.get_ssh_command(self.machine_config, self.vm_config)
@@ -27,7 +28,7 @@ class Client:
         time.sleep(3)
         self.run_benchmark_rpc(w_sudo, ld_preload, clean=False)
 
-    def run_benchmark_rpc(self, w_sudo, ld_preload, clean):
+    def run_benchmark_rpc(self, w_sudo, ld_preload, clean, cores=None):
         self.pane.send_keys('cd ' + self.client_config.comp_dir)
 
         if clean:
@@ -41,6 +42,10 @@ class Client:
 
         cmd = 'stdbuf -oL '
         
+        # Keep application on even cores, so it's the same NUMA node as TAS
+        if cores is not None:
+            cmd += "taskset -c {} ".format(cores)
+
         if w_sudo:
             cmd += 'sudo -E '
         
