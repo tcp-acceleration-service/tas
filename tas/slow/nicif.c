@@ -1026,10 +1026,11 @@ int ovs_rx_upcall(volatile struct flextcp_pl_krx *krx)
   toe->msg.packet.len = krx->msg.packet.len;
   toe->msg.packet.fn_core = krx->msg.packet.fn_core;
   toe->msg.packet.flow_group = krx->msg.packet.flow_group;
+  toe->msg.packet.vmid = krx->msg.packet.vmid;
   MEM_BARRIER();
 
   /* ovstas queue header */
-  toe->type = krx->msg.packet.vmid;
+  toe->type = FLEXTCP_PL_TOE_VALID;
 
   return 0;
 }
@@ -1066,7 +1067,7 @@ int ovs_tx_upcall(struct pkt_gre *p, uint16_t vmid,
   MEM_BARRIER();
 
   /* ovstas queue header */
-  toe->type = vmid;
+  toe->type = FLEXTCP_PL_TOE_VALID;
 
   return 0;
 }
