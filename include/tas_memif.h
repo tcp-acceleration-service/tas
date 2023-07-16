@@ -143,7 +143,8 @@ STATIC_ASSERT(sizeof(struct flextcp_pl_ktx) == 64, ktx_size);
 /******************************************************************************/
 /* TAS to OvS Entry*/
 
-#define FLEXTCP_PL_TOE_INVALID 0xff
+#define FLEXTCP_PL_TOE_INVALID 0x0
+#define FLEXTCP_PL_TOE_VALID 0x1
 
 /** TAS to OvS queue entry. */
 struct flextcp_pl_toe {
