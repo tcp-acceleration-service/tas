@@ -123,6 +123,8 @@ int shm_init(unsigned num)
   tas_info->mac_address = 0;
   tas_info->poll_cycle_app = us_to_cycles(config.fp_poll_interval_app);
   tas_info->poll_cycle_tas = us_to_cycles(config.fp_poll_interval_tas);
+  tas_info->nic_rx_len = config.nic_rx_len;
+  tas_info->nic_tx_len = config.nic_tx_len;
 
   if (config.fp_hugepages)
     tas_info->flags |= FLEXNIC_FLAG_HUGEPAGES;

@@ -780,7 +780,7 @@ int tas_getsockopt(int sockfd, int level, int optname, void *optval,
     res = 1460;
   } else if (level == SOL_TCP && optname == TCP_INFO) {
     fprintf(stderr, "flextcp getsockopt: warning TCP_INFO hardcoded\n");
-    len = MIN(*optlen, sizeof(struct tcp_info));
+    len = TAS_MIN(*optlen, sizeof(struct tcp_info));
     memset(optval, 0, len);
     *optlen = len;
     goto out;
@@ -794,7 +794,7 @@ int tas_getsockopt(int sockfd, int level, int optname, void *optval,
   }
 
   /* copy result to optval, truncate if necessary */
-  len = MIN(*optlen, sizeof(res));
+  len = TAS_MIN(*optlen, sizeof(res));
   memcpy(optval, &res, len);
   *optlen = res;
 
@@ -909,7 +909,7 @@ int tas_getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     goto out;
   }
 
-  len = MIN(*addrlen, sizeof(sin));
+  len = TAS_MIN(*addrlen, sizeof(sin));
   *addrlen = len;
   memcpy(addr, &sin, len);
 
@@ -947,7 +947,7 @@ int tas_getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
   sin.sin_addr.s_addr = htonl(s->data.connection.c.in_remote_ip);
   sin.sin_port = htons(s->data.connection.c.remote_port);
 
-  len = MIN(*addrlen, sizeof(sin));
+  len = TAS_MIN(*addrlen, sizeof(sin));
   *addrlen = len;
   memcpy(addr, &sin,  len);
 

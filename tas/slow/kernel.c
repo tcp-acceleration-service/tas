@@ -145,6 +145,8 @@ int slowpath_main(int threads_launched)
     cur_ts = util_timeout_time_us();
 
     n += nicif_poll();
+    if (config.fp_gre)
+      n += ovs_poll();
     n += cc_poll(cur_ts);
     n += appif_poll();
     n += kni_poll();
@@ -248,7 +250,7 @@ static void slowpath_block(uint32_t cur_ts)
 
   if (cc_timeout != -1U && util_timeout != -1U)
   {
-    timeout_us = MIN(cc_timeout, util_timeout);
+    timeout_us = TAS_MIN(cc_timeout, util_timeout);
   }
   else if (cc_timeout != -1U)
   {

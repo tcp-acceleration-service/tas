@@ -50,6 +50,10 @@ struct configuration {
   uint64_t nic_rx_len;
   /** Kernel nic transmit queue length. */
   uint64_t nic_tx_len;
+  /** OvS -> TAS queue length */
+  uint64_t ovs_tas_len;
+  /** TAS -> OvS queue length */
+  uint64_t tas_ovs_len;
   /** App context -> kernel queue length. */
   uint64_t app_kin_len;
   /** App context <- kernel queue length. */

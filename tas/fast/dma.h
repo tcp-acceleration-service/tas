@@ -50,7 +50,7 @@ static inline void dma_read(uintptr_t addr, size_t len, void *buf,
       .len = len,
     };
   trace_event2(FLEXNIC_TRACE_EV_DMARD, sizeof(evt), &evt,
-      MIN(len, UINT16_MAX - sizeof(evt)), buf);
+      TAS_MIN(len, UINT16_MAX - sizeof(evt)), buf);
 #endif
 }
 
@@ -67,7 +67,7 @@ static inline void dma_write(uintptr_t addr, size_t len, const void *buf,
       .len = len,
     };
   trace_event2(FLEXNIC_TRACE_EV_DMAWR, sizeof(evt), &evt,
-      MIN(len, UINT16_MAX - sizeof(evt)), buf);
+      TAS_MIN(len, UINT16_MAX - sizeof(evt)), buf);
 #endif
 }
 

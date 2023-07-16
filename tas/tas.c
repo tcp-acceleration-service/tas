@@ -92,34 +92,6 @@ int main(int argc, char *argv[])
     goto error_exit;
   }
 
-  // TODO: Keep this hardcoded for now, but move it to control path
-  uint32_t in_lip;
-  uint32_t in_rip;
-  uint32_t out_rip;
-  util_parse_ipv4("10.0.0.20", &in_lip);
-  util_parse_ipv4("10.0.0.1", &in_rip);
-  util_parse_ipv4("192.168.10.14", &out_rip);
-  struct flextcp_pl_tun tun0 = {
-    .tun_id = 1,
-    .out_local_ip = config.ip,
-    .out_remote_ip = out_rip,
-    .in_local_ip = in_lip,
-    .in_remote_ip = in_rip,
-  };
-  fp_state->tunt[0] = tun0;
-
-  util_parse_ipv4("10.0.0.21", &in_lip);
-  util_parse_ipv4("10.0.0.2", &in_rip);
-  util_parse_ipv4("192.168.10.14", &out_rip);
-  struct flextcp_pl_tun tun1 = {
-    .tun_id = 2,
-    .out_local_ip = config.ip,
-    .out_remote_ip = out_rip,
-    .in_local_ip = in_lip,
-    .in_remote_ip = in_rip,
-  };
-  fp_state->tunt[1] = tun1;
-
   /* initialize dpdk */
   rte_log_set_global_level(RTE_LOG_ERR);
   if (rte_eal_init(config.dpdk_argc, config.dpdk_argv) < 0) {

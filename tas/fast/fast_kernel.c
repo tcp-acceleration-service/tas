@@ -132,7 +132,6 @@ void fast_kernel_packet(struct dataplane_context *ctx,
   if (kctx->rx_head >= kctx->rx_len)
     kctx->rx_head -= kctx->rx_len;
 
-
   len = network_buf_len(nbh);
   dma_write(krx->addr, len, network_buf_bufoff(nbh), SP_MEM_ID);
 
@@ -143,6 +142,7 @@ void fast_kernel_packet(struct dataplane_context *ctx,
 
   krx->msg.packet.len = len;
   krx->msg.packet.fn_core = ctx->id;
+  krx->msg.packet.vmid = kctx->vm_id;
   MEM_BARRIER();
 
   /* krx queue header */

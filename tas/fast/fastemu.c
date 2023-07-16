@@ -720,7 +720,7 @@ static inline uint8_t bufcache_prealloc(struct dataplane_context *ctx, uint16_t 
 
     ctx->bufcache_num += res;
   }
-  num = MIN(num, (ctx->bufcache_head + ctx->bufcache_num <= BUFCACHE_SIZE ? ctx->bufcache_num : BUFCACHE_SIZE - ctx->bufcache_head));
+  num = TAS_MIN(num, (ctx->bufcache_head + ctx->bufcache_num <= BUFCACHE_SIZE ? ctx->bufcache_num : BUFCACHE_SIZE - ctx->bufcache_head));
 
   *handles = ctx->bufcache_handles + ctx->bufcache_head;
 

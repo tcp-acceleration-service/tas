@@ -27,6 +27,7 @@
 
 #include <stdint.h>
 #include <utils.h>
+#include <stdatomic.h>
 #include <packet_defs.h>
 
 /**
@@ -55,6 +56,13 @@
 /** ID of the mem region to use for the slow path */
 #define SP_MEM_ID FLEXNIC_PL_VMST_NUM
 
+/** NIC buffer struc used by kernel queues */
+struct nic_buffer
+{
+  uint64_t addr;
+  void *buf;
+};
+
 /** Info struct: layout of info shared memory region */
 struct flexnic_info {
   /** Flags: see FLEXNIC_FLAG_* */
@@ -65,6 +73,10 @@ struct flexnic_info {
   uint64_t dma_mem_off;
   /** Size of internal flexnic memory in bytes. */
   uint64_t internal_mem_size;
+  /** Size of NIC rx queue */
+  uint32_t nic_rx_len;
+  /** Size of NIC tx queue */
+  uint32_t nic_tx_len;
   /** export mac address */
   uint64_t mac_address;
   /** Cycles to poll before blocking for application */
@@ -93,6 +105,7 @@ struct flextcp_pl_krx {
       uint16_t len;
       uint16_t fn_core;
       uint16_t flow_group;
+      uint16_t vmid;
     } packet;
     uint8_t raw[55];
   } __attribute__((packed)) msg;
@@ -126,6 +139,62 @@ struct flextcp_pl_ktx {
 } __attribute__((packed));
 
 STATIC_ASSERT(sizeof(struct flextcp_pl_ktx) == 64, ktx_size);
+
+/******************************************************************************/
+/* TAS to OvS Entry*/
+
+#define FLEXTCP_PL_TOE_INVALID 0x0
+#define FLEXTCP_PL_TOE_VALID 0x1
+
+/** TAS to OvS queue entry. */
+struct flextcp_pl_toe {
+  uint64_t addr;
+  union {
+    struct {
+      uint16_t len;
+      uint16_t fn_core;
+      uint16_t flow_group;
+      uint16_t vmid;
+      uint64_t connaddr;
+    } packet;
+    uint8_t raw[55];
+  } __attribute__((packed)) msg;
+  volatile uint8_t type;
+} __attribute__((packed));
+
+STATIC_ASSERT(sizeof(struct flextcp_pl_toe) == 64, toe_size);
+
+
+/******************************************************************************/
+/* OvS to TAS Entry */
+
+#define FLEXTCP_PL_OTE_INVALID 0x0
+#define FLEXTCP_PL_OTE_VALID 0x1
+
+/** OvS to TAS queue entry */
+struct flextcp_pl_ote {
+  uint64_t addr;
+  uint32_t key;
+  uint32_t out_remote_ip;
+  uint32_t out_local_ip;
+  uint32_t in_remote_ip;
+  uint32_t in_local_ip;
+  union {
+    struct {
+      uint16_t len;
+      uint16_t fn_core;
+      uint16_t flow_group;
+      uint16_t vmid;
+      uint64_t connaddr;
+    } packet;
+    uint8_t raw[35];
+  } __attribute__((packed)) msg;
+  volatile uint8_t type;
+} __attribute__((packed));
+
+STATIC_ASSERT(sizeof(struct flextcp_pl_ote) == 64, ote_size);
+
+/******************************************************************************/
 
 /******************************************************************************/
 /* App RX queue */
@@ -279,7 +348,7 @@ struct flextcp_pl_flowst {
   beui16_t remote_port;
 
   /** Remote MAC address */
-  struct eth_addr remote_mac;
+  struct tas_eth_addr remote_mac;
 
   /** Doorbell ID (identifying the app ctx to use) */
   uint16_t db_id;
@@ -361,6 +430,23 @@ struct flextcp_pl_flowhte {
 
 #define FLEXNIC_PL_MAX_FLOWGROUPS 4096
 
+/** OvS state */
+struct flextcp_pl_ovsctx {
+  /********************************************************/
+  /* read-only fields */
+  uint64_t rx_base;
+  uint32_t rx_len;
+  uint64_t tx_base;
+  uint32_t tx_len;
+
+  /********************************************************/
+  /* read-write fields */
+  uint32_t rx_head;
+  uint32_t rx_tail;
+  uint32_t tx_head;
+  uint32_t tx_tail;
+} __attribute__((packed));
+
 /** Layout of internal pipeline memory */
 struct flextcp_pl_mem {
   /* registers for application context queues */
@@ -373,14 +459,17 @@ struct flextcp_pl_mem {
   /* flow lookup table */
   struct flextcp_pl_flowhte flowht[FLEXNIC_PL_FLOWHT_ENTRIES];
 
-  /* tunnel entry lookup table */
-  struct flextcp_pl_tun tunt[FLEXNIC_PL_TUN_NUM];
-
   /* registers for kernel queues */
   struct flextcp_pl_appctx kctx[FLEXNIC_PL_APPST_CTX_MCS];
 
   /* registers for application state */
   struct flextcp_pl_appst appst[FLEXNIC_PL_APPST_NUM];
+
+  /* register for tas to ovs queue */
+  struct flextcp_pl_ovsctx tasovs;
+
+  /* register for ovs to tas queue */
+  struct flextcp_pl_ovsctx ovstas;
 
   uint8_t flow_group_steering[FLEXNIC_PL_MAX_FLOWGROUPS];
 } __attribute__((packed));
