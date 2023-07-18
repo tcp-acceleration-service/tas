@@ -371,7 +371,6 @@ int fast_flows_packet(struct dataplane_context *ctx,
 #endif
 
   fs_lock(fs);
-  printf("local=\n remote=\n");
 #ifdef FLEXNIC_TRACING
   struct flextcp_pl_trev_rxfs te_rxfs = {
       .local_ip = f_beui32(p->ip.dest),
