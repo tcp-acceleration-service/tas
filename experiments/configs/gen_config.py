@@ -34,13 +34,14 @@ class Defaults:
         self.client_interface = 'enp59s0f0np0'
         self.server_interface = 'enp59s0f0np0'
 
-        ### INTERVAL VM CONFIGS ###
+        ### INTERNAL VM CONFIGS ###
         # Network interface used to set ip for a VM
         self.vm_interface = "enp0s3"
         # Network interface used to bind TAS in tap VM
         self.tas_interface = "enp0s3"
         # PCI Id of TAS interface inside a VM
         self.pci_id = "0000:00:03.0"
+        ############################
 
         self.remote_connect_cmd = 'ssh swsnetlab04'
 
@@ -92,7 +93,6 @@ class TasConfig:
         self.args = '--ip-addr={}/24 --fp-cores-max={}'.format(ip, n_cores) + \
             ' --cc=const-rate --cc-const-rate=0 ' + \
             ' --fp-no-autoscale --fp-no-ints' + \
-            ' --dpdk-extra="--lcores=0@0,1@2,2@4,3@6,4@8,5@10,6@12,7@14,8@16,9@18,10@20"' + \
             ' --dpdk-extra="-a{}"'.format(dpdk_extra)   
         
         self.pane = pane

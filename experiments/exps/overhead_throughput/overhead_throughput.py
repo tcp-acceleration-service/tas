@@ -8,10 +8,8 @@ from exps.overhead_throughput.configs.ovs_tas import Config as OVSTasConf
 
 experiments = []
 
-# msize = [64, 128, 256, 512, 1024, 2048]
-# n_runs = 5
-msize = [64]
-n_runs = 1
+msize = [64, 128, 256, 512, 1024, 2048]
+n_runs = 3
 
 for n_r in range(n_runs):
   for n_m in msize:
@@ -22,8 +20,9 @@ for n_r in range(n_runs):
     tas_virt_exp = exp.Experiment(TasVirtConf(exp_name + "virt-tas", n_m), name=exp_name)
     ovs_tas_exp = exp.Experiment(OVSTasConf(exp_name + "ovs-tas", n_m), name=exp_name)
 
-    # experiments.append(tas_bare_exp)
-    # experiments.append(vtas_bare_tunoff_exp)
+    experiments.append(tas_bare_exp)
+    experiments.append(vtas_bare_tunoff_exp)
     experiments.append(vtas_bare_exp)
     experiments.append(ovs_tas_exp)
     experiments.append(tas_virt_exp)
+# 
