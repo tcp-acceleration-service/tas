@@ -21,7 +21,6 @@ for n_r in range(n_runs):
     ovs_tas_exp = exp.Experiment(OVSTasConf(exp_name + "ovs-tas", n_m), name=exp_name)
 
     experiments.append(tas_bare_exp)
-    experiments.append(vtas_bare_tunoff_exp)
     experiments.append(vtas_bare_exp)
     experiments.append(ovs_tas_exp)
     experiments.append(tas_virt_exp)
