@@ -200,7 +200,6 @@ int tcp_open(struct app_context *ctx,
   conn->opaque = opaque;
   conn->status = CONN_OVS_PENDING;
   conn->out_local_ip = config.ip;
-  conn->in_remote_ip = remote_ip;
   conn->remote_port = remote_port;
   conn->local_port = local_port;
   conn->local_seq = 0; /* TODO: assign random */
@@ -209,10 +208,17 @@ int tcp_open(struct app_context *ctx,
   conn->db_id = db_id;
   conn->flags = 0;
 
-  /* These fields are 0 because we are waiting for OvS */
-  conn->tunnel_id = 0;
-  conn->in_local_ip = 0;
-  conn->out_remote_ip = 0;
+  if (config.fp_gre) {
+    conn->in_remote_ip = remote_ip;
+    
+    /* These fields are 0 because we are waiting for OvS */
+    conn->tunnel_id = 0;
+    conn->in_local_ip = 0;
+    conn->out_remote_ip = 0;
+  } else
+  {
+    conn->out_remote_ip = remote_ip;
+  }
 
   conn->comp.q = &conn_async_q;
   conn->comp.notify_fd = -1;
