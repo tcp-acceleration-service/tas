@@ -218,6 +218,8 @@ int tcp_open(struct app_context *ctx,
   {
     conn->out_remote_ip = remote_ip;
     conn->status = CONN_ARP_PENDING;
+    conn->comp.notify_fd = -1;
+    conn->comp.status = 0;
   }
 
   conn->comp.q = &conn_async_q;
@@ -253,10 +255,6 @@ int tcp_open(struct app_context *ctx,
     }
 
     ports[local_port] = (uintptr_t) conn | PORT_TYPE_CONN;
-
-    conn->status = CONN_ARP_PENDING;
-    conn->comp.notify_fd = -1;
-    conn->comp.status = 0;
   }
 
   *pconn = conn;
