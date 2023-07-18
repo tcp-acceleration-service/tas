@@ -198,7 +198,6 @@ int tcp_open(struct app_context *ctx,
 
   conn->ctx = ctx;
   conn->opaque = opaque;
-  conn->status = CONN_OVS_PENDING;
   conn->out_local_ip = config.ip;
   conn->remote_port = remote_port;
   conn->local_port = local_port;
@@ -210,7 +209,7 @@ int tcp_open(struct app_context *ctx,
 
   if (config.fp_gre) {
     conn->in_remote_ip = remote_ip;
-    
+    conn->status = CONN_OVS_PENDING;
     /* These fields are 0 because we are waiting for OvS */
     conn->tunnel_id = 0;
     conn->in_local_ip = 0;
@@ -218,6 +217,7 @@ int tcp_open(struct app_context *ctx,
   } else
   {
     conn->out_remote_ip = remote_ip;
+    conn->status = CONN_ARP_PENDING;
   }
 
   conn->comp.q = &conn_async_q;
