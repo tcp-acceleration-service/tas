@@ -29,7 +29,10 @@ class Config:
                 machine_config=self.s_machine_config,
                 tas_dir=self.defaults.default_vtas_dir_bare,
                 tas_dir_virt=self.defaults.default_vtas_dir_virt,
-                idx=0)
+                idx=0,
+                n_cores=11,
+                memory=10,
+                n_queues=11)
         tas0_config = TasConfig(pane=self.defaults.s_tas_pane,
                 machine_config=self.s_machine_config,
                 project_dir=self.defaults.default_otas_dir_virt,
@@ -42,7 +45,10 @@ class Config:
                 machine_config=self.s_machine_config,
                 tas_dir=self.defaults.default_vtas_dir_bare,
                 tas_dir_virt=self.defaults.default_vtas_dir_virt,
-                idx=1)
+                idx=1,
+                n_cores=11,
+                memory=10,
+                n_queues=11)
         tas1_config = TasConfig(pane=self.defaults.s_tas_pane,
                 machine_config=self.s_machine_config,
                 project_dir=self.defaults.default_otas_dir_virt,
@@ -89,7 +95,10 @@ class Config:
                 machine_config=self.c_machine_config,
                 tas_dir=self.defaults.default_vtas_dir_bare,
                 tas_dir_virt=self.defaults.default_vtas_dir_virt,
-                idx=0)
+                idx=0,
+                n_cores=11,
+                memory=10,
+                n_queues=11)
         tas0_config = TasConfig(pane=self.defaults.c_tas_pane,
                 machine_config=self.c_machine_config,
                 project_dir=self.defaults.default_otas_dir_virt,
@@ -102,7 +111,10 @@ class Config:
                 machine_config=self.c_machine_config,
                 tas_dir=self.defaults.default_vtas_dir_bare,
                 tas_dir_virt=self.defaults.default_vtas_dir_virt,
-                idx=1)
+                idx=1,
+                n_cores=11,
+                memory=10,
+                n_queues=11)
         tas1_config = TasConfig(pane=self.defaults.c_tas_pane,
                 machine_config=self.c_machine_config,
                 project_dir=self.defaults.default_otas_dir_virt,

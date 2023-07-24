@@ -43,7 +43,9 @@ class Config:
                 machine_config=self.s_machine_config,
                 tas_dir=self.defaults.default_vtas_dir_bare,
                 tas_dir_virt=self.defaults.default_vtas_dir_virt,
-                idx=0)
+                idx=0,
+                n_cores=5,
+                memory=10)
 
         self.s_vm_configs.append(vm0_config)
 
@@ -91,7 +93,9 @@ class Config:
                 machine_config=self.c_machine_config,
                 tas_dir=self.defaults.default_vtas_dir_bare,
                 tas_dir_virt=self.defaults.default_vtas_dir_virt,
-                idx=0)
+                idx=0,
+                n_cores=5,
+                memory=10)
 
         self.c_vm_configs.append(vm0_config)
 

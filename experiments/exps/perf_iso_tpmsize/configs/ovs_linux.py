@@ -29,12 +29,18 @@ class Config:
                 machine_config=self.s_machine_config,
                 tas_dir=self.defaults.default_vtas_dir_bare,
                 tas_dir_virt=self.defaults.default_vtas_dir_virt,
-                idx=0)
+                idx=0,
+                n_cores=11,
+                memory=10,
+                n_queues=11)
         vm1_config = VMConfig(pane=self.defaults.s_vm_pane,
                 machine_config=self.s_machine_config,
                 tas_dir=self.defaults.default_vtas_dir_bare,
                 tas_dir_virt=self.defaults.default_vtas_dir_virt,
-                idx=1)
+                idx=1,
+                n_cores=11,
+                memory=10,
+                n_queues=11)
 
         self.s_vm_configs.append(vm0_config)
         self.s_vm_configs.append(vm1_config)
@@ -71,12 +77,18 @@ class Config:
                 machine_config=self.c_machine_config,
                 tas_dir=self.defaults.default_vtas_dir_bare,
                 tas_dir_virt=self.defaults.default_vtas_dir_virt,
-                idx=0)
+                idx=0,
+                n_cores=11,
+                memory=10,
+                n_queues=11)
         vm1_config = VMConfig(pane=self.defaults.c_vm_pane,
                 machine_config=self.c_machine_config,
                 tas_dir=self.defaults.default_vtas_dir_bare,
                 tas_dir_virt=self.defaults.default_vtas_dir_virt,
-                idx=1)
+                idx=1,
+                n_cores=11,
+                memory=10,
+                n_queues=11)
 
         self.c_vm_configs.append(vm0_config)
         self.c_vm_configs.append(vm1_config)

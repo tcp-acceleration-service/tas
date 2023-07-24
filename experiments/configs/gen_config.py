@@ -100,7 +100,8 @@ class TasConfig:
         self.n_cores = n_cores
 
 class VMConfig:
-    def __init__(self, pane, machine_config, tas_dir, tas_dir_virt, idx):
+    def __init__(self, pane, machine_config, tas_dir, tas_dir_virt, idx,
+                 n_cores, memory, n_queues=None):
         self.name = "server" if machine_config.is_server else "client"
         
         self.manager_dir = tas_dir + '/images'
@@ -108,6 +109,10 @@ class VMConfig:
         
         self.pane = pane
         self.id = idx
+
+        self.n_cores = n_cores
+        self.memory = memory
+        self.n_queues = n_queues
         if machine_config.is_server:
             self.vm_ip = '10.0.0.{}'.format(1 + idx)
             self.tas_tap_ip = '10.0.1.{}'.format(1 + idx)
