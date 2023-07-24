@@ -100,16 +100,16 @@ def parse_data(parsed_md):
 def save_dat_file(data, fname):
   f = open(fname, "w+")
   header = "msize " + \
-      "bare-tas-avg bare-vtas-avg virt-tas-avg bare-tunoffbtas-avg " + \
-      "bare-tas-std bare-vtas-std virt-tas-std bare-tunoffbtas-std\n"
+      "bare-tas-avg bare-vtas-avg virt-tas-avg ovs-tas-avg " + \
+      "bare-tas-std bare-vtas-std virt-tas-std ovs-tas-std\n"
   f.write(header)
   for dp in data:
     f.write("{} {} {} {} {} {} {} {} {}\n".format(
       dp["msize"],
       dp["bare-tas"]["tp"], dp["bare-vtas"]["tp"], dp["virt-tas"]["tp"],
-      dp["bare-tunoffvtas"]["tp"],
+      dp["ovs-tas"]["tp"],
       dp["bare-tas"]["std"], dp["bare-vtas"]["std"], dp["virt-tas"]["std"],
-      dp["bare-tunoffvtas"]["std"]))
+      dp["ovs-tas"]["std"]))
         
 def main():
   parsed_md = parse_metadata()
