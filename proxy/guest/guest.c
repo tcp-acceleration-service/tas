@@ -39,6 +39,10 @@ struct guest_proxy *guest_init_proxy()
   pxy->epfd = -1;
   pxy->ctxreq_id_next = 0;
   
+  pxy->block_epfd = -1;
+  pxy->block_elapsed = 0;
+  pxy->poll_cycles_proxy = 10000;
+
   pxy->kernel_notifyfd = -1;
   pxy->next_app_id = 0;
   pxy->apps = NULL;
@@ -50,7 +54,10 @@ struct guest_proxy *guest_init_proxy()
 
 int main(int argc, char *argv[])
 {
+  int ret;
   unsigned int n;
+  uint64_t start, end;
+  struct epoll_event evs[1];
   struct guest_proxy *pxy = guest_init_proxy();
 
   if (ivshmem_init(pxy) < 0)
@@ -69,8 +76,27 @@ int main(int argc, char *argv[])
   while (exited == 0)
   {
     n = 0;
-    n += ivshmem_channel_poll(pxy);
-    n += vflextcp_poll(pxy);
+
+    if (pxy->block_elapsed > pxy->poll_cycles_proxy)
+    {
+      epoll_wait(pxy->block_epfd, evs, 1, -1);
+    }
+
+    start = util_rdtsc();
+
+    if ((ret = ivshmem_channel_poll(pxy)) > 0)
+      n += ret;
+
+    if ((ret = vflextcp_poll(pxy)) > 0)
+      n += ret;    
+
+    if (n > 0)
+    {
+        pxy->block_elapsed = 0;
+    } else {
+        end = util_rdtsc();
+        pxy->block_elapsed += end - start;
+    }
   }
 
   return 0;

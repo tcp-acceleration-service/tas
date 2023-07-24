@@ -78,6 +78,13 @@ int vflextcp_init(struct guest_proxy *pxy)
     goto error_close_vepfd;
   }
 
+  if (epoll_ctl(pxy->block_epfd, EPOLL_CTL_ADD, pxy->flextcp_uxfd, &ev) != 0) 
+  {
+    fprintf(stderr, "vflextcp_init: failed to add fd to block_epfd.");
+    goto error_close_vepfd;
+  }
+
+
   return 0;
 
 error_close_vepfd:
@@ -176,6 +183,14 @@ int vflextcp_kernel_notifyfd_init(struct guest_proxy *pxy)
     return -1;
   }
 
+  if (epoll_ctl(pxy->block_epfd, EPOLL_CTL_ADD,
+      pxy->kernel_notifyfd, &ev) != 0) 
+  {
+    perror("vflextcp_kernel_notifyfd_init: "
+        "epoll_ctl listen  for block_epfd failed.");
+    return -1;
+  }
+
   return 0;
 }
 
@@ -233,6 +248,14 @@ int vflextcp_core_evfds_init(struct guest_proxy *pxy) {
       perror("vflextcp_core_evfds_init: epoll_ctl listen failed.");
       goto error_close;
     }
+
+    if (epoll_ctl(pxy->block_epfd, EPOLL_CTL_ADD,
+        pxy->core_evfds[i], &ev) != 0) 
+    {
+      perror("vflextcp_core_evfds_init: "
+          "epoll_ctl listen for block_epfd failed.");
+      goto error_close;
+    }
   }
 
   return 0;
@@ -272,19 +295,22 @@ int vflextcp_serve_tasinfo(uint8_t *info, ssize_t size)
 
 int vflextcp_poll(struct guest_proxy *pxy) 
 {
-  if (vflextcp_uxsocket_poll(pxy) != 0) 
+  int ret, n = 0; 
+  if ((ret = vflextcp_uxsocket_poll(pxy)) < 0) 
   {
     fprintf(stderr, "flextcp_poll: uxsocket_poll failed.\n");
     return -1;
   }
+  n += ret;
 
-  if (vflextcp_tas_poke_poll(pxy) != 0) 
+  if ((ret = vflextcp_tas_poke_poll(pxy)) < 0) 
   {
     fprintf(stderr, "flextcp_poll: vflextcp_virtfd_poll failed.\n");
     return -1;
   }
+  n += ret;
 
-  return 0;
+  return n;
 }
 
 /*****************************************************************************/
@@ -314,7 +340,7 @@ static int vflextcp_uxsocket_poll(struct guest_proxy *pxy)
     } 
   }
   
-  return 0;
+  return n;
 }
 
 static int vflextcp_uxsocket_accept(struct guest_proxy *pxy) 
@@ -387,6 +413,14 @@ int vflextcp_handle_newapp_res(struct guest_proxy *pxy,
   if (epoll_ctl(pxy->flextcp_epfd, EPOLL_CTL_ADD, cfd, &ev) != 0) 
   {
     fprintf(stderr, "vflextcp_uxsocket_accept: epoll_ctl failed.");
+    free(app);
+    close(cfd);
+    return -1;
+  }
+
+  if (epoll_ctl(pxy->block_epfd, EPOLL_CTL_ADD, cfd, &ev) != 0) 
+  {
+    fprintf(stderr, "vflextcp_uxsocket_accept: epoll_ctl for block epfd failed.");
     free(app);
     close(cfd);
     return -1;
@@ -542,7 +576,8 @@ static int vflextcp_tas_poke_poll(struct guest_proxy *pxy) {
       }
     }
   }
-  return 0;
+
+  return n;
 }
 
 static int vflextcp_handle_tas_kernel_poke(struct guest_proxy *pxy, 

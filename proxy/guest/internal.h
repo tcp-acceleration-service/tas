@@ -54,6 +54,11 @@ struct guest_proxy {
     int *core_evfds;
     int epfd;
     int ctxreq_id_next;
+
+    /* Fields used to block the proxy */
+    int block_epfd;
+    uint64_t block_elapsed;
+    uint64_t poll_cycles_proxy;
     
     /* Notify fd for kernel slowpath */
     int kernel_notifyfd;

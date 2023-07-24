@@ -27,7 +27,14 @@ int ivshmem_init(struct guest_proxy *pxy)
   /* Create epoll that will wait for events from host */
   if ((pxy->chan_epfd = epoll_create1(0)) < 0)
   {
-    fprintf(stderr, "ivshmem_init: failed to create ivm_epfd.\n");
+    fprintf(stderr, "ivshmem_init: failed to create chan_epfd.\n");
+    return -1;
+  }
+
+  /* Create epoll that will wait and block */
+  if ((pxy->block_epfd = epoll_create1(0)) < 0)
+  {
+    fprintf(stderr, "ivshmem_init: failed to create block_epfd.\n");
     return -1;
   }
 

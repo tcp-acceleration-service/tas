@@ -172,6 +172,13 @@ int vfio_subscribe_irq(struct guest_proxy *pxy)
     return -1;
   }
 
+  if (epoll_ctl(pxy->block_epfd, EPOLL_CTL_ADD, pxy->irq_fd, &ev) != 0)
+  {
+    fprintf(stderr, 
+        "vfio_subscribe_irqs: addint irq_fd to block_epoll failed.\n");
+    return -1;
+  }
+
   return 0;
 }
 
