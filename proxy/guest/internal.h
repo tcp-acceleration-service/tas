@@ -66,4 +66,4 @@ struct guest_proxy {
     struct flexnic_info *flexnic_info;
 };
 
-#endif /* ndef INTERNAL_H_ */
+#endif /* ndef GUEST_INTERNAL_H_ */

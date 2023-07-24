@@ -14,23 +14,7 @@
 #include <tas_pxy.h>
 #include "../proxy.h"
 #include "../channel.h"
-// #include "../../lib/tas/internal.h"
 #include "ivshmem.h"
-
-/* Epoll fd that subscribes to uxfd */
-static int epfd = -1;
-/* Epoll fd that subscribes to irqfd */
-static int chan_epfd = -1;
-/* Unix socket that connects host proxy to guest proxy */
-static int uxfd = -1;
-/* Epoll for contexsts */
-static int ctx_epfd = -1;
-/* ID of next virtual machine to connect */
-static int next_vm_id = 0;
-/* ID of next app for each vm */
-static int next_app_id[FLEXNIC_PL_VMST_NUM];
-/* List of VMs */
-static struct v_machine vms[MAX_VMS];
 
 static int notify_guest(int fd);
 
@@ -42,15 +26,16 @@ static int uxsocket_handle_error();
 static int uxsocket_send_int(int fd, int64_t i);
 static int uxsocket_sendfd(int uxfd, int fd, int64_t i);
 
-static int app_ctxs_poll();
+static int app_ctxs_poll(struct host_proxy *pxy);
 
 static int channel_poll();
-static int channel_poll_vm(struct v_machine *vm);
+static int channel_poll_vm(struct host_proxy *pxy,
+        struct v_machine *vm);
 static int channel_handle_tasinforeq_msg(struct v_machine *vm);
-static int channel_handle_newapp(struct v_machine *vm,
-        struct newapp_req_msg *req_msg);
-static int channel_handle_ctx_req(struct v_machine *vm, 
-        struct context_req_msg *msg);
+static int channel_handle_newapp(struct host_proxy *pxy, 
+        struct v_machine *vm, struct newapp_req_msg *req_msg);
+static int channel_handle_ctx_req(struct host_proxy *pxy,
+        struct v_machine *vm, struct context_req_msg *msg);
 static void channel_handle_poke_tas_kernel(struct v_machine *vm, 
         struct poke_tas_kernel_msg *msg);
 static void channel_handle_poke_tas_core(struct v_machine *vm, 
@@ -58,85 +43,107 @@ static void channel_handle_poke_tas_core(struct v_machine *vm,
 
 
 
-int ivshmem_init()
+int ivshmem_init(struct host_proxy *pxy)
 {
     struct epoll_event ev;
 
     /* Create unix socket for comm between guest and host proxies */
-    if ((uxfd = uxsocket_init()) < 0)
+    if ((pxy->uxfd = uxsocket_init()) < 0)
     {
         fprintf(stderr,"ivshmem_init: failed to init unix socket.\n");
         return -1;
     }
 
     /* Create epoll used to subscribe to events */
-    if ((epfd = epoll_create1(0)) < -1) 
+    if ((pxy->epfd = epoll_create1(0)) < -1) 
     {
         fprintf(stderr, "ivshmem_init: epoll_create1 for epfd failed.\n"); 
         goto close_uxfd;
     }
 
     /* Create epoll to subscribe to interrupts from guests */
-    if ((chan_epfd = epoll_create1(0)) < -1) 
+    if ((pxy->chan_epfd = epoll_create1(0)) < -1) 
     {
         fprintf(stderr, "ivshmem_init: epoll_create1 for chan_epfd failed.\n"); 
         goto close_epfd;
     }
 
     /* Create epoll to subscribe to contexts */
-    if ((ctx_epfd = epoll_create1(0)) == -1) 
+    if ((pxy->ctx_epfd = epoll_create1(0)) == -1) 
     {
         fprintf(stderr, "ivshmem_init: epoll_create1 for ctx epfd failed.");
         goto close_chan_epfd;
     }
 
-    /* Add unix socket to interest list */
-    ev.events = EPOLLIN;
-    ev.data.ptr = EP_LISTEN;
-    if (epoll_ctl(epfd, EPOLL_CTL_ADD, uxfd, &ev) != 0) 
+    /* Create epoll to control blocking */
+    if ((pxy->block_epfd = epoll_create1(0)) == -1)
     {
-        fprintf(stderr, "ivshmem_init: epoll_ctl listen failed.\n"); 
+        fprintf(stderr, "ivshmem_init: epoll_create1 for block epfd failed.");
         goto close_ctx_epfd;
     }
 
+    /* Add unix socket to interest list */
+    ev.events = EPOLLIN;
+    ev.data.ptr = EP_LISTEN;
+    if (epoll_ctl(pxy->epfd, EPOLL_CTL_ADD, pxy->uxfd, &ev) != 0) 
+    {
+        fprintf(stderr, "ivshmem_init: epoll_ctl listen failed.\n"); 
+        goto close_block_epfd;
+    }
+
+    /* Add unix socket to blocking epoll */
+    if (epoll_ctl(pxy->block_epfd, EPOLL_CTL_ADD, pxy->uxfd, &ev) != 0)
+    {
+        fprintf(stderr, "ivshmem_init: epoll_ctl for block failed.\n"); 
+        goto close_block_epfd;
+    }
+    
     /* Initialize all ids to 0 */
-    memset(next_app_id, 0, sizeof(next_app_id));
+    memset(pxy->next_app_id, 0, sizeof(pxy->next_app_id));
 
     return 0;
 
+close_block_epfd:
+    close(pxy->block_epfd);
 close_ctx_epfd:
-    close(ctx_epfd);
+    close(pxy->ctx_epfd);
 close_chan_epfd:
-    close(chan_epfd);
+    close(pxy->chan_epfd);
 close_epfd:
-    close(epfd);
+    close(pxy->epfd);
 close_uxfd:
-    close(uxfd);
+    close(pxy->uxfd);
 
     return -1;
 }
 
-int ivshmem_poll() 
+int ivshmem_poll(struct host_proxy *pxy) 
 {
-    if (uxsocket_poll() != 0)
+    int ret, n = 0;
+
+
+    if ((ret = uxsocket_poll(pxy)) < 0)
     {
         fprintf(stderr, "ivshmem_poll: failed to poll uxsocket.\n");
         return -1;
     }
+    n += ret;
 
-    if (channel_poll() != 0)
+    if ((ret = channel_poll(pxy)) < 0)
     {
         fprintf(stderr, "ivshmem_poll: failed to poll proxy channel.\n");
         return -1;
     }
+    n += ret;
 
-    if (app_ctxs_poll() != 0) 
+    if ((ret = app_ctxs_poll(pxy)) < 0) 
     {
         fprintf(stderr, "ivshmem_poll: failed to poll ctxs fds.\n");
         return -1;
     }
+    n += ret;
 
-    return 0;
+    return n;
 }
 
 int notify_guest(int fd)
@@ -219,13 +226,13 @@ close_fd:
     return -1;
 }
 
-static int uxsocket_poll()
+static int uxsocket_poll(struct host_proxy *pxy)
 {
     int i, n;
     struct epoll_event evs[32];
     struct epoll_event ev;
 
-    if ((n = epoll_wait(epfd, evs, 32, 0)) < 0)
+    if ((n = epoll_wait(pxy->epfd, evs, 32, 0)) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_poll: epoll_wait failed.\n");
         return -1;
@@ -237,7 +244,7 @@ static int uxsocket_poll()
         ev = evs[i];
         if (ev.data.ptr == EP_LISTEN)
         {
-            uxsocket_accept();
+            uxsocket_accept(pxy);
         }
         else if (ev.data.ptr == EP_NOTIFY)
         {
@@ -249,12 +256,12 @@ static int uxsocket_poll()
         }
     }
 
-    return 0;
+    return n;
 }
 
 /* Accepts connection when a qemu vm starts and uses the
    uxsocket to set up the shared memory region */
-static int uxsocket_accept()
+static int uxsocket_accept(struct host_proxy *pxy)
 {   
     int ret;
     int cfd, ifd, nfd;
@@ -270,14 +277,14 @@ static int uxsocket_accept()
     memset(&ev, 0, sizeof(ev));
 
     /* Return error if max number of VMs has been reached */
-    if (next_vm_id > MAX_VMS)
+    if (pxy->next_vm_id > MAX_VMS)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: max vms reached.\n");
         return -1;
     }
 
     /* Accept connection from qemu ivshmem */
-    if ((cfd = accept(uxfd, NULL, NULL)) < 0)
+    if ((cfd = accept(pxy->uxfd, NULL, NULL)) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: accept failed.\n");
         return -1;
@@ -293,7 +300,7 @@ static int uxsocket_accept()
     }
 
     /* Send vm id to qemu */
-    ret = uxsocket_send_int(cfd, next_vm_id);
+    ret = uxsocket_send_int(cfd, pxy->next_vm_id);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send vm id.\n");
@@ -301,7 +308,7 @@ static int uxsocket_accept()
     }
 
     /* Send shared memory fd to qemu */
-    ret = uxsocket_sendfd(cfd, flexnic_shmfds_pxy[next_vm_id], -1);
+    ret = uxsocket_sendfd(cfd, flexnic_shmfds_pxy[pxy->next_vm_id], -1);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send shm fd.\n");
@@ -335,7 +342,7 @@ static int uxsocket_accept()
         goto close_nfd;
     }
 
-    ret = uxsocket_sendfd(cfd, ifd, next_vm_id);
+    ret = uxsocket_sendfd(cfd, ifd, pxy->next_vm_id);
     if (ret < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to send "
@@ -343,26 +350,41 @@ static int uxsocket_accept()
         goto close_ifd;
     }
 
-    if (epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &ev) < 0)
+    if (epoll_ctl(pxy->epfd, EPOLL_CTL_ADD, cfd, &ev) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
                 "cfd to epfd.\n");
         goto close_ifd;
     }
 
-    /* Add notify fd to the chan epoll interest list */
-    ev.events = EPOLLIN;
-    ev.data.ptr = &vms[next_vm_id];
-    if (epoll_ctl(chan_epfd, EPOLL_CTL_ADD, nfd, &ev) < 0)
+    if (epoll_ctl(pxy->block_epfd, EPOLL_CTL_ADD, cfd, &ev) < 0)
     {
         fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
-                "nfd to epfd.\n");
+                "cfd to block_epfd.\n");
+        goto close_ifd;
+    }
+
+    /* Add notify fd to the chan epoll interest list */
+    ev.events = EPOLLIN;
+    ev.data.ptr = &pxy->vms[pxy->next_vm_id];
+    if (epoll_ctl(pxy->chan_epfd, EPOLL_CTL_ADD, nfd, &ev) < 0)
+    {
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
+                "nfd to chan epfd.\n");
+        goto close_ifd;
+    }
+
+    /* Add notify fd to blocking epoll */
+    if (epoll_ctl(pxy->block_epfd, EPOLL_CTL_ADD, nfd, &ev) < 0)
+    {
+        fprintf(stderr, "ivshmem_uxsocket_accept: failed to add "
+                "nfd to block epfd.\n");
         goto close_ifd;
     }
 
     /* Init channel in shared memory */
-    tx_addr = flexnic_mem_pxy[next_vm_id] + CHAN_OFFSET + CHAN_SIZE;
-    rx_addr = flexnic_mem_pxy[next_vm_id] + CHAN_OFFSET;
+    tx_addr = flexnic_mem_pxy[pxy->next_vm_id] + CHAN_OFFSET + CHAN_SIZE;
+    rx_addr = flexnic_mem_pxy[pxy->next_vm_id] + CHAN_OFFSET;
     chan = channel_init(tx_addr, rx_addr, CHAN_SIZE);
     if (chan == NULL)
     {
@@ -389,13 +411,13 @@ static int uxsocket_accept()
     }
     notify_guest(ifd);
     
-    vms[next_vm_id].ifd = ifd;
-    vms[next_vm_id].nfd = nfd;
-    vms[next_vm_id].id = next_vm_id;
-    vms[next_vm_id].chan = chan;
-    fprintf(stdout, "Connected VM=%d\n", next_vm_id);
+    pxy->vms[pxy->next_vm_id].ifd = ifd;
+    pxy->vms[pxy->next_vm_id].nfd = nfd;
+    pxy->vms[pxy->next_vm_id].id = pxy->next_vm_id;
+    pxy->vms[pxy->next_vm_id].chan = chan;
+    fprintf(stdout, "Connected VM=%d\n", pxy->next_vm_id);
     
-    next_vm_id++;
+    pxy->next_vm_id++;
 
     return 0;
 
@@ -424,24 +446,26 @@ static int uxsocket_handle_error()
 /*****************************************************************************/
 /* Channel */
 
-static int channel_poll()
+static int channel_poll(struct host_proxy *pxy)
 {
-    int i;
+    int i, n = 0;
     struct v_machine *vm;
 
-    for(i = 0; i < next_vm_id; i++)
+    for(i = 0; i < pxy->next_vm_id; i++)
     {
-        vm = &vms[i];
+        vm = &pxy->vms[i];
         if (vm != NULL)
         {
-            channel_poll_vm(vm);
+            if (channel_poll_vm(pxy, vm) > 0)
+                n += 1;
         }
     }
 
-    return 0;
+    return n;
 }
 
-static int channel_poll_vm(struct v_machine *vm)
+static int channel_poll_vm(struct host_proxy *pxy, 
+        struct v_machine *vm)
 {
     int ret, is_empty;
     void *msg;
@@ -475,10 +499,10 @@ static int channel_poll_vm(struct v_machine *vm)
             channel_handle_tasinforeq_msg(vm);
             break;
         case MSG_TYPE_CONTEXT_REQ:
-            channel_handle_ctx_req(vm, msg);
+            channel_handle_ctx_req(pxy, vm, msg);
             break;
         case MSG_TYPE_NEWAPP_REQ:
-            channel_handle_newapp(vm, msg);
+            channel_handle_newapp(pxy, vm, msg);
             break;
         case MSG_TYPE_POKE_TAS_CORE:
             channel_handle_poke_tas_core(vm, msg);
@@ -535,8 +559,8 @@ free_msg:
 
 }
 
-static int channel_handle_ctx_req(struct v_machine *vm, 
-        struct context_req_msg *msg) 
+static int channel_handle_ctx_req(struct host_proxy *pxy,
+        struct v_machine *vm, struct context_req_msg *msg) 
 {
   int ret;
   struct context_res_msg res_msg;
@@ -596,9 +620,15 @@ static int channel_handle_ctx_req(struct v_machine *vm,
   /* add vctx to context request epoll */
   ev.events = EPOLLIN;
   ev.data.ptr = vctx;
-  if (epoll_ctl(ctx_epfd, EPOLL_CTL_ADD, vctx->ctx->evfd, &ev) != 0) 
+  if (epoll_ctl(pxy->ctx_epfd, EPOLL_CTL_ADD, vctx->ctx->evfd, &ev) != 0) 
   {
     fprintf(stderr, "ivshmem_handle_ctxreq: epoll_ctl listen failed."); 
+    return -1;
+  }
+
+  if (epoll_ctl(pxy->block_epfd, EPOLL_CTL_ADD, vctx->ctx->evfd, &ev) != 0) 
+  {
+    fprintf(stderr, "ivshmem_handle_ctxreq: epoll_ctl block_epfd failed."); 
     return -1;
   }
 
@@ -607,13 +637,13 @@ static int channel_handle_ctx_req(struct v_machine *vm,
   return 0;
 }
 
-static int channel_handle_newapp(struct v_machine *vm, 
-        struct newapp_req_msg *msg_req)
+static int channel_handle_newapp(struct host_proxy *pxy,
+        struct v_machine *vm, struct newapp_req_msg *msg_req)
 {
     int ret, appid;
     struct newapp_res_msg msg_res;
-    appid = next_app_id[vm->id];
-    next_app_id[vm->id]++;
+    appid = pxy->next_app_id[vm->id];
+    pxy->next_app_id[vm->id]++;
 
     if (flextcp_proxy_newapp(vm->id, appid) < 0) 
     {
@@ -658,15 +688,15 @@ static void channel_handle_poke_tas_core(struct v_machine *vm,
 /*****************************************************************************/
 /* App contexts */
 
-static int app_ctxs_poll() 
+static int app_ctxs_poll(struct host_proxy *pxy) 
 {
-    int i, n, ret;
+    int i, n, ret, n_pokes = 0;
     struct vmcontext_req *vctx;
     struct _msg;
     struct epoll_event evs[2];
     struct poke_app_ctx_msg msg;
 
-    n = epoll_wait(ctx_epfd, evs, 2, 0);
+    n = epoll_wait(pxy->ctx_epfd, evs, 2, 0);
 
     if (n < 0)
     {
@@ -691,10 +721,11 @@ static int app_ctxs_poll()
                 return -1;
             }       
             notify_guest(vctx->vm->ifd);
+            n_pokes++;
         }
     }
 
-    return 0;
+    return n_pokes;
 }
 
 /*****************************************************************************/

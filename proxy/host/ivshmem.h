@@ -1,6 +1,7 @@
 #ifndef PROXY_IVSHMEM_H_
 #define PROXY_IVSHMEM_H_
 
+#include "internal.h"
 #include "../channel.h"
 
 #define IVSHMEM_SOCK_PATH "/run/tasproxy"
@@ -11,21 +12,6 @@
 
 #define MAX_VMS 16
 
-struct v_machine {
-    int id;  
-    /* Connection fd */
-    int fd;
-    /* Interrupt fd */
-    int ifd;
-    /* Notify fd  */
-    int nfd;
-    /* Shared memory channel used for tx and rx */
-    struct channel *chan;
-    /* List of context requests for VM */
-    struct vmcontext_req *ctxs;
-
-};
-
 struct vmcontext_req {
     int app_id;
     uint32_t ctxreq_id;
@@ -35,7 +21,7 @@ struct vmcontext_req {
     struct vmcontext_req *next;
 };
 
-int ivshmem_init();
-int ivshmem_poll();
+int ivshmem_init(struct host_proxy *pxy);
+int ivshmem_poll(struct host_proxy *pxy);
 
 #endif /* ndef PROXY_IVSHMEM_H_ */
